@@ -45,9 +45,9 @@ const WebSocketClient = () => {
       <h1>WebSocket Client</h1>
       <button onClick={sendMessage}>Send Message</button>
       <ul>
-        {messages.map((msg, index) => (
-          <li key={index}>{msg}</li>
-        ))}
+        {/* {messages.map((msg, index) => ( */}
+          <li >{messages[messages.length - 1]}</li>
+        {/* ))} */}
       </ul>
     </div>
   );

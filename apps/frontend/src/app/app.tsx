@@ -1,6 +1,6 @@
 import { Header } from './header';
 import GameBoard from './map';
-import Panel from './panel';
+import {Panel} from './panel';
 import WebSocketClient from './websocket-client';
 
 export function App() {
