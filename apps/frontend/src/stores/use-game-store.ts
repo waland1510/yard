@@ -6,8 +6,9 @@ export type Role =
   | 'detective3'
   | 'detective4'
   | 'detective5'
-  | 'mrX';
+  | 'culprit';
 
+export type GameMode = 'easy' | 'medium' | 'hard';
 export interface Player {
   id: number;
   role: Role;
@@ -19,16 +20,18 @@ export interface Player {
   doubleTickets?: number;
 }
 
-interface GameState {
+export interface GameState {
   players: Player[];
   setPlayer: (player: Player) => void;
+  gameMode?: GameMode;
+  setGameMode: (gameMode?: GameMode) => void;
   move: (playerId: number, target: number) => void;
   setTaxiTickets: (playerId: number, taxiTickets: number) => void;
   setBusTickets: (playerId: number, busTickets: number) => void;
   setUndergroundTickets: (playerId: number, undergroundTickets: number) => void;
   setSecretTickets: (secretTickets: number) => void;
   setDoubleTickets: (doubleTickets: number) => void;
-  setPosition: (playerId: number, position: number) => void;
+  setPosition: (playerRole: string, position: number | string) => void;
 }
 
 const initialPlayers: Player[] = [
@@ -74,7 +77,7 @@ const initialPlayers: Player[] = [
   },
   {
     id: 6,
-    role: 'mrX',
+    role: 'culprit',
     position: 60,
     taxiTickets: 24,
     busTickets: 24,
@@ -101,6 +104,8 @@ export const useGameStore = create<GameState>((set) => ({
       }
       return { players: state.players };
     }),
+  gameMode: undefined,
+  setGameMode: (gameMode?: GameMode) => set({ gameMode }),
   move: (playerId: number, target: number) =>
     set((state) => {
       const player = state.players.find((p) => p.id === playerId);
@@ -131,21 +136,21 @@ export const useGameStore = create<GameState>((set) => ({
     }),
   setSecretTickets: (secretTickets: number) =>
     set((state) => {
-      const mrX = state.players.find((p) => p.role === 'mrX');
-      if (mrX) mrX.secretTickets = secretTickets;
+      const culprit = state.players.find((p) => p.role === 'culprit');
+      if (culprit) culprit.secretTickets = secretTickets;
       return { players: state.players };
     }),
   setDoubleTickets: (doubleTickets: number) =>
     set((state) => {
-      const mrX = state.players.find((p) => p.role === 'mrX');
-      if (mrX) mrX.doubleTickets = doubleTickets;
+      const culprit = state.players.find((p) => p.role === 'culprit');
+      if (culprit) culprit.doubleTickets = doubleTickets;
       return { players: state.players };
     }),
-  setPosition: (playerId: number, position: number) =>
+  setPosition: (playerRole: string, position: number | string) =>
     set((state) => {
-      const player = state.players.find((p) => p.id === playerId);
+      const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
-      player.position = position;
+      player.position = Number(position);
       return { players: state.players };
     }),
 }));

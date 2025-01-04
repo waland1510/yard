@@ -7,7 +7,9 @@ export const Panel = () => {
     const secretTickets = useRunnerStore((state) => state.secretTickets);
     const currentPosition = useRunnerStore((state) => state.currentPosition);
 
-    const node = useNodesStore((state) => state.getNode(currentPosition));   
+    const node = useNodesStore((state) => state.getNode(currentPosition)); 
+    console.log({node});
+      
     if (!node) {
       return null;
     }

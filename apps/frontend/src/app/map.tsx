@@ -3,9 +3,12 @@ import { mapData } from './grid_map';
 import { connectionsData } from './connections';
 import useWebSocket from './use-websocket';
 import { useRunnerStore } from '../stores/use-runner-store';
-import { useGameStore } from '../stores/use-game-store';
+import { usePlayersSubscription } from '../hooks/use-players-subscription';
+import { usePlayerSubscription } from '../hooks/use-player-subscription';
 
 const GameBoard = () => {
+    const players = usePlayersSubscription();
+    
   const [nodes, setNodes] = useState<
     {
       id: number;
@@ -21,21 +24,22 @@ const GameBoard = () => {
     { from: number; to: number; types: string[] }[]
   >([]);
 
-  const currentPosition = useRunnerStore((state) => state.currentPosition);
+  const currentPosition = usePlayerSubscription().currentPosition;
   const currentType = useRunnerStore((state) => state.currentType);
+  const currentRole = useRunnerStore((state) => state.currentRole);
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
 
-  const players = useGameStore((state) => state.players);
-  
-  const availableMoves = nodes.find((node) => node.id === currentPosition)?.[currentType as 'taxi' | 'bus' | 'underground' | 'river'] || [];
+  const availableMoves =
+    nodes.find((node) => node.id === currentPosition)?.[
+      currentType as 'taxi' | 'bus' | 'underground' | 'river'
+    ] || [];
 
   const { messages, sendMessage } = useWebSocket();
 
   const handleSend = (id: number) => {
-    
-    sendMessage(id.toString());
+    sendMessage('makeMove', { role: currentRole, target: id.toString() });
     setCurrentPosition(id);
   };
 
@@ -71,7 +75,11 @@ const GameBoard = () => {
   }, []);
 
   return (
-    <svg width="1200" height="1000" style={{ border: '1px solid black', background: '#f0f0f0' }}>
+    <svg
+      width="1200"
+      height="1000"
+      style={{ border: '1px solid black', background: '#f0f0f0' }}
+    >
       {connections.map((conn, index) => {
         const fromNode = nodes.find((node) => node.id === conn.from);
         const toNode = nodes.find((node) => node.id === conn.to);
@@ -151,7 +159,13 @@ const GameBoard = () => {
               y={node.y + 4} // Adjusted to vertically center the text
               textAnchor="middle"
               fontSize={currentPosition === node.id ? '12' : '10'}
-              fill={currentPosition === node.id ?'red'  : availableMoves?.includes(node.id) ? 'orange' : 'black'}
+              fill={
+                currentPosition === node.id
+                  ? 'red'
+                  : availableMoves?.includes(node.id)
+                  ? 'orange'
+                  : 'black'
+              }
               onClick={() => handleSend(node.id)}
             >
               {node.id}
@@ -165,7 +179,7 @@ const GameBoard = () => {
           playerNode && (
             <image
               key={index}
-              href={`/images/${player.role}.png`} 
+              href={`/images/${player.role}.png`}
               x={playerNode.x + 8} // Adjust the position as needed
               y={playerNode.y - 25} // Adjust the position as needed
               width="20"

@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import { Role } from './use-game-store';
 
-interface RunnerState {
+export interface RunnerState {
     currentPosition: number;
     currentType: string;
     secretTickets: number;
@@ -11,12 +11,12 @@ interface RunnerState {
     updateDoubleTickets: (doubleTickets: number) => void;
     setCurrentPosition: (currentPosition: number) => void;
     setCurrentType: (currentType: string) => void;
-    currentRole: Role;
+    currentRole?: Role;
     setCurrentRole: (role: Role) => void;
 }
 
 export const useRunnerStore = create<RunnerState>((set) => ({
-    currentPosition: 117,
+    currentPosition: 0,
     currentType: '',
     secretTickets: 5,
     doubleTickets: 2,
@@ -28,6 +28,6 @@ export const useRunnerStore = create<RunnerState>((set) => ({
         console.log('setCurrentType', currentType);
         set({ currentType });
     },
-    currentRole: 'detective1',
+    currentRole: undefined,
     setCurrentRole: (role) => set({currentRole: role}),
 }));
