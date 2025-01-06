@@ -6,47 +6,46 @@ import { usePlayersSubscription } from '../hooks/use-players-subscription';
 import { usePlayerSubscription } from '../hooks/use-player-subscription';
 
 export const Header = () => {
-    const { messages, sendMessage } = useWebSocket();
-    const currentPosition = useRunnerStore((state) => state.currentPosition);
-    const currentType = useRunnerStore((state) => state.currentType);
-    const currentRole = useRunnerStore((state) => state.currentRole);
+  const existingChannel = useGameStore((state) => state.channel);
+  const { sendMessage } = useWebSocket(existingChannel);
+  const currentPosition = useRunnerStore((state) => state.currentPosition);
+  const currentType = useRunnerStore((state) => state.currentType);
+  const currentRole = useRunnerStore((state) => state.currentRole);
   const setCurrentRole = useRunnerStore((state) => state.setCurrentRole);
-  const setCurrentPosition = useRunnerStore((state) => state.setCurrentPosition);
+  const setCurrentPosition = useRunnerStore(
+    (state) => state.setCurrentPosition
+  );
   const players = usePlayersSubscription();
-  
-  const onRoleChange = (role: Role) => {
-      setCurrentRole(role);
-      const currentPlayer = players.find((p) => p.role === role);
-      if (currentPlayer) {
-        setCurrentPosition(currentPlayer.position);
-      }
+  const setGameMode = useGameStore((state) => state.setGameMode);
 
-      sendMessage('updateGameState', role);
+  const onRoleChange = (role: Role) => {
+    setCurrentRole(role);
+    const currentPlayer = players.find((p) => p.role === role);
+    if (currentPlayer) {
+      setCurrentPosition(currentPlayer.position);
+    }
+
+    sendMessage('updateGameState', role);
   };
 
   return (
-    <div className="flex justify-center items-center gap-10">
-      <img className="w-36" src="/images/logo.jpg" alt="player" />
+    <div className="flex justify-around items-center gap-10 h-10">
+      <img className="w-20" src="/images/logo.jpg" alt="player" />
       <div className="flex flex-col gap-2">
-        <h1>Scotland Yard</h1>
         {currentRole ? (
-            <>
-        <div className="flex items-center">
-          <p>Player Role: {currentRole}</p>
-
-          <img
-            className="w-10"
-            src={`/images/${currentRole}.png`}
-            alt="player"
-          />
-        </div>
-        <p>Current Position: {currentPosition}</p>
-        <p>Current Type: {currentType}</p>
-            </>
+            <div className="flex items-center">
+              <img
+                className="w-10"
+                src={`/images/${currentRole}.png`}
+                alt="player"
+              />
+            </div>
         ) : (
             <p>Select a player to start</p>
         )}
       </div>
+        <p>Current Position: {currentPosition}</p>
+        <p>Current Type: {currentType}</p>
 
       {players && (
         <div className="flex gap-2">
@@ -63,10 +62,6 @@ export const Header = () => {
           ))}
         </div>
       )}
-
-      {/* <button onClick={() => handleMove(player.position + 1)}>
-        Move to {player.position + 1}
-      </button> */}
     </div>
   );
 };

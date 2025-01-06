@@ -5,21 +5,14 @@ import useWebSocket from './use-websocket';
 import { useRunnerStore } from '../stores/use-runner-store';
 import { usePlayersSubscription } from '../hooks/use-players-subscription';
 import { usePlayerSubscription } from '../hooks/use-player-subscription';
+import { useGameStore } from '../stores/use-game-store';
+import { MapNode } from '../stores/use-nodes-store';
+import { riverData } from './river';
 
-const GameBoard = () => {
-    const players = usePlayersSubscription();
-    
-  const [nodes, setNodes] = useState<
-    {
-      id: number;
-      bus?: number[];
-      taxi: number[];
-      underground?: number[];
-      river?: number[];
-      x: number;
-      y: number;
-    }[]
-  >([]);
+export const Board = ({channel}: {channel: string}) => {
+  const players = usePlayersSubscription();
+
+  const [nodes, setNodes] = useState<MapNode[]>([]);
   const [connections, setConnections] = useState<
     { from: number; to: number; types: string[] }[]
   >([]);
@@ -35,8 +28,10 @@ const GameBoard = () => {
     nodes.find((node) => node.id === currentPosition)?.[
       currentType as 'taxi' | 'bus' | 'underground' | 'river'
     ] || [];
-
-  const { messages, sendMessage } = useWebSocket();
+  // const existingChannel = useGameStore((state) => state.channel);
+  // console.log('existingChannel', existingChannel);
+  
+  const { sendMessage } = useWebSocket(channel);
 
   const handleSend = (id: number) => {
     sendMessage('makeMove', { role: currentRole, target: id.toString() });
@@ -45,41 +40,33 @@ const GameBoard = () => {
 
   useEffect(() => {
     setNodes(mapData.nodes);
-
-    // // Generate connections from the nodes' `taxi`, `bus`, and `underground` arrays
-    // const generatedConnections: { from: number; to: number; type: string }[] = [];
-    // mapData.nodes.forEach(node => {
-    //   if (node.taxi) {
-    //     node.taxi.forEach(target => {
-    //       generatedConnections.push({ from: node.id, to: target, type: 'taxi' });
-    //     });
-    //   }
-    //   if (node.bus) {
-    //     node.bus.forEach(target => {
-    //       generatedConnections.push({ from: node.id, to: target, type: 'bus' });
-    //     });
-    //   }
-    //   if (node.underground) {
-    //     node.underground.forEach(target => {
-    //       generatedConnections.push({ from: node.id, to: target, type: 'underground' });
-    //     });
-    //   }
-    //     if (node.river) {
-    //         node.river.forEach(target => {
-    //         generatedConnections.push({ from: node.id, to: target, type: 'river' });
-    //         });
-    //     }
-    // });
-
     setConnections(connectionsData);
+    sendMessage('joinGame', channel);
   }, []);
 
   return (
     <svg
       width="1200"
-      height="1000"
-      style={{ border: '1px solid black', background: '#f0f0f0' }}
+      height="850"
+      style={{ border: '2px solid gray', background: '#f0f0f0' }}
     >
+      {riverData.map((river, index) => {
+        const toNode = riverData.find((node) => node.id === river.id + 1);
+        return (
+          <Fragment key={index}>
+            {toNode && (
+              <path
+                d={`M ${river.x} ${river.y} Q ${(river.x + toNode?.x) / 2} ${
+                  (river.y + toNode.y) / 2
+                } ${toNode.x} ${toNode.y}`}
+                stroke="lightblue"
+                strokeWidth="20"
+                fill="none"
+              />
+            )}
+          </Fragment>
+        );
+      })}
       {connections.map((conn, index) => {
         const fromNode = nodes.find((node) => node.id === conn.from);
         const toNode = nodes.find((node) => node.id === conn.to);
@@ -96,21 +83,28 @@ const GameBoard = () => {
                   y2={toNode.y}
                   stroke={
                     type === 'taxi'
-                      ? 'orange'
+                      ? 'yellow'
                       : type === 'bus'
                       ? 'green'
                       : type === 'river'
-                      ? 'blue'
+                      ? '#060606'
                       : 'red'
                   }
                   strokeWidth={
                     type === 'underground'
-                      ? 7
+                      ? 15
                       : type === 'bus'
-                      ? 5
+                      ? 10
                       : type === 'river'
-                      ? 1
-                      : 2
+                      ? 10
+                      : 5
+                  }
+                  strokeDasharray={
+                    type === 'underground'
+                      ? '7 7'
+                      : type === 'river'
+                      ? '25 15'
+                      : 'none'
                   }
                 />
               ))}
@@ -120,7 +114,8 @@ const GameBoard = () => {
       {nodes.map((node) => {
         const hasBus = node.bus && node.bus.length > 0;
         const hasUnderground = node.underground && node.underground.length > 0;
-
+        if (node.id < 0) return null;
+        const role = players.find((p) => p.position === node.id)?.role;
         return (
           <g key={node.id}>
             {/* Additional strokes for bus and underground */}
@@ -128,39 +123,60 @@ const GameBoard = () => {
               <circle
                 cx={node.x}
                 cy={node.y}
-                r="12"
+                r="18"
                 fill="none"
-                stroke="green"
-                strokeWidth="2"
+                stroke="#0db708"
+                strokeWidth="4"
               />
             )}
             {hasUnderground && (
               <circle
                 cx={node.x}
                 cy={node.y}
-                r="14"
+                r="22"
                 fill="none"
-                stroke="red"
-                strokeWidth="2"
+                stroke="#ed0013"
+                strokeWidth="4"
               />
             )}
             {/* Main node circle */}
             <circle
               cx={node.x}
               cy={node.y}
-              r="10"
+              r="14"
               fill="white"
               stroke="black"
-              strokeWidth="2"
+              strokeWidth="4"
               onClick={() => handleSend(node.id)}
+              strokeDasharray={node.river ? '5 5' : 'none'}
             />
+            {/* Image fitting in the circle */}
+            <defs>
+              <clipPath id={`clip-circle-${node.id}`}>
+                <circle cx={node.x} cy={node.y} r="14" />
+              </clipPath>
+            </defs>
+            {role && (
+              <image
+                href={`/images/${role}.png`}
+                x={node.x - 14}
+                y={node.y - 14}
+                width="28"
+                height="28"
+                clipPath={`url(#clip-circle-${node.id})`}
+              />
+            )}
+            {/* Text on top of the circle and image */}
             <text
               x={node.x}
-              y={node.y + 4} // Adjusted to vertically center the text
+              y={node.y + 5}
               textAnchor="middle"
-              fontSize={currentPosition === node.id ? '12' : '10'}
+              fontWeight={role ? 'bold' : 'normal'}
+              fontSize={currentPosition === node.id ? '16' : '14'}
               fill={
-                currentPosition === node.id
+                role
+                  ? 'transparent'
+                  : currentPosition === node.id
                   ? 'red'
                   : availableMoves?.includes(node.id)
                   ? 'orange'
@@ -173,23 +189,6 @@ const GameBoard = () => {
           </g>
         );
       })}
-      {players.map((player, index) => {
-        const playerNode = nodes.find((node) => node.id === player.position);
-        return (
-          playerNode && (
-            <image
-              key={index}
-              href={`/images/${player.role}.png`}
-              x={playerNode.x + 8} // Adjust the position as needed
-              y={playerNode.y - 25} // Adjust the position as needed
-              width="20"
-              height="20"
-            />
-          )
-        );
-      })}
     </svg>
   );
 };
-
-export default GameBoard;

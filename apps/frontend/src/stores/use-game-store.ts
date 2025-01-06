@@ -25,6 +25,8 @@ export interface GameState {
   setPlayer: (player: Player) => void;
   gameMode?: GameMode;
   setGameMode: (gameMode?: GameMode) => void;
+  channel: string;
+  setChannel: (channel?: string) => void;
   move: (playerId: number, target: number) => void;
   setTaxiTickets: (playerId: number, taxiTickets: number) => void;
   setBusTickets: (playerId: number, busTickets: number) => void;
@@ -106,6 +108,8 @@ export const useGameStore = create<GameState>((set) => ({
     }),
   gameMode: undefined,
   setGameMode: (gameMode?: GameMode) => set({ gameMode }),
+    channel: '',
+    setChannel: (channel?: string) => set({ channel }),
   move: (playerId: number, target: number) =>
     set((state) => {
       const player = state.players.find((p) => p.id === playerId);

@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { mapData } from '../app/grid_map';
 
-export interface Node {
+export interface MapNode {
     id: number;
-    taxi: number[];
+    taxi?: number[];
     bus?: number[];
     underground?: number[];
     river?: number[];
@@ -12,8 +12,8 @@ export interface Node {
 }
 
 interface NodesState {
-    nodes: Node[];
-    getNode: (nodeId: number) => Node | undefined;
+    nodes: MapNode[];
+    getNode: (nodeId: number) => MapNode | undefined;
 }
 
 
