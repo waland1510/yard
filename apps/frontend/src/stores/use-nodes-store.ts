@@ -7,6 +7,8 @@ export interface MapNode {
     bus?: number[];
     underground?: number[];
     river?: number[];
+    secret?: number[];
+    double?: number[];      
     x: number;
     y: number;
 }

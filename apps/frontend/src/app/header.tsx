@@ -6,6 +6,7 @@ import { usePlayersSubscription } from '../hooks/use-players-subscription';
 import { usePlayerSubscription } from '../hooks/use-player-subscription';
 import { useNavigate } from 'react-router-dom';
 import { RoleType } from '@yard/shared-utils';
+import {isMoveAllowed} from '../utils/move-allowed'
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -22,8 +23,7 @@ export const Header = () => {
     (state) => state.setCurrentPosition
   );
   const players = usePlayersSubscription();
-  const setGameMode = useGameStore((state) => state.setGameMode);
-  const updateMoves = useGameStore((state) => state.updateMoves);
+  const setGameMode = useGameStore((state) => state.setGameMode); 
   const navigate = useNavigate();
 
   const onRoleChange = (role: RoleType) => {
@@ -35,20 +35,15 @@ export const Header = () => {
 
     sendMessage('updateGameState', role);
   };
-
+  console.log({currentPosition, currentType});
+  
   const handleSend = () => {
     if (move) {
-      if (currentRole === 'culprit') {
-        if (updateMoves) {
-          updateMoves(move);
-        }
-      }
       sendMessage('makeMove', move);
       setMove(null);
     }
     // sendMessage('makeMove', { role: currentRole, target: id.toString() });
   };
-
   return (
     <div className="flex justify-around items-center gap-10 h-10">
       <img
@@ -71,11 +66,12 @@ export const Header = () => {
         )}
       </div>
       {currentRole === currentTurn && (
+        
         <button
           className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
           onClick={handleSend}
         >
-          {move ? `Confirm ${move.position}` : 'Your Turn'}
+          {move ? isMoveAllowed(move.position, players.find((p) => p.role === currentRole)?.position, currentType) ? `Confirm ${move.position}` : 'Invalid Move' : 'Your Turn'}
         </button>
       )}
       <p>Moves: {movesCount}</p>
@@ -84,7 +80,7 @@ export const Header = () => {
 
       {players && (
         <div className="flex gap-2">
-          {players.filter(player => player.role !== 'culprit').map((p) => (
+          {players.filter(player => currentRole !== 'culprit' && player.role !== 'culprit').map((p) => (
             <span key={p.id}>
               <img
                 className="w-10 h-12"

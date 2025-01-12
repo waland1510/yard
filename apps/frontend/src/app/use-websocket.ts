@@ -14,6 +14,7 @@ const useWebSocket = (initialChannel?: string) => {
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
   const setMovesCount = useGameStore((state) => state.setMovesCount);
+  const updateMoves = useGameStore((state) => state.updateMoves);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
 
   useEffect(() => {
@@ -30,6 +31,9 @@ const useWebSocket = (initialChannel?: string) => {
           updateTicketsCount(message.data.role, message.data.type, message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
           setMovesCount(message.data.movesCount);
+          if(message.data.role === 'culprit') {     
+            updateMoves(message.data);
+          }
           console.log('Move made:', message.data);
           break;
         case 'updateGameState':

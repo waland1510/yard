@@ -24,7 +24,7 @@ export interface ClientGameState extends GameState {
   setPosition: (playerRole: string, position: number | string) => void;
 }
 
-export const useGameStore = create<ClientGameState>((set) => ({
+export const useGameStore = create<ClientGameState>((set, get) => ({
   moves: [],
   updateMoves: (move) =>
     set((state) => ({ moves: [...(state.moves || []), move] })),

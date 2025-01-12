@@ -81,7 +81,7 @@ server.register(async function (fastify) {
 
             broadcast(currentChannel, {
               type: 'updateGameState',
-              data: gameState,
+              data: { ...gameState, movesCount: gameState.moves.length },
             });
             break;
           }

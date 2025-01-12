@@ -9,8 +9,9 @@ import { useGameStore } from '../stores/use-game-store';
 import { MapNode } from '../stores/use-nodes-store';
 import { riverData } from './river';
 import { showCulpritAtMoves } from '@yard/shared-utils';
+import { isMoveAllowed } from '../utils/move-allowed';
 
-export const Board = ({ channel }: { channel: string }) => {
+export const Board = ({ channel }: { channel: string | undefined }) => {
   const players = usePlayersSubscription();
   console.log('playersBoard', players);
   const movesCount = useGameStore((state) => state.movesCount);
@@ -29,7 +30,7 @@ export const Board = ({ channel }: { channel: string }) => {
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
   const availableMoves =
     nodes.find((node) => node.id === runnerPosition)?.[
-      currentType as 'taxi' | 'bus' | 'underground' | 'river'
+      currentType
     ] || [];
   // const existingChannel = useGameStore((state) => state.channel);
   // console.log('existingChannel', existingChannel);
@@ -38,12 +39,12 @@ export const Board = ({ channel }: { channel: string }) => {
 
   const handleSend = (id: number) => {
     setMove({
-            role: currentRole,
-            type: currentType,
-            position: id,
-            isSecret: currentType === 'secret',
-            isDouble: currentType === 'double',
-          });
+      role: currentRole,
+      type: currentType,
+      position: id,
+      isSecret: currentType === 'secret',
+      isDouble: currentType === 'double',
+    });
     setCurrentPosition(id);
   };
 
@@ -51,7 +52,7 @@ export const Board = ({ channel }: { channel: string }) => {
     setNodes(mapData.nodes);
     setConnections(connectionsData);
     // sendMessage('joinGame', channel);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -126,8 +127,11 @@ export const Board = ({ channel }: { channel: string }) => {
         const hasUnderground = node.underground && node.underground.length > 0;
         if (node.id < 0) return null;
         const role = players.find((p) => p.position === node.id)?.role;
-        const showImage = role && (role !== 'culprit' || currentRole === 'culprit' || (role === 'culprit' && showCulpritAtMoves.includes(movesCount)));
-
+        const showImage =
+          role &&
+          (role !== 'culprit' ||
+            currentRole === 'culprit' ||
+            (role === 'culprit' && showCulpritAtMoves.includes(movesCount)));
         return (
           <g key={node.id}>
             {/* Additional strokes for bus and underground */}
@@ -168,7 +172,7 @@ export const Board = ({ channel }: { channel: string }) => {
                 <circle cx={node.x} cy={node.y} r="14" />
               </clipPath>
             </defs>
-            {showImage &&(
+            {showImage && (
               <image
                 href={`/images/${role}.png`}
                 x={node.x - 14}
@@ -190,7 +194,12 @@ export const Board = ({ channel }: { channel: string }) => {
                   ? 'transparent'
                   : currentPosition === node.id
                   ? 'red'
-                  : availableMoves?.includes(node.id)
+                  : availableMoves.includes(node.id)
+                  // : isMoveAllowed(
+                  //     node.id,
+                  //     runnerPosition,
+                  //     currentType
+                  //   )
                   ? 'orange'
                   : 'black'
               }

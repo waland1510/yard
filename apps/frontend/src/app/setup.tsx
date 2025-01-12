@@ -23,7 +23,7 @@ export const Setup = () => {
   const channelRef = useRef<string | undefined>(
     Math.random().toString(36).substring(7)
   );
-  const existingChannel = useGameStore((state) => state.channel);
+  const existingChannel = sessionStorage.getItem('channel');
   const navigate = useNavigate();
   const setGameMode = useGameStore((state) => state.setGameMode);
   const setPosition = useGameStore((state) => state.setPosition);
@@ -129,6 +129,7 @@ export const Setup = () => {
               onClick={() => {
                 setNewGame(true);
                 setCurrentStep('chooseMode');
+                sessionStorage.setItem('channel', channelRef.current!); 
               }}
             >
               Start New Game
