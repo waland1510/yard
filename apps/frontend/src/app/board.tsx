@@ -9,7 +9,7 @@ import { useGameStore } from '../stores/use-game-store';
 import { MapNode } from '../stores/use-nodes-store';
 import { riverData } from './river';
 
-export const Board = ({channel}: {channel: string}) => {
+export const Board = ({ channel }: { channel: string }) => {
   const players = usePlayersSubscription();
 
   const [nodes, setNodes] = useState<MapNode[]>([]);
@@ -20,6 +20,7 @@ export const Board = ({channel}: {channel: string}) => {
   const currentPosition = usePlayerSubscription().currentPosition;
   const currentType = useRunnerStore((state) => state.currentType);
   const currentRole = useRunnerStore((state) => state.currentRole);
+  const updateMoves = useGameStore((state) => state.updateMoves);
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
@@ -30,10 +31,20 @@ export const Board = ({channel}: {channel: string}) => {
     ] || [];
   // const existingChannel = useGameStore((state) => state.channel);
   // console.log('existingChannel', existingChannel);
-  
+
   const { sendMessage } = useWebSocket(channel);
 
   const handleSend = (id: number) => {
+    if (currentRole === 'culprit') {
+      if (updateMoves) {
+        updateMoves({
+          type: currentType,
+          position: id,
+          isSecret: false,
+          isDouble: false,
+        });
+      }
+    }
     sendMessage('makeMove', { role: currentRole, target: id.toString() });
     setCurrentPosition(id);
   };
@@ -41,7 +52,8 @@ export const Board = ({channel}: {channel: string}) => {
   useEffect(() => {
     setNodes(mapData.nodes);
     setConnections(connectionsData);
-    sendMessage('joinGame', channel);
+    // sendMessage('joinGame', channel);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

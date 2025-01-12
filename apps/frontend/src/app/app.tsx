@@ -7,6 +7,7 @@ export function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Setup />} />
+        <Route path="/join/:channel" element={<Setup />} />
         <Route path="/game/:id" element={<Game />} />
       </Routes>
     </Router>

@@ -1,5 +1,5 @@
 import {create} from 'zustand';
-import { Role } from './use-game-store';
+import { RoleType } from '@yard/shared-utils';
 
 export interface RunnerState {
     currentPosition: number;
@@ -11,13 +11,13 @@ export interface RunnerState {
     updateDoubleTickets: (doubleTickets: number) => void;
     setCurrentPosition: (currentPosition: number) => void;
     setCurrentType: (currentType: string) => void;
-    currentRole?: Role;
-    setCurrentRole: (role: Role) => void;
+    currentRole?: RoleType;
+    setCurrentRole: (role: RoleType) => void;
 }
 
 export const useRunnerStore = create<RunnerState>((set) => ({
     currentPosition: 0,
-    currentType: '',
+    currentType: 'taxi',
     secretTickets: 5,
     doubleTickets: 2,
     move: (target: number) => set({ currentPosition: target }),

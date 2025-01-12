@@ -1,24 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getWebSocket } from './websocket-manager';
 import { useGameStore } from '../stores/use-game-store';
-import { log } from 'node:console';
-
-type MessageType = 'startGame' | 'joinGame' | 'makeMove' | 'updateGameState';
-
-interface Message {
-  type: MessageType;
-  channel: string; // Added channel to the message structure
-  data: any;
-}
+import { useRunnerStore } from '../stores/use-runner-store';
+import { Message, MessageType } from '@yard/shared-utils';
 
 const useWebSocket = (initialChannel?: string) => {
-  console.log('initialChannel', initialChannel);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
   const socket = getWebSocket();
-
+  const username = localStorage.getItem('username');
+  const currentRole = useRunnerStore((state) => state.currentRole);
   const setPosition = useGameStore((state) => state.setPosition);
+  const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
+  const setMovesCount = useGameStore((state) => state.setMovesCount);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -27,10 +22,12 @@ const useWebSocket = (initialChannel?: string) => {
 
       switch (message.type) {
         case 'joinGame':
-          console.log('Player joined:', message.data);
+          console.log('Player joined:', message.data.username);
           break;
         case 'makeMove':
           setPosition(message.data.role, message.data.target);
+          setCurrentTurn(message.data.currentTurn);
+          setMovesCount(message.data.movesCount);
           console.log('Move made:', message.data);
           break;
         case 'updateGameState':
@@ -44,11 +41,11 @@ const useWebSocket = (initialChannel?: string) => {
 
     if (socket) {
       socket.onmessage = handleMessage;
-      if (channel) {
+      if (channel && username) {
         if (socket.readyState === WebSocket.OPEN) {
-          sendMessage('joinGame', { channel });
+          sendMessage('joinGame', { channel, username, currentRole });
         } else {
-          socket.onopen = () => sendMessage('joinGame', { channel });
+          socket.onopen = () => sendMessage('joinGame', { channel, username, currentRole });
         }
       }
     }
@@ -72,14 +69,14 @@ const useWebSocket = (initialChannel?: string) => {
     [socket, channel]
   );
 
-  const joinChannel = (newChannel: string) => {
-    setChannel(newChannel);
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      sendMessage('joinGame', { channel: newChannel });
-    }
-  };
+  // const joinChannel = (newChannel: string) => {
+  //   setChannel(newChannel);
+  //   if (socket && socket.readyState === WebSocket.OPEN) {
+  //     sendMessage('joinGame', { channel: newChannel });
+  //   }
+  // };
 
-  return { messages, sendMessage, joinChannel, channel };
+  return { messages, sendMessage,  channel };
 };
 
 export default useWebSocket;

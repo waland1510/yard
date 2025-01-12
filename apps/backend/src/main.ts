@@ -1,26 +1,36 @@
 import Fastify from 'fastify';
 import { app } from './app/app';
 import ws from '@fastify/websocket';
+import {
+  initialPlayers,
+  Player,
+  GameState,
+  Role,
+  RoleType,
+  Message,
+} from '@yard/shared-utils';
 
 const host = process.env.HOST ?? 'localhost';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const server = Fastify();
 
-interface Message {
-  type: string;
-  channel?: string;
-  data: any;
+function getNextRole(currentRole: RoleType): RoleType {
+  const roles = Object.values(Role) as RoleType[];
+  const currentIndex = roles.indexOf(currentRole);
+  return roles[(currentIndex + 1) % roles.length];
 }
 
-let gameState = {
-  players: [],
+const gameState: GameState = {
+  players: initialPlayers,
   gameMode: 'easy',
   channel: '',
+  moves: [],
+  currentTurn: Role[0],
+  movesCount: 0,
 };
 
 console.log('gameState', gameState);
-
 
 const channels: Record<string, Set<any>> = {};
 
@@ -45,20 +55,31 @@ server.register(async function (fastify) {
             console.log(`Client joined channel: ${currentChannel}`);
             break;
 
-          case 'joinGame':
+          case 'joinGame': {
             currentChannel = parsedMessage.channel;
             if (!channels[currentChannel]) {
-              channels[currentChannel] = new Set();
+              return;
             }
             channels[currentChannel].add(connection);
             console.log(`Client joined channel: ${currentChannel}`);
-            console.log('Client joined channel:',{gameState});
+            console.log('Client joined channel:', { gameState });
 
+            broadcast(currentChannel, {
+              type: 'joinGame',
+              data: parsedMessage.data.username,
+            });
+            console.log('broadcasted joinGame', gameState.players);
+
+            const player: Player = gameState.players?.find(
+              (p) => p.role === parsedMessage.data.currentRole
+            );
+            player.username = parsedMessage.data.username;
             broadcast(currentChannel, {
               type: 'updateGameState',
               data: gameState,
             });
             break;
+          }
 
           case 'updateGameState':
             if (currentChannel) {
@@ -72,10 +93,22 @@ server.register(async function (fastify) {
 
           case 'makeMove':
             if (currentChannel) {
-              broadcast( currentChannel, {
-                
+              const { role, isDouble } = parsedMessage.data;
+              console.log(getNextRole(role));
+              if (role === 'culprit') {
+                gameState.moves.push(parsedMessage.data);
+              }
+
+              if (role !== 'culprit' && !isDouble) {
+                gameState.currentTurn = getNextRole(role);
+              }
+              broadcast(currentChannel, {
                 type: 'makeMove',
-                data: parsedMessage.data,
+                data: {
+                  ...parsedMessage.data,
+                  currentTurn: getNextRole(role),
+                  movesCount: gameState.moves.length,
+                },
               });
             }
             break;
