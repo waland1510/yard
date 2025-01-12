@@ -73,7 +73,12 @@ server.register(async function (fastify) {
             const player: Player = gameState.players?.find(
               (p) => p.role === parsedMessage.data.currentRole
             );
-            player.username = parsedMessage.data.username;
+            if (player) {
+              player.username = parsedMessage.data.username;
+            } else {
+              console.log('Player not found');
+            }
+
             broadcast(currentChannel, {
               type: 'updateGameState',
               data: gameState,

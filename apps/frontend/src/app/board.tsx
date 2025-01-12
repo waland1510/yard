@@ -8,10 +8,12 @@ import { usePlayerSubscription } from '../hooks/use-player-subscription';
 import { useGameStore } from '../stores/use-game-store';
 import { MapNode } from '../stores/use-nodes-store';
 import { riverData } from './river';
+import { showCulpritAtMoves } from '@yard/shared-utils';
 
 export const Board = ({ channel }: { channel: string }) => {
   const players = usePlayersSubscription();
-
+  console.log('playersBoard', players);
+  const movesCount = useGameStore((state) => state.movesCount);
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [connections, setConnections] = useState<
     { from: number; to: number; types: string[] }[]
@@ -20,13 +22,13 @@ export const Board = ({ channel }: { channel: string }) => {
   const currentPosition = usePlayerSubscription().currentPosition;
   const currentType = useRunnerStore((state) => state.currentType);
   const currentRole = useRunnerStore((state) => state.currentRole);
-  const updateMoves = useGameStore((state) => state.updateMoves);
+  const setMove = useRunnerStore((state) => state.setMove);
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
-
+  const runnerPosition = players.find((p) => p.role === currentRole)?.position;
   const availableMoves =
-    nodes.find((node) => node.id === currentPosition)?.[
+    nodes.find((node) => node.id === runnerPosition)?.[
       currentType as 'taxi' | 'bus' | 'underground' | 'river'
     ] || [];
   // const existingChannel = useGameStore((state) => state.channel);
@@ -35,17 +37,13 @@ export const Board = ({ channel }: { channel: string }) => {
   const { sendMessage } = useWebSocket(channel);
 
   const handleSend = (id: number) => {
-    if (currentRole === 'culprit') {
-      if (updateMoves) {
-        updateMoves({
-          type: currentType,
-          position: id,
-          isSecret: false,
-          isDouble: false,
-        });
-      }
-    }
-    sendMessage('makeMove', { role: currentRole, target: id.toString() });
+    setMove({
+            role: currentRole,
+            type: currentType,
+            position: id,
+            isSecret: currentType === 'secret',
+            isDouble: currentType === 'double',
+          });
     setCurrentPosition(id);
   };
 
@@ -128,6 +126,8 @@ export const Board = ({ channel }: { channel: string }) => {
         const hasUnderground = node.underground && node.underground.length > 0;
         if (node.id < 0) return null;
         const role = players.find((p) => p.position === node.id)?.role;
+        const showImage = role && (role !== 'culprit' || currentRole === 'culprit' || (role === 'culprit' && showCulpritAtMoves.includes(movesCount)));
+
         return (
           <g key={node.id}>
             {/* Additional strokes for bus and underground */}
@@ -168,7 +168,7 @@ export const Board = ({ channel }: { channel: string }) => {
                 <circle cx={node.x} cy={node.y} r="14" />
               </clipPath>
             </defs>
-            {role && (
+            {showImage &&(
               <image
                 href={`/images/${role}.png`}
                 x={node.x - 14}
@@ -183,10 +183,10 @@ export const Board = ({ channel }: { channel: string }) => {
               x={node.x}
               y={node.y + 5}
               textAnchor="middle"
-              fontWeight={role ? 'bold' : 'normal'}
+              fontWeight={showImage ? 'bold' : 'normal'}
               fontSize={currentPosition === node.id ? '16' : '14'}
               fill={
-                role
+                showImage
                   ? 'transparent'
                   : currentPosition === node.id
                   ? 'red'

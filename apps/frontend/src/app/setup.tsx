@@ -29,7 +29,7 @@ export const Setup = () => {
   const setPosition = useGameStore((state) => state.setPosition);
   const setChannel = useGameStore((state) => state.setChannel);
   const players = useGameStore((state) => state.players);
-  const username = localStorage.getItem('username');
+  const username = sessionStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const [newGame, setNewGame] = useState(false);
 
@@ -80,8 +80,6 @@ export const Setup = () => {
     if (channel) {
       setChannel(channel);
       console.log({ channel, username });
-
-      sendMessage('joinGame', { channel, username, currentRole });
       navigate(`/game/${channel}`);
       return;
     }
@@ -97,6 +95,7 @@ export const Setup = () => {
     useRunnerStore.setState({
       currentPosition: players.find((p) => p.role === role)?.position,
     });
+    sendMessage('joinGame', { channel, username, currentRole });
     setCurrentStep('invitePlayers');
   };
 
@@ -165,13 +164,14 @@ export const Setup = () => {
       case 'addUsername':
         return (
           <div className="text-center">
-            <p className="text-lg text-gray-700">Add Username</p>
+            <p className="text-lg text-gray-700">{username ? 'Update Username' : 'Add Username'}</p>
             <input
               type="text"
               className="px-4 py-2 border border-gray-300 rounded-lg"
               placeholder="Enter your username"
+              defaultValue={username || ''}
               onChange={(e) => {
-                localStorage.setItem('username', e.target.value);
+                sessionStorage.setItem('username', e.target.value);
               }}
             />
             <button

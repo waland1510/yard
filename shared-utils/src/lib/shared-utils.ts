@@ -86,6 +86,7 @@ export const initialPlayers: Player[] = [
 ];
 
 export interface Move {
+  role?: RoleType;
   type: string;
   isSecret?: boolean;
   isDouble?: boolean;
@@ -99,3 +100,6 @@ export interface Message {
   channel?: string;
   data: any;
 }
+
+export const showCulpritAtMoves = [3, 8, 13, 18];
+

@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import { initialPlayers, Player, GameMode, Role, RoleType, Move, GameState } from '@yard/shared-utils';
+import {
+  initialPlayers,
+  Player,
+  GameMode,
+  Role,
+  RoleType,
+  Move,
+  GameState,
+} from '@yard/shared-utils';
 
 export interface ClientGameState extends GameState {
   updateMoves: (move: Move) => void;
@@ -8,17 +16,18 @@ export interface ClientGameState extends GameState {
   setPlayer: (player: Player) => void;
   setGameMode: (gameMode?: GameMode) => void;
   setChannel: (channel?: string) => void;
-  setTaxiTickets: (playerId: number, taxiTickets: number) => void;
-  setBusTickets: (playerId: number, busTickets: number) => void;
-  setUndergroundTickets: (playerId: number, undergroundTickets: number) => void;
-  setSecretTickets: (secretTickets: number) => void;
-  setDoubleTickets: (doubleTickets: number) => void;
+  updateTicketsCount: (
+    playerRole: string,
+    type: string,
+    isDouble: boolean
+  ) => void;
   setPosition: (playerRole: string, position: number | string) => void;
 }
 
 export const useGameStore = create<ClientGameState>((set) => ({
   moves: [],
-  updateMoves: (move) => set((state) => ({ moves: [...(state.moves || []), move] })),
+  updateMoves: (move) =>
+    set((state) => ({ moves: [...(state.moves || []), move] })),
   movesCount: 0,
   setMovesCount: (movesCount) => set({ movesCount }),
   currentTurn: Role.culprit,
@@ -45,37 +54,34 @@ export const useGameStore = create<ClientGameState>((set) => ({
   setGameMode: (gameMode?: GameMode) => set({ gameMode }),
   channel: '',
   setChannel: (channel?: string) => set({ channel }),
-  setTaxiTickets: (playerId: number, taxiTickets: number) =>
+  updateTicketsCount: (playerRole: string, type: string, isDouble: boolean) =>
     set((state) => {
-      const player = state.players.find((p) => p.id === playerId);
+      const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
-      player.taxiTickets = taxiTickets;
-      return { players: state.players };
-    }),
-  setBusTickets: (playerId: number, busTickets: number) =>
-    set((state) => {
-      const player = state.players.find((p) => p.id === playerId);
-      if (!player) return state;
-      player.busTickets = busTickets;
-      return { players: state.players };
-    }),
-  setUndergroundTickets: (playerId: number, undergroundTickets: number) =>
-    set((state) => {
-      const player = state.players.find((p) => p.id === playerId);
-      if (!player) return state;
-      player.undergroundTickets = undergroundTickets;
-      return { players: state.players };
-    }),
-  setSecretTickets: (secretTickets: number) =>
-    set((state) => {
-      const culprit = state.players.find((p) => p.role === 'culprit');
-      if (culprit) culprit.secretTickets = secretTickets;
-      return { players: state.players };
-    }),
-  setDoubleTickets: (doubleTickets: number) =>
-    set((state) => {
-      const culprit = state.players.find((p) => p.role === 'culprit');
-      if (culprit) culprit.doubleTickets = doubleTickets;
+      if (isDouble) {
+        if (player.doubleTickets !== undefined) {
+          player.doubleTickets = player.doubleTickets - 1;
+        }
+      } else {
+        switch (type) {
+          case 'taxi':
+            player.taxiTickets = player.taxiTickets - 1;
+            break;
+          case 'bus':
+            player.busTickets = player.busTickets - 1;
+            break;
+          case 'underground':
+            player.undergroundTickets = player.undergroundTickets - 1;
+            break;
+          case 'secret':
+            if (player.secretTickets !== undefined) {
+              player.secretTickets = player.secretTickets - 1;
+            }
+            break;
+          default:
+            break;
+        }
+      }
       return { players: state.players };
     }),
   setPosition: (playerRole: string, position: number | string) =>

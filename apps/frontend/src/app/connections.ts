@@ -651,7 +651,7 @@ export const connectionsData = [
   },
   {
     from: 69,
-    to: 86,
+    to: 142,
     types: ['bus', 'taxi'],
   },
   {
@@ -923,11 +923,6 @@ export const connectionsData = [
     from: 104,
     to: 115,
     types: ['underground'],
-  },
-  {
-    from: 104,
-    to: 142,
-    types: ['bus', 'taxi'],
   },
   {
     from: 105,

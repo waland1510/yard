@@ -9,11 +9,12 @@ const useWebSocket = (initialChannel?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
   const socket = getWebSocket();
-  const username = localStorage.getItem('username');
+  const username = sessionStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
   const setMovesCount = useGameStore((state) => state.setMovesCount);
+  const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -25,7 +26,8 @@ const useWebSocket = (initialChannel?: string) => {
           console.log('Player joined:', message.data.username);
           break;
         case 'makeMove':
-          setPosition(message.data.role, message.data.target);
+          setPosition(message.data.role, message.data.position);
+          updateTicketsCount(message.data.role, message.data.type, message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
           setMovesCount(message.data.movesCount);
           console.log('Move made:', message.data);

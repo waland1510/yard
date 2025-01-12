@@ -16,11 +16,14 @@ export const Header = () => {
   const currentTurn = useGameStore((state) => state.currentTurn);
   const movesCount = useGameStore((state) => state.movesCount);
   const setCurrentRole = useRunnerStore((state) => state.setCurrentRole);
+  const move = useRunnerStore((state) => state.move);
+  const setMove = useRunnerStore((state) => state.setMove);
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
   const players = usePlayersSubscription();
   const setGameMode = useGameStore((state) => state.setGameMode);
+  const updateMoves = useGameStore((state) => state.updateMoves);
   const navigate = useNavigate();
 
   const onRoleChange = (role: RoleType) => {
@@ -31,6 +34,19 @@ export const Header = () => {
     }
 
     sendMessage('updateGameState', role);
+  };
+
+  const handleSend = () => {
+    if (move) {
+      if (currentRole === 'culprit') {
+        if (updateMoves) {
+          updateMoves(move);
+        }
+      }
+      sendMessage('makeMove', move);
+      setMove(null);
+    }
+    // sendMessage('makeMove', { role: currentRole, target: id.toString() });
   };
 
   return (
@@ -54,21 +70,21 @@ export const Header = () => {
           <p>Select a player to start</p>
         )}
       </div>
-      {
-        currentRole === currentTurn &&
+      {currentRole === currentTurn && (
         <button
           className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          onClick={handleSend}
         >
-          Your Turn
+          {move ? `Confirm ${move.position}` : 'Your Turn'}
         </button>
-      }
+      )}
       <p>Moves: {movesCount}</p>
       <p>Current Position: {currentPosition}</p>
       <p>Current Type: {currentType}</p>
 
       {players && (
         <div className="flex gap-2">
-          {players.map((p) => (
+          {players.filter(player => player.role !== 'culprit').map((p) => (
             <span key={p.id}>
               <img
                 className="w-10 h-12"
