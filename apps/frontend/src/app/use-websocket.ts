@@ -15,6 +15,7 @@ const useWebSocket = (initialChannel?: string) => {
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
   const setMovesCount = useGameStore((state) => state.setMovesCount);
   const updateMoves = useGameStore((state) => state.updateMoves);
+  const updatePlayer = useGameStore((state) => state.updatePlayer);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
 
   useEffect(() => {
@@ -31,7 +32,7 @@ const useWebSocket = (initialChannel?: string) => {
           updateTicketsCount(message.data.role, message.data.type, message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
           setMovesCount(message.data.movesCount);
-          if(message.data.role === 'culprit') {     
+          if(message.data.role === 'culprit') {
             updateMoves(message.data);
           }
           console.log('Move made:', message.data);
@@ -39,6 +40,10 @@ const useWebSocket = (initialChannel?: string) => {
         case 'updateGameState':
           useGameStore.setState({ ...message.data });
           console.log('Game state updated:', message.data.players);
+          break;
+        case 'impersonate':
+          updatePlayer(message.data.role, message.data.username);
+          console.log('Impersonating:', message.data.role);
           break;
         default:
           console.warn('Unknown message type:', message.type);

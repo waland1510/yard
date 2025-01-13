@@ -14,6 +14,7 @@ export interface ClientGameState extends GameState {
   setMovesCount: (movesCount: number) => void;
   setCurrentTurn: (currentTurn: RoleType) => void;
   setPlayer: (player: Player) => void;
+  updatePlayer: (role: string, username: string) => void;
   setGameMode: (gameMode?: GameMode) => void;
   setChannel: (channel?: string) => void;
   updateTicketsCount: (
@@ -47,6 +48,14 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
         existingPlayer.doubleTickets = player.doubleTickets;
       } else {
         state.players.push(player);
+      }
+      return { players: state.players };
+    }),
+  updatePlayer: (role, username) =>
+    set((state) => {
+      const player = state.players.find((p) => p.role === role);
+      if (player) {
+        player.username = username;
       }
       return { players: state.players };
     }),

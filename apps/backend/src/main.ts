@@ -96,6 +96,24 @@ server.register(async function (fastify) {
             }
             break;
 
+          case 'impersonate':
+            if (currentChannel) {
+              const { role, username } = parsedMessage.data;
+              const player = gameState.players?.find((p) => p.role === role);
+              if (player) {
+                player.username = username;
+              }
+              broadcast(currentChannel, {
+                type: 'updateGameState',
+                data: { ...gameState, movesCount: gameState.moves.length },
+              });
+              broadcast(currentChannel, {
+                type: 'impersonate',
+                data: parsedMessage.data,
+              });
+            }
+            break;
+
           case 'makeMove':
             if (currentChannel) {
               const { role, isDouble } = parsedMessage.data;

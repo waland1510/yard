@@ -7,6 +7,7 @@ import { usePlayerSubscription } from '../hooks/use-player-subscription';
 import { useNavigate } from 'react-router-dom';
 import { RoleType } from '@yard/shared-utils';
 import {isMoveAllowed} from '../utils/move-allowed'
+import { send } from 'process';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -23,9 +24,9 @@ export const Header = () => {
     (state) => state.setCurrentPosition
   );
   const players = usePlayersSubscription();
-  const setGameMode = useGameStore((state) => state.setGameMode); 
+  const setGameMode = useGameStore((state) => state.setGameMode);
   const navigate = useNavigate();
-
+  const username = sessionStorage.getItem('username');
   const onRoleChange = (role: RoleType) => {
     setCurrentRole(role);
     const currentPlayer = players.find((p) => p.role === role);
@@ -34,9 +35,10 @@ export const Header = () => {
     }
 
     sendMessage('updateGameState', role);
+    sendMessage('impersonate', { role, username });
   };
   console.log({currentPosition, currentType});
-  
+
   const handleSend = () => {
     if (move) {
       sendMessage('makeMove', move);
@@ -45,7 +47,7 @@ export const Header = () => {
     // sendMessage('makeMove', { role: currentRole, target: id.toString() });
   };
   return (
-    <div className="flex justify-around items-center gap-10 h-10">
+    <div className="flex justify-around items-center gap-10 h-16">
       <img
         className="w-20"
         src="/images/logo.jpg"
@@ -54,19 +56,20 @@ export const Header = () => {
       />
       <div className="flex flex-col gap-2">
         {currentRole ? (
-          <div className="flex items-center">
+          <div className="flex items-center gap-4">
             <img
               className="w-10"
               src={`/images/${currentRole}.png`}
               alt="player"
             />
+            <p>{username}</p>
           </div>
         ) : (
           <p>Select a player to start</p>
         )}
       </div>
       {currentRole === currentTurn && (
-        
+
         <button
           className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
           onClick={handleSend}
@@ -79,16 +82,17 @@ export const Header = () => {
       <p>Current Type: {currentType}</p>
 
       {players && (
-        <div className="flex gap-2">
-          {players.filter(player => currentRole !== 'culprit' && player.role !== 'culprit').map((p) => (
+        <div className="flex gap-2 items-end">
+          {players.map((p) => (
             <span key={p.id}>
+              <p>{p.username}</p>
               <img
                 className="w-10 h-12"
                 src={`/images/${p.role}.png`}
                 alt="player"
-                onClick={() => onRoleChange(p.role)}
+                onClick={currentRole !== 'culprit' && p.role !== 'culprit' ? () => onRoleChange(p.role): undefined}
               />
-              <p>{p.position}</p>
+              {p.role !== 'culprit' ? <p>{ p.position}</p> : <p>??</p>}
             </span>
           ))}
         </div>

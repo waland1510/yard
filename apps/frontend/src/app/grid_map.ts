@@ -54,7 +54,7 @@ export const mapData = {
     },
     {
       id: 9,
-      taxi: [19, 20],
+      taxi: [1, 19, 20],
       x: 200,
       y: 100,
     },
@@ -262,7 +262,7 @@ export const mapData = {
     {
       id: 42,
       taxi: [29, 30, 56, 72],
-      bus: [7, 29, 30, 72],
+      bus: [7, 29, 72],
       x: 1100,
       y: 200,
     },
@@ -394,7 +394,7 @@ export const mapData = {
     {
       id: 63,
       taxi: [48, 64, 79, 80],
-      bus: [34, 65, 79],
+      bus: [34, 65, 79, 100],
       x: 450,
       y: 300,
     },

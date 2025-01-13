@@ -93,7 +93,7 @@ export interface Move {
   position: number;
 }
 
-export type MessageType = 'startGame' | 'joinGame' | 'makeMove' | 'updateGameState';
+export type MessageType = 'startGame' | 'joinGame' | 'makeMove' | 'updateGameState' | 'impersonate' | 'endGame';
 
 export interface Message {
   type: MessageType;
