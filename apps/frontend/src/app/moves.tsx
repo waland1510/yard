@@ -10,7 +10,7 @@ export const Moves = () => {
       <ul className="mt-2">
         {moves?.map((move, index) => (
           <li key={index} className="text-gray-600">
-            {index + 1}. {move.type} - {showCulpritAtMoves.includes(index + 1) ? move.position : '??'}
+            {index + 1}. {move.type ?? 'secret'} - {showCulpritAtMoves.includes(index + 1) ? move.position : '??'}
           </li>
         ))}
       </ul>

@@ -6,14 +6,18 @@ import { usePlayersSubscription } from '../hooks/use-players-subscription';
 import { usePlayerSubscription } from '../hooks/use-player-subscription';
 import { useNavigate } from 'react-router-dom';
 import { RoleType } from '@yard/shared-utils';
-import {isMoveAllowed} from '../utils/move-allowed'
-import { send } from 'process';
+import { isMoveAllowed } from '../utils/move-allowed';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
   const { sendMessage } = useWebSocket(existingChannel);
   const currentPosition = useRunnerStore((state) => state.currentPosition);
   const currentType = useRunnerStore((state) => state.currentType);
+  const isSecret = useRunnerStore((state) => state.isSecret);
+  const setIsSecret = useRunnerStore((state) => state.setIsSecret);
+  const isDouble = useRunnerStore((state) => state.isDouble);
+  const setIsDouble = useRunnerStore((state) => state.setIsDouble);
+  const isDoubleMove = useGameStore((state) => state.isDoubleMove);
   const currentRole = useRunnerStore((state) => state.currentRole);
   const currentTurn = useGameStore((state) => state.currentTurn);
   const movesCount = useGameStore((state) => state.movesCount);
@@ -37,12 +41,15 @@ export const Header = () => {
     sendMessage('updateGameState', role);
     sendMessage('impersonate', { role, username });
   };
-  console.log({currentPosition, currentType});
 
   const handleSend = () => {
     if (move) {
       sendMessage('makeMove', move);
       setMove(null);
+      if (currentRole === 'culprit') {
+        setIsDouble(false);
+        setIsSecret(false);
+      }
     }
     // sendMessage('makeMove', { role: currentRole, target: id.toString() });
   };
@@ -68,18 +75,60 @@ export const Header = () => {
           <p>Select a player to start</p>
         )}
       </div>
-      {currentRole === currentTurn && (
+      {currentRole === currentTurn && (() => {
+  const currentPlayer = players.find((player) => player.role === currentRole);
+  const isAllowed = move && isMoveAllowed(move.position, currentPlayer?.position, currentType, isSecret);
 
+  return (
+    <div>
+      {isAllowed ? (
         <button
-          className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
           onClick={handleSend}
         >
-          {move ? isMoveAllowed(move.position, players.find((p) => p.role === currentRole)?.position, currentType) ? `Confirm ${move.position}` : 'Invalid Move' : 'Your Turn'}
+          Confirm {move.position}
+        </button>
+      ) : (
+        <button
+          className="bg-red-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed"
+          disabled
+        >
+          {move ? 'Invalid Move' : 'Your Turn'}
         </button>
       )}
+    </div>
+  );
+})()}
       <p>Moves: {movesCount}</p>
       <p>Current Position: {currentPosition}</p>
       <p>Current Type: {currentType}</p>
+      {currentRole === 'culprit' ? (
+        <>
+          {' '}
+          <p
+            className={
+              isSecret ? 'text-2xl font-black text-red-700' : 'text-sm'
+            }
+          >
+            Secret
+          </p>
+          <p
+            className={
+              isDouble ? 'text-2xl font-black text-red-700' : 'text-sm'
+            }
+          >
+            Double
+          </p>
+        </>
+      ) : (
+        <p
+          className={
+            isDoubleMove ? 'text-2xl font-black text-red-700' : 'text-sm'
+          }
+        >
+          Double
+        </p>
+      )}
 
       {players && (
         <div className="flex gap-2 items-end">
@@ -90,9 +139,13 @@ export const Header = () => {
                 className="w-10 h-12"
                 src={`/images/${p.role}.png`}
                 alt="player"
-                onClick={currentRole !== 'culprit' && p.role !== 'culprit' ? () => onRoleChange(p.role): undefined}
+                onClick={
+                  currentRole !== 'culprit' && p.role !== 'culprit'
+                    ? () => onRoleChange(p.role)
+                    : undefined
+                }
               />
-              {p.role !== 'culprit' ? <p>{ p.position}</p> : <p>??</p>}
+              {p.role !== 'culprit' ? <p>{p.position}</p> : <p>??</p>}
             </span>
           ))}
         </div>

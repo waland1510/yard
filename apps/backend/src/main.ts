@@ -15,7 +15,10 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const server = Fastify();
 
-function getNextRole(currentRole: RoleType): RoleType {
+function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
+  if (isDouble) {
+    return currentRole;
+  }
   const roles = Object.values(Role) as RoleType[];
   const currentIndex = roles.indexOf(currentRole);
   return roles[(currentIndex + 1) % roles.length];
@@ -28,6 +31,7 @@ const gameState: GameState = {
   moves: [],
   currentTurn: Role[0],
   movesCount: 0,
+  isDoubleMove: false,
 };
 
 console.log('gameState', gameState);
@@ -117,19 +121,17 @@ server.register(async function (fastify) {
           case 'makeMove':
             if (currentChannel) {
               const { role, isDouble } = parsedMessage.data;
-              console.log(getNextRole(role));
+              const currentTurn = getNextRole(role, isDouble);
+              gameState.currentTurn =currentTurn
               if (role === 'culprit') {
                 gameState.moves.push(parsedMessage.data);
               }
 
-              if (role !== 'culprit' && !isDouble) {
-                gameState.currentTurn = getNextRole(role);
-              }
               broadcast(currentChannel, {
                 type: 'makeMove',
                 data: {
                   ...parsedMessage.data,
-                  currentTurn: getNextRole(role),
+                  currentTurn,
                   movesCount: gameState.moves.length,
                 },
               });

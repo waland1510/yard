@@ -7,6 +7,7 @@ import {
   RoleType,
   Move,
   GameState,
+  MoveType,
 } from '@yard/shared-utils';
 
 export interface ClientGameState extends GameState {
@@ -19,10 +20,12 @@ export interface ClientGameState extends GameState {
   setChannel: (channel?: string) => void;
   updateTicketsCount: (
     playerRole: string,
-    type: string,
+    type: MoveType,
+    isSecret: boolean,
     isDouble: boolean
   ) => void;
   setPosition: (playerRole: string, position: number | string) => void;
+  setIsDoubleMove: (isDoubleMove: boolean) => void;
 }
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
@@ -63,13 +66,23 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   setGameMode: (gameMode?: GameMode) => set({ gameMode }),
   channel: '',
   setChannel: (channel?: string) => set({ channel }),
-  updateTicketsCount: (playerRole: string, type: string, isDouble: boolean) =>
+  updateTicketsCount: (
+    playerRole: string,
+    type: MoveType,
+    isSecret: boolean,
+    isDouble: boolean
+  ) =>
     set((state) => {
       const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
       if (isDouble) {
         if (player.doubleTickets !== undefined) {
           player.doubleTickets = player.doubleTickets - 1;
+        }
+      }
+      if (isSecret) {
+        if (player.secretTickets !== undefined) {
+          player.secretTickets = player.secretTickets - 1;
         }
       } else {
         switch (type) {
@@ -81,11 +94,6 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
             break;
           case 'underground':
             player.undergroundTickets = player.undergroundTickets - 1;
-            break;
-          case 'secret':
-            if (player.secretTickets !== undefined) {
-              player.secretTickets = player.secretTickets - 1;
-            }
             break;
           default:
             break;
@@ -100,4 +108,6 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
       player.position = Number(position);
       return { players: state.players };
     }),
+  isDoubleMove: false,
+  setIsDoubleMove: (isDoubleMove) => set({ isDoubleMove }),
 }));

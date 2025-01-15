@@ -17,6 +17,7 @@ const useWebSocket = (initialChannel?: string) => {
   const updateMoves = useGameStore((state) => state.updateMoves);
   const updatePlayer = useGameStore((state) => state.updatePlayer);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
+  const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -29,7 +30,8 @@ const useWebSocket = (initialChannel?: string) => {
           break;
         case 'makeMove':
           setPosition(message.data.role, message.data.position);
-          updateTicketsCount(message.data.role, message.data.type, message.data.isDouble);
+          updateTicketsCount(message.data.role, message.data.type, message.data.isSecret, message.data.isDouble);
+          setIsDoubleMove(message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
           setMovesCount(message.data.movesCount);
           if(message.data.role === 'culprit') {

@@ -1,20 +1,22 @@
-import { MapNode } from '../stores/use-nodes-store';
+import { MoveType } from '@yard/shared-utils';
 import { mapData } from '../app/grid_map';
+import { MapNode } from '../stores/use-nodes-store';
 
 export const isMoveAllowed = (
   nodeId: number,
   runnerPosition: number | undefined,
-  currentType: 'taxi' | 'bus' | 'underground' | 'river' | 'secret' | 'double',
+  currentType: MoveType,
+  isSecret: boolean,
 ): boolean => {
 
-console.log('isMoveAllowed', nodeId, runnerPosition, currentType);
-
   const nodes: MapNode[] = mapData.nodes;
+  const node = nodes.find((node) => node.id === runnerPosition);
+  if (!node) {
+    return false;
+  }
+  const availableMoves = isSecret ?
+    [...(node.taxi || []), ...(node.bus || []), ...(node.underground || []), ...(node.river || [])] :
+    node[currentType] || [];
 
-  // Find the available moves based on the runner's current position and type
-  const availableMoves =
-    nodes.find((node) => node.id === runnerPosition)?.[currentType] || [];
-
-  // Check if the given nodeId is in the list of available moves
   return availableMoves.includes(nodeId);
 };

@@ -13,7 +13,6 @@ import { isMoveAllowed } from '../utils/move-allowed';
 
 export const Board = ({ channel }: { channel: string | undefined }) => {
   const players = usePlayersSubscription();
-  console.log('playersBoard', players);
   const movesCount = useGameStore((state) => state.movesCount);
   const [nodes, setNodes] = useState<MapNode[]>([]);
   const [connections, setConnections] = useState<
@@ -21,38 +20,35 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
   >([]);
 
   const currentPosition = usePlayerSubscription().currentPosition;
-  const currentType = useRunnerStore((state) => state.currentType);
-  const currentRole = useRunnerStore((state) => state.currentRole);
+  const type = useRunnerStore((state) => state.currentType);
+  const role = useRunnerStore((state) => state.currentRole);
+  const isSecret = useRunnerStore((state) => state.isSecret);
+  const isDouble = useRunnerStore((state) => state.isDouble);
   const setMove = useRunnerStore((state) => state.setMove);
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
-  const runnerPosition = players.find((p) => p.role === currentRole)?.position;
-  const availableMoves =
-    nodes.find((node) => node.id === runnerPosition)?.[
-      currentType
-    ] || [];
+  const runnerPosition = players.find((p) => p.role === role)?.position;
   // const existingChannel = useGameStore((state) => state.channel);
   // console.log('existingChannel', existingChannel);
 
   const { sendMessage } = useWebSocket(channel);
 
-  const handleSend = (id: number) => {
+  const handleSend = (position: number) => {
     setMove({
-      role: currentRole,
-      type: currentType,
-      position: id,
-      isSecret: currentType === 'secret',
-      isDouble: currentType === 'double',
+      role,
+      type,
+      position,
+      isSecret,
+      isDouble,
     });
-    setCurrentPosition(id);
+    setCurrentPosition(position);
   };
 
   useEffect(() => {
     setNodes(mapData.nodes);
     setConnections(connectionsData);
     // sendMessage('joinGame', channel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -126,12 +122,13 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
         const hasBus = node.bus && node.bus.length > 0;
         const hasUnderground = node.underground && node.underground.length > 0;
         if (node.id < 0) return null;
-        const role = players.find((p) => p.position === node.id)?.role;
+        const playerRole = players.find((p) => p.position === node.id)?.role;
         const showImage =
-          role &&
-          (role !== 'culprit' ||
-            currentRole === 'culprit' ||
-            (role === 'culprit' && showCulpritAtMoves.includes(movesCount)));
+          playerRole &&
+          (playerRole !== 'culprit' ||
+            role === 'culprit' ||
+            (playerRole === 'culprit' &&
+              showCulpritAtMoves.includes(movesCount)));
         return (
           <g key={node.id}>
             {/* Additional strokes for bus and underground */}
@@ -174,7 +171,7 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
             </defs>
             {showImage && (
               <image
-                href={`/images/${role}.png`}
+                href={`/images/${playerRole}.png`}
                 x={node.x - 14}
                 y={node.y - 14}
                 width="28"
@@ -194,12 +191,7 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
                   ? 'transparent'
                   : currentPosition === node.id
                   ? 'red'
-                  : availableMoves.includes(node.id)
-                  // : isMoveAllowed(
-                  //     node.id,
-                  //     runnerPosition,
-                  //     currentType
-                  //   )
+                  : isMoveAllowed(node.id, runnerPosition, type, isSecret)
                   ? 'orange'
                   : 'black'
               }

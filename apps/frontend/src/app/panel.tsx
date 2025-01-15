@@ -9,14 +9,18 @@ export const Panel = () => {
   const player = useGameStore((state) =>
     state.players.find((p) => p.role === currentRole)
   );
-  const currentPosition = useRunnerStore((state) => state.currentPosition);
   const currentTurn = useGameStore((state) => state.currentTurn);
 
   const players = usePlayersSubscription();
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
 
   const node = useNodesStore((state) => state.getNode(runnerPosition || 0));
-  console.log({ node });
+  const isSecret = useRunnerStore((state) => state.isSecret);
+  const isDouble = useRunnerStore((state) => state.isDouble);
+  const setIsSecret = useRunnerStore((state) => state.setIsSecret);
+  const setIsDouble = useRunnerStore((state) => state.setIsDouble);
+  const setCurrentType = useRunnerStore((state) => state.setCurrentType);
+
   if (!node) {
     return null;
   }
@@ -27,21 +31,21 @@ export const Panel = () => {
       id: 'taxi',
       label: 'Taxi',
       bg: 'bg-yellow-400',
-      count: player?.taxiTickets,
+      count: player?.taxiTickets || 0,
     },
     {
       icon: '🚌',
       id: 'bus',
       label: 'Bus',
       bg: 'bg-green-400',
-      count: player?.busTickets,
+      count: player?.busTickets || 0,
     },
     {
       icon: '🚇',
       id: 'underground',
       label: 'Subway',
       bg: 'bg-red-500',
-      count: player?.undergroundTickets,
+      count: player?.undergroundTickets || 0,
     },
   ];
   const culpritItems = [
@@ -50,16 +54,25 @@ export const Panel = () => {
       id: 'secret',
       label: 'Hidden',
       bg: 'bg-black text-white',
-      count: player?.secretTickets,
+      count: player?.secretTickets || 0,
     },
     {
       icon: '2️⃣',
       id: 'double',
       label: 'Double',
       bg: 'bg-gradient-to-r from-yellow-400 to-red-500',
-      count: player?.doubleTickets,
+      count: player?.doubleTickets || 0,
     },
   ];
+
+  const handleCulpritMoveClick = (type: 'secret' | 'double') => {
+    if (type === 'secret' && culpritItems[0].count > 0) {
+      setCurrentType(undefined);
+      setIsSecret(!isSecret);
+    } else if (type === 'double' && culpritItems[1].count > 0) {
+      setIsDouble(!isDouble);
+    }
+  };
 
   return (
     <div className="p-4 max-w-[120px] bg-gray-100 rounded-lg shadow-lg">
@@ -76,7 +89,7 @@ export const Panel = () => {
       </div>
 
       {items.map((item, index) => {
-        const available = item.id && node[item.id as keyof typeof node];
+        const available = item.id && node[item.id as keyof typeof node] && item.count;
         return (
           <div
             key={index}
@@ -98,24 +111,17 @@ export const Panel = () => {
       })}
       {currentRole === 'culprit' && (
         <div className="flex flex-col gap-3">
-          {culpritItems.map((item, index) => {
-            const available = item.id && node[item.id as keyof typeof node];
+          {culpritItems.map((item) => {
             return (
               <div
-                key={index}
+                key={item.id}
                 className={`flex items-center cursor-pointer justify-between px-4 py-2 rounded-lg mb-3 ${
-                  item.count ? item.bg : 'bg-gray-200'
+                  item.count > 0 ? item.bg : 'bg-gray-200'
                 }`}
-                onClick={
-                  available
-                    ? () => {
-                        useRunnerStore.getState().setCurrentType(item.label as 'taxi');
-                      }
-                    : undefined
-                }
+                onClick={item.count ? () => handleCulpritMoveClick(item.id as 'secret') : undefined}
               >
                 <span className="text-2xl">{item.icon}</span>
-                {item.count && (
+                {item.count > 0 && (
                   <span className="ml-4 text-sm">{item.count}</span>
                 )}
               </div>
