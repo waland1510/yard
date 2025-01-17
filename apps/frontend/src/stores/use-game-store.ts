@@ -30,6 +30,7 @@ export interface ClientGameState extends GameState {
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
   moves: [],
+  status: 'active',
   updateMoves: (move) =>
     set((state) => ({ moves: [...(state.moves || []), move] })),
   movesCount: 0,

@@ -7,6 +7,7 @@ import { usePlayerSubscription } from '../hooks/use-player-subscription';
 import { useNavigate } from 'react-router-dom';
 import { RoleType } from '@yard/shared-utils';
 import { isMoveAllowed } from '../utils/move-allowed';
+import { patchPlayer } from '../api';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -28,6 +29,8 @@ export const Header = () => {
     (state) => state.setCurrentPosition
   );
   const players = usePlayersSubscription();
+  console.log('players', players);
+  
   const setGameMode = useGameStore((state) => state.setGameMode);
   const navigate = useNavigate();
   const username = sessionStorage.getItem('username');
@@ -36,6 +39,7 @@ export const Header = () => {
     const currentPlayer = players.find((p) => p.role === role);
     if (currentPlayer) {
       setCurrentPosition(currentPlayer.position);
+      patchPlayer(currentPlayer.id, { username: username as string });
     }
 
     sendMessage('updateGameState', role);

@@ -14,6 +14,7 @@ export type RoleType = typeof Role[keyof typeof Role];
 export type GameMode = 'easy' | 'medium' | 'hard';
 
 export interface GameState {
+  id? : number;
   channel: string;
   gameMode?: GameMode;
   players: Player[];
@@ -21,6 +22,7 @@ export interface GameState {
   moves: Move[];
   movesCount: number;
   isDoubleMove: boolean;
+  status: 'active' | 'finished';
 }
 
 export interface Player {

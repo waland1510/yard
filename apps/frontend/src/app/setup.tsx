@@ -10,6 +10,7 @@ import useWebSocket from './use-websocket';
 import { useRunnerStore } from '../stores/use-runner-store';
 import { send } from 'process';
 import { GameMode, RoleType } from '@yard/shared-utils';
+import { createGame, getGameByChannel, patchPlayer, updateGame } from '../api';
 
 export const Setup = () => {
   const { channel } = useParams();
@@ -72,12 +73,18 @@ export const Setup = () => {
       Object.entries(startingPositions).forEach(([role, position]) =>
         setPosition(role, position)
       );
-      sendMessage('updateGameState', useGameStore.getState());
+      // sendMessage('updateGameState', useGameStore.getState());
+      await createGame(useGameStore.getState());
+      const game = await getGameByChannel(channelRef.current);
+      useGameStore.setState(game[0]);
     }
   };
 
-  const handleContinueGame = () => {
+  const handleContinueGame = async () => {
     if (channel) {
+      const [game] = await getGameByChannel(channel);
+      if (!game) return;
+      useGameStore.setState(game);
       setChannel(channel);
       console.log({ channel, username });
       navigate(`/game/${channel}`);
@@ -88,14 +95,18 @@ export const Setup = () => {
 
   const handleAddUsername = () => {
     setCurrentStep('chooseRole');
+    
   };
 
-  const onRoleChange = (role: string) => {
+  const onRoleChange = async (role: string) => {
+    const player = players.find((p) => p.role === role);
+    if (!player) return;
     useRunnerStore.setState({ currentRole: role as RoleType });
     useRunnerStore.setState({
-      currentPosition: players.find((p) => p.role === role)?.position,
+      currentPosition: player.position,
     });
     sendMessage('joinGame', { channel, username, currentRole });
+    await patchPlayer(player.id, { username: username as string });
     setCurrentStep('invitePlayers');
   };
 

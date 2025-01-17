@@ -8,6 +8,7 @@ import { Moves } from './moves';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Move } from '@yard/shared-utils';
 import { useRunnerStore } from '../stores/use-runner-store';
+import { getGameByChannel } from '../api';
 
 export const Game = () => {
   const navigate = useNavigate(); 
@@ -19,11 +20,23 @@ export const Game = () => {
   const username = sessionStorage.getItem('username') ;
 
   useEffect(() => {
-     sendMessage('joinGame', { channel, username, undefined });
-     if (existingChannel !== channel) {
-      sessionStorage.setItem('channel', channel!);
-      navigate(`/join/${channel}`);
-     }
+    const checkGame = async () => {
+      if (channel) {
+        const [game] = await getGameByChannel(channel);
+        
+        if (game) {;
+          useGameStore.setState(game);
+          if (!game.players.find((p) => p.username === username)) {
+            sendMessage('joinGame', { channel, username, undefined });
+          }
+        }
+      }
+      if (existingChannel !== channel) {
+        sessionStorage.setItem('channel', channel!);
+        navigate(`/join/${channel}`);
+      }
+    }
+    checkGame();
   }, []);
 
   useEffect(() => {

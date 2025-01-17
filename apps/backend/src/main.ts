@@ -9,11 +9,20 @@ import {
   RoleType,
   Message,
 } from '@yard/shared-utils';
+import cors from '@fastify/cors'
 
-const host = process.env.HOST ?? 'localhost';
+// const host = process.env.HOST ?? 'localhost';
+const host = process.env.HOST ?? '0.0.0.0';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const server = Fastify();
+
+server.register(cors, {
+  origin: 'http://localhost:4200', 
+  methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
+});
+
 
 function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
   if (isDouble) {
@@ -32,6 +41,7 @@ const gameState: GameState = {
   currentTurn: Role[0],
   movesCount: 0,
   isDoubleMove: false,
+  status: 'active',
 };
 
 console.log('gameState', gameState);

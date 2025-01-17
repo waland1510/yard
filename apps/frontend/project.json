@@ -4,6 +4,19 @@
   "sourceRoot": "apps/frontend/src",
   "projectType": "application",
   "tags": [],
-  "// targets": "to see all targets run: nx show project frontend --web",
-  "targets": {}
+  "targets": {
+    "build": {
+      "executor": "@nrwl/vite:build",
+      "options": {
+        "outputPath": "dist/apps/frontend",
+        "configFile": "apps/frontend/vite.config.ts"
+      }
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "netlify deploy --dir=dist/apps/frontend"
+      }
+    }
+  }
 }
