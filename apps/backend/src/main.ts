@@ -18,7 +18,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const server = Fastify();
 
 server.register(cors, {
-  origin: 'http://localhost:4200', 
+  origin: true, 
   methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
   allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
 });
