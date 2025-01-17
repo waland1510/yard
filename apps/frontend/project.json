@@ -6,7 +6,6 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "@nrwl/vite:build",
       "options": {
         "outputPath": "dist/apps/frontend",
         "configFile": "apps/frontend/vite.config.ts"
