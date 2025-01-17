@@ -6,16 +6,15 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "@nrwl/vite:build",
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/frontend",
-        "configFile": "apps/frontend/vite.config.ts"
-      }
-    },
-    "deploy": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "netlify deploy --dir=dist/apps/frontend"
+        "tsConfig": "apps/frontend/tsconfig.app.json",
+        "assets": ["apps/frontend/src/assets"],
+        "generatePackageJson": true
+
       }
     }
   }
