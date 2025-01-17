@@ -8,7 +8,7 @@
   NODE_ENV = "production"
 
 [context.production]
-  command = "yarn install && npx nx build frontend" # Build command for production context
+  command = "bun install && npx nx build frontend" # Build command for production context
 
 [[redirects]]
   from = "/*"
