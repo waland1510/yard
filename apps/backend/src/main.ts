@@ -18,7 +18,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const server = Fastify();
 
 server.register(cors, {
-  origin: true, 
+  origin: ['http://localhost:4200', 'https://catch-me-if-you-can-yard.vercel.app'], 
   methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
   allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
 });
