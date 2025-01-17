@@ -1,0 +1,16 @@
+[build]
+  base = "apps/frontend" # Base directory for your frontend app
+  command = "npx nx build frontend" # Build command for your Nx app
+  publish = "dist/apps/frontend" # Directory to publish to Netlify
+
+[context.production.environment]
+  # Environment variables for production
+  NODE_ENV = "production"
+
+[context.production]
+  command = "npx nx build frontend" # Build command for production context
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
