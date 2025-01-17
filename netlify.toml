@@ -8,9 +8,12 @@
   NODE_ENV = "production"
 
 [context.production]
-  command = "npx nx build frontend" # Build command for production context
+  command = "yarn install && npx nx build frontend" # Build command for production context
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[build.environment]
+  NODE_VERSION = "20"
