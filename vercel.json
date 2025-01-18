@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/game/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/join/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}
