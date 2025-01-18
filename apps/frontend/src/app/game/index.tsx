@@ -1,34 +1,31 @@
-import { useEffect, useState } from 'react';
-import { Header } from './header';
-import { Board } from './board';
-import { Panel } from './panel';
-import { useGameStore } from '../../stores/use-game-store';
-import useWebSocket from '../use-websocket';
-import { Moves } from './moves';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Move, RoleType } from '@yard/shared-utils';
-import { useRunnerStore } from '../../stores/use-runner-store';
-import { getGameByChannel, patchPlayer } from '../../api';
 import {
   Box,
-  Flex,
-  Text,
-  Avatar,
-  VStack,
-  HStack,
-  Badge,
-  Divider,
+  Button,
   Drawer,
   DrawerBody,
-  DrawerFooter,
+  DrawerContent,
   DrawerHeader,
   DrawerOverlay,
-  DrawerContent,
-  Button,
+  Flex,
+  HStack,
   IconButton,
+  Text,
   useDisclosure,
+  VStack,
 } from '@chakra-ui/react';
-import { FiMenu, FiArrowRight, FiArrowLeft } from 'react-icons/fi';
+import { RoleType } from '@yard/shared-utils';
+import { useEffect } from 'react';
+import { FiArrowLeft, FiMenu } from 'react-icons/fi';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getGameByChannel, patchPlayer } from '../../api';
+import { useGameStore } from '../../stores/use-game-store';
+import { useRunnerStore } from '../../stores/use-runner-store';
+import useWebSocket from '../use-websocket';
+import { Board } from './board';
+import { Header } from './header';
+import { Moves } from './moves';
+import { Panel } from './panel';
+import { PlayerInfo } from './player-info';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -43,6 +40,7 @@ export const Game = () => {
   const setCurrentPosition = useRunnerStore(
     (state) => state.setCurrentPosition
   );
+  const currentTurn = useGameStore((state) => state.currentTurn);
 
   useEffect(() => {
     const checkGame = async () => {
@@ -96,20 +94,6 @@ export const Game = () => {
   };
 
   return (
-    // <div className="grid grid-cols-12 gap-4 p-4">
-    //   <div className="col-span-12 mb-4 text-center">
-    //     <Header />
-    //   </div>
-    //   <div className="col-span-1">
-    //     <Panel />
-    //   </div>
-    //   <div className="col-span-10">
-    //     <Board channel={channel} />
-    //   </div>
-    //   <div className="col-span-1">
-    //     <Moves />
-    //   </div>
-    // </div>
     <Flex height="100vh" bg="#f7f9fc">
       {/* Left Sidebar Drawer */}
       <Drawer isOpen={isLeftOpen} placement="left" onClose={onLeftClose}>
@@ -130,26 +114,37 @@ export const Game = () => {
           <DrawerBody>
             <VStack spacing={6} align="stretch">
               {players && (
-                <div className="flex gap-2 items-end">
-                  {players.map((p) => (
-                    <span key={p.id}>
-                      <p>{p.username}</p>
-                      <img
-                        className="w-10 h-12"
-                        src={`/images/${p.role}.png`}
-                        alt="player"
-                        onClick={
-                          currentRole !== 'culprit' && p.role !== 'culprit'
-                            ? () => onRoleChange(p.role)
-                            : undefined
-                        }
-                      />
-                      {p.role !== 'culprit' ? <p>{p.position}</p> : <p>??</p>}
-                    </span>
-                  ))}
-                </div>
+                <>
+                  <div className="flex gap-2 items-end">
+                    {players
+                      .filter((player) => player.role !== currentRole)
+                      .slice(0, 3)
+                      .map((p) => (
+                        <PlayerInfo
+                          key={p.id}
+                          player={p}
+                          currentRole={currentRole}
+                          onRoleChange={onRoleChange}
+                        />
+                      ))}
+                  </div>
+                  <div className="flex gap-2 items-end">
+                    {players
+                      .filter((player) => player.role !== currentRole)
+                      .slice(3)
+                      .map((p) => (
+                        <PlayerInfo
+                          key={p.id}
+                          player={p}
+                          currentRole={currentRole}
+                          onRoleChange={onRoleChange}
+                        />
+                      ))}
+                  </div>
+                </>
               )}
-              {/* <Avatar size="xl" name="Detective 3" src="/path-to-avatar.png" />
+            </VStack>
+            {/* <Avatar size="xl" name="Detective 3" src="/path-to-avatar.png" />
               <VStack spacing={2}>
                 <Text fontSize="lg" fontWeight="bold">
                   Detective 3
@@ -165,7 +160,6 @@ export const Game = () => {
               <Badge colorScheme="blue" p={2} rounded="lg">
                 Your Turn
               </Badge> */}
-            </VStack>
           </DrawerBody>
         </DrawerContent>
       </Drawer>
@@ -181,18 +175,16 @@ export const Game = () => {
         flexDirection="column"
         alignItems="center"
       >
-        {/* <IconButton
+        <IconButton
           icon={<FiMenu />}
           onClick={onLeftOpen}
           aria-label="Open Player Info"
-        /> */}
+        />
         <img
           className="w-20"
           src="/images/logo.jpg"
           alt="player"
-          onClick={onLeftOpen}
-
-          // onClick={() => navigate('/')}
+          onClick={() => navigate('/')}
         />
         <Panel />
       </Box>
@@ -234,9 +226,6 @@ export const Game = () => {
         {/* Map Section */}
         <Box
           flex="1"
-          bg="gray.200"
-          p={4}
-          rounded="lg"
           margin="auto"
           overflow="scroll"
         >
@@ -254,7 +243,7 @@ export const Game = () => {
 
       {/* Right Sidebar Compact */}
       <Box
-        w="50px"
+        w="120px"
         p={2}
         bg="white"
         boxShadow="xl"
@@ -268,20 +257,17 @@ export const Game = () => {
           onClick={onRightOpen}
           aria-label="Open Moves History"
         />
-        <div className="flex flex-col gap-2">
-        {currentRole ? (
-          <div className="flex items-center flex-col gap-4">
-            <img
-              className="w-10"
-              src={`/images/${currentRole}.png`}
-              alt="player"
-            />
-            <p>{username}</p>
-          </div>
-        ) : (
-          <p>Select a player to start</p>
-        )}
-      </div>
+        <div className="flex flex-col items-center justify-between px-4 py-2 mb-5 rounded-lg bg-gray-200">
+          <span className="text-2xl" role="img" aria-label="dice">
+            🎲
+          </span>
+          <img
+            className="w-10 h-12"
+            src={`/images/${currentTurn}.png`}
+            alt="player"
+          />
+          <div className="text-sm">{currentTurn}</div>
+        </div>
       </Box>
     </Flex>
   );

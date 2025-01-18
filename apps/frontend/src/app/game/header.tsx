@@ -1,15 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import useWebSocket from '../use-websocket';
-import { useRunnerStore } from '../../stores/use-runner-store';
-import { ClientGameState, useGameStore } from '../../stores/use-game-store';
+import { Badge, Flex } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
-import { usePlayerSubscription } from '../../hooks/use-player-subscription';
-import { useNavigate } from 'react-router-dom';
-import { RoleType } from '@yard/shared-utils';
+import { useGameStore } from '../../stores/use-game-store';
+import { useRunnerStore } from '../../stores/use-runner-store';
 import { isMoveAllowed } from '../../utils/move-allowed';
-import { patchPlayer } from '../../api';
-import { Badge, Flex, Text } from '@chakra-ui/react';
-import { mapData } from './board-data/grid_map';
+import useWebSocket from '../use-websocket';
+import { PlayerPosition } from './player-position';
+import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from "react-icons/fa6";
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -24,84 +20,13 @@ export const Header = () => {
   const currentRole = useRunnerStore((state) => state.currentRole);
   const currentTurn = useGameStore((state) => state.currentTurn);
   const movesCount = useGameStore((state) => state.movesCount);
-  const setCurrentRole = useRunnerStore((state) => state.setCurrentRole);
   const move = useRunnerStore((state) => state.move);
   const setMove = useRunnerStore((state) => state.setMove);
-  const setCurrentPosition = useRunnerStore(
-    (state) => state.setCurrentPosition
-  );
+  const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
+  const setIsMagnifyEnabled = useRunnerStore((state) => state.setIsMagnifyEnabled);
+
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
-  console.log('players', players);
-  const positionNode = (position: number) => {
-    const node = mapData.nodes.find((node) => node.id === position);
-    if (!node) {
-      return null;
-    }
-
-    const hasBus = node.bus && node.bus.length > 0;
-    const hasUnderground = node.underground && node.underground.length > 0;
-    return (
-      <svg width="52" height="52">
-        <g>
-          {hasBus && (
-            <circle
-              cx={25}
-              cy={25}
-              r="21"
-              fill="none"
-              stroke="#0db708"
-              strokeWidth="3"
-            />
-          )}
-          {hasUnderground && (
-            <circle
-              cx={25}
-              cy={25}
-              r="24"
-              fill="none"
-              stroke="#ed0013"
-              strokeWidth="3"
-            />
-          )}
-          <circle
-            cx={25}
-            cy={25}
-            r="18"
-            fill="white"
-            stroke="black"
-            strokeWidth="3"
-            // onClick={() => handleSend(node.id)}
-            strokeDasharray={node.river ? '5 5' : 'none'}
-          />
-          <text
-            x={25}
-            y={30}
-            textAnchor="middle"
-            fontWeight="bold"
-            fontSize="16"
-            fill="black"
-          >
-            {position}
-          </text>
-        </g>
-      </svg>
-    );
-  };
-  const setGameMode = useGameStore((state) => state.setGameMode);
-  const navigate = useNavigate();
-  const username = sessionStorage.getItem('username');
-  // const onRoleChange = (role: RoleType) => {
-  //   setCurrentRole(role);
-  //   const currentPlayer = players.find((p) => p.role === role);
-  //   if (currentPlayer) {
-  //     setCurrentPosition(currentPlayer.position);
-  //     patchPlayer(currentPlayer.id, { username: username as string });
-  //   }
-
-  //   sendMessage('updateGameState', role);
-  //   sendMessage('impersonate', { role, username });
-  // };
 
   const handleSend = () => {
     if (move) {
@@ -112,7 +37,9 @@ export const Header = () => {
         setIsSecret(false);
       }
     }
-    // sendMessage('makeMove', { role: currentRole, target: id.toString() });
+  };
+  const toggleMagnify = () => {
+    setIsMagnifyEnabled(!isMagnifyEnabled);
   };
 
   const getStatusColorScheme = () => {
@@ -129,36 +56,21 @@ export const Header = () => {
   };
   return (
     <div className="flex justify-around items-center gap-10">
-      {/* <div className="flex flex-col gap-2">
-        {currentRole ? (
-          <div className="flex items-center gap-4">
-            <img
-              className="w-10"
-              src={`/images/${currentRole}.png`}
-              alt="player"
-            />
-            <p>{username}</p>
-          </div>
-        ) : (
-          <p>Select a player to start</p>
-        )}
-      </div> */}
-
-      <Badge colorScheme="orange">Moves: {movesCount}</Badge>
-      <Badge colorScheme="red">{currentPosition}</Badge>
+      <Badge colorScheme="orange">Round: {movesCount}</Badge>
       <Flex alignItems={'center'}>
-      {currentPlayer ? positionNode(currentPlayer?.position) : null}
-      <Badge colorScheme={getStatusColorScheme()}>{currentType}</Badge>
+        {currentPlayer ? (
+          <PlayerPosition position={currentPlayer.position} />
+        ) : null}
+        <Badge colorScheme={getStatusColorScheme()}>{currentType}</Badge>
         {currentPosition && currentPosition !== currentPlayer?.position ? (
           <svg width="30" height="30">
             <polygon points="20,15 0,5 0,25" fill="black" />
           </svg>
         ) : null}
 
-        {currentPosition && currentPosition !== currentPlayer?.position
-          ? positionNode(currentPosition)
-          : null}
-
+        {currentPosition && currentPosition !== currentPlayer?.position ? (
+          <PlayerPosition position={currentPosition} />
+        ) : null}
       </Flex>
       {currentRole === currentTurn &&
         (() => {
@@ -193,21 +105,17 @@ export const Header = () => {
         })()}
       {currentRole === 'culprit' ? (
         <>
-          {' '}
-          <p
-            className={
-              isSecret ? 'text-2xl font-black text-red-700' : 'text-sm'
-            }
-          >
-            Secret
+
+          <Badge colorScheme={isSecret ? 'red' : 'gray'}>
+          <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
+          Secret
           </p>
-          <p
-            className={
-              isDouble ? 'text-2xl font-black text-red-700' : 'text-sm'
-            }
-          >
+        </Badge>
+          <Badge colorScheme={isDouble ? 'red' : 'gray'}>
+          <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
             Double
           </p>
+        </Badge>
         </>
       ) : (
         <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
@@ -216,27 +124,13 @@ export const Header = () => {
           </p>
         </Badge>
       )}
-
-      {/* {players && (
-        <div className="flex gap-2 items-end">
-          {players.map((p) => (
-            <span key={p.id}>
-              <p>{p.username}</p>
-              <img
-                className="w-10 h-12"
-                src={`/images/${p.role}.png`}
-                alt="player"
-                onClick={
-                  currentRole !== 'culprit' && p.role !== 'culprit'
-                    ? () => onRoleChange(p.role)
-                    : undefined
-                }
-              />
-              {p.role !== 'culprit' ? <p>{p.position}</p> : <p>??</p>}
-            </span>
-          ))}
-        </div>
-      )} */}
+      {
+        isMagnifyEnabled ? (
+          <Badge colorScheme="green" w={26} h={6} display="flex" alignSelf="center" onClick={toggleMagnify} ><FaMagnifyingGlass size={20}/></Badge>
+        ) : (
+          <Badge colorScheme="gray" w={26} h={6} display="flex" alignSelf="center" onClick={toggleMagnify}><FaMagnifyingGlass size={20}/></Badge>
+        )
+      }
     </div>
   );
 };

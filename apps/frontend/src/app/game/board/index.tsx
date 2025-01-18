@@ -1,5 +1,6 @@
 import { useState } from 'react';
 // import useWebSocket from '../use-websocket';
+import { useRunnerStore } from '../../../stores/use-runner-store';
 import { Connections } from './connections';
 import { Nodes } from './nodes';
 import { RiverPath } from './river-path';
@@ -10,12 +11,9 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
 
   // const { sendMessage } = useWebSocket(channel);
 
-  const [isMagnifyEnabled, setIsMagnifyEnabled] = useState(false);
+  // const [isMagnifyEnabled, setIsMagnifyEnabled] = useState(false);
+  const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
   const [magnifyArea, setMagnifyArea] = useState({ x: 0, y: 0, radius: 100 });
-
-  const toggleMagnify = () => {
-    setIsMagnifyEnabled(!isMagnifyEnabled);
-  };
 
   const handleMouseMove = (event: {
     currentTarget: { getBoundingClientRect: () => DOMRect };
@@ -34,9 +32,6 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
 
   return (
     <div>
-      <button onClick={toggleMagnify}>
-        {isMagnifyEnabled ? 'Disable Magnify' : 'Enable Magnify'}
-      </button>
       <svg
         width="1200"
         height="850"

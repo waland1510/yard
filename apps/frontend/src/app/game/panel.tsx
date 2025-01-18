@@ -9,7 +9,6 @@ export const Panel = () => {
   const player = useGameStore((state) =>
     state.players.find((p) => p.role === currentRole)
   );
-  const currentTurn = useGameStore((state) => state.currentTurn);
 
   const players = usePlayersSubscription();
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
@@ -20,6 +19,7 @@ export const Panel = () => {
   const setIsSecret = useRunnerStore((state) => state.setIsSecret);
   const setIsDouble = useRunnerStore((state) => state.setIsDouble);
   const setCurrentType = useRunnerStore((state) => state.setCurrentType);
+  const username = sessionStorage.getItem('username');
 
   if (!node) {
     return null;
@@ -76,17 +76,21 @@ export const Panel = () => {
 
   return (
     <div className="p-4 max-w-[120px]">
-      <div className="flex flex-col items-center justify-between px-4 py-2 mb-5 rounded-lg bg-gray-200">
-        <span className="text-2xl" role="img" aria-label="dice">
-          🎲
-        </span>
-        <img
-          className="w-10 h-12"
-          src={`/images/${currentTurn}.png`}
-          alt="player"
-        />
-        <div className="text-sm">{currentTurn}</div>
-      </div>
+
+      <div className="flex flex-col gap-2">
+          {currentRole ? (
+            <div className="flex items-center flex-col gap-4">
+              <img
+                className="w-10"
+                src={`/images/${currentRole}.png`}
+                alt="player"
+              />
+              <p>{username}</p>
+            </div>
+          ) : (
+            <p>Select a player to start</p>
+          )}
+        </div>
 
       {items.map((item, index) => {
         const available = item.id && node[item.id as keyof typeof node] && item.count;

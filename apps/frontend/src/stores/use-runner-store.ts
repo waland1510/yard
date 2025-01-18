@@ -10,6 +10,8 @@ export interface RunnerState {
     secretTickets: number;
     doubleTickets: number;
     move: Move | null;
+isMagnifyEnabled: boolean;
+setIsMagnifyEnabled: (isMagnifyEnabled: boolean) => void;
     setMove: (move: Move | null) => void;
     updateSecretTickets: (secretTickets: number) => void;
     updateDoubleTickets: (doubleTickets: number) => void;
@@ -29,6 +31,8 @@ export const useRunnerStore = create<RunnerState>((set) => ({
     secretTickets: 5,
     doubleTickets: 2,
     move: null,
+    isMagnifyEnabled: false,
+    setIsMagnifyEnabled: (isMagnifyEnabled) => set({ isMagnifyEnabled }),
     setMove: (move) => set({ move }),
     updateSecretTickets: (secretTickets: number) => set({ secretTickets }),
     updateDoubleTickets: (doubleTickets: number) => set({ doubleTickets }),
