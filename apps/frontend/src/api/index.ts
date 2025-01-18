@@ -3,10 +3,9 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL:
-    // process.env.NODE_ENV === 'production'? 
-    'https://yard-1.onrender.com/',
-
-    //   : 'http://localhost:3000',
+    process.env.NODE_ENV === 'production'
+      ? 'https://yard-1.onrender.com/'
+      : 'http://localhost:3000',
   headers: {
     'Content-Type': 'application/json', // Ensures that the body is sent as JSON
   },

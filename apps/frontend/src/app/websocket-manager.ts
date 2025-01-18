@@ -3,8 +3,8 @@ let socket: WebSocket | null = null;
 
 export const getWebSocket = () => {
   if (!socket) {
-    const url = 'https://yard-1.onrender.com/ws' 
-    // const url = 'ws://localhost:3000/ws';
+    // const url = 'https://yard-1.onrender.com/ws'
+    const url = 'ws://localhost:3000/ws';
     socket = new WebSocket(url);
 
     socket.onopen = () => {

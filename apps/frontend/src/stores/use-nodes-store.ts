@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { mapData } from '../app/grid_map';
+import { mapData } from '../app/game/board-data/grid_map';
 
 export interface MapNode {
     id: number;

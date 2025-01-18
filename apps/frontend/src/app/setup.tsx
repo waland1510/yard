@@ -5,7 +5,7 @@ import {
   easyPositions,
   hardPositions,
   mediumPositions,
-} from './starting-positions';
+} from './game/board-data/starting-positions';
 import useWebSocket from './use-websocket';
 import { useRunnerStore } from '../stores/use-runner-store';
 import { send } from 'process';
@@ -95,7 +95,7 @@ export const Setup = () => {
 
   const handleAddUsername = () => {
     setCurrentStep('chooseRole');
-    
+
   };
 
   const onRoleChange = async (role: string) => {
@@ -140,7 +140,7 @@ export const Setup = () => {
               onClick={() => {
                 setNewGame(true);
                 setCurrentStep('chooseMode');
-                sessionStorage.setItem('channel', channelRef.current!); 
+                sessionStorage.setItem('channel', channelRef.current!);
               }}
             >
               Start New Game

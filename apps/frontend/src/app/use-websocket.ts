@@ -3,9 +3,10 @@ import { getWebSocket } from './websocket-manager';
 import { useGameStore } from '../stores/use-game-store';
 import { useRunnerStore } from '../stores/use-runner-store';
 import { Message, MessageType } from '@yard/shared-utils';
+import { useToast } from '@chakra-ui/react';
 
 const useWebSocket = (initialChannel?: string) => {
-
+  const toast = useToast()
   const [messages, setMessages] = useState<Message[]>([]);
   const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
   const socket = getWebSocket();
@@ -38,6 +39,7 @@ const useWebSocket = (initialChannel?: string) => {
             updateMoves(message.data);
           }
           console.log('Move made:', message.data);
+          toast({ description: `${message.data.role} moved to ${message.data.position}. Next turn - ${message.data.currentTurn}`, status: "warning", position: 'top-right', duration: 9000, isClosable: true })
           break;
         case 'updateGameState':
           useGameStore.setState({ ...message.data });

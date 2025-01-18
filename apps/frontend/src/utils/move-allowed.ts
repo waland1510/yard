@@ -1,5 +1,5 @@
 import { MoveType } from '@yard/shared-utils';
-import { mapData } from '../app/grid_map';
+import { mapData } from '../app/game/board-data/grid_map';
 import { MapNode } from '../stores/use-nodes-store';
 
 export const isMoveAllowed = (

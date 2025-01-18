@@ -5,6 +5,9 @@
   "scripts": {},
   "private": true,
   "dependencies": {
+    "@chakra-ui/react": "2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@fastify/autoload": "~5.7.1",
     "@fastify/cors": "^10.0.2",
     "@fastify/postgres": "^6.0.2",
@@ -13,8 +16,10 @@
     "axios": "^1.6.0",
     "fastify": "^5.2.0",
     "fastify-plugin": "^5.0.1",
+    "framer-motion": "^11.18.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-icons": "^5.4.0",
     "react-router-dom": "^7.1.1",
     "zustand": "^5.0.2"
   },
