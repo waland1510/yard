@@ -59,7 +59,7 @@ export const Header = () => {
     }
   };
   return (
-    <div className="flex justify-around items-center gap-10">
+    <div className="flex px-4 justify-around items-center gap-10">
       <Badge colorScheme="orange">Round: {movesCount}</Badge>
       <Badge colorScheme="blue">
         <Flex alignItems={'center'} gap={2}>
