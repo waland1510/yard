@@ -30,11 +30,10 @@ import { PlayerInfo } from './player-info';
 export const Game = () => {
   const navigate = useNavigate();
   const { id: channel } = useParams<{ id: string }>();
-  const existingChannel = sessionStorage.getItem('channel');
   const { sendMessage } = useWebSocket(channel);
   const setChannel = useGameStore((state) => state.setChannel);
   const players = useGameStore((state) => state.players);
-  const username = sessionStorage.getItem('username');
+  const username = localStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setCurrentRole = useRunnerStore((state) => state.setCurrentRole);
   const setCurrentPosition = useRunnerStore(
@@ -48,27 +47,23 @@ export const Game = () => {
         const [game] = await getGameByChannel(channel);
 
         if (game) {
+          localStorage.setItem('channel', channel);
+          setChannel(channel);
           useGameStore.setState(game);
-          if (!game.players.find((p) => p.username === username)) {
+          const currentPlayer = game.players.find((p) => p.username === username);
+          if (currentPlayer) {
+            setCurrentRole(currentPlayer.role);
+          } else {
             sendMessage('joinGame', { channel, username, undefined });
           }
         }
-      }
-      if (existingChannel !== channel) {
-        sessionStorage.setItem('channel', channel!);
-        navigate(`/join/${channel}`);
+        if (!username) {
+          navigate(`/join/${channel}`);
+        }
       }
     };
     checkGame();
   }, []);
-
-  useEffect(() => {
-    setChannel(channel);
-
-    // sendMessage('updateGameState', game);
-
-    useGameStore.setState({ channel });
-  }, [channel, setChannel]);
 
   const {
     isOpen: isLeftOpen,

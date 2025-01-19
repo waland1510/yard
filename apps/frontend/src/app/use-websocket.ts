@@ -6,11 +6,13 @@ import { Message, MessageType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
 
 const useWebSocket = (initialChannel?: string) => {
+  console.log('initialChannel', initialChannel);
+
   const toast = useToast()
   const [messages, setMessages] = useState<Message[]>([]);
   const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
   const socket = getWebSocket();
-  const username = sessionStorage.getItem('username');
+  const username = localStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);

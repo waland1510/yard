@@ -19,7 +19,7 @@ export const Panel = () => {
   const setIsSecret = useRunnerStore((state) => state.setIsSecret);
   const setIsDouble = useRunnerStore((state) => state.setIsDouble);
   const setCurrentType = useRunnerStore((state) => state.setCurrentType);
-  const username = sessionStorage.getItem('username');
+  const username = localStorage.getItem('username');
 
   if (!node) {
     return null;

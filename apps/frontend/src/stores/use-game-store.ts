@@ -66,7 +66,10 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   gameMode: undefined,
   setGameMode: (gameMode?: GameMode) => set({ gameMode }),
   channel: '',
-  setChannel: (channel?: string) => set({ channel }),
+  setChannel: (channel?: string) => {
+    console.log('setChannel', channel);
+    if (channel) set({ channel });
+  },
   updateTicketsCount: (
     playerRole: string,
     type: MoveType,

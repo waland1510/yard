@@ -18,7 +18,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const server = Fastify();
 
 server.register(cors, {
-  origin: ['http://localhost:4200', 'https://catch-me-if-you-can-yard.vercel.app'], 
+  origin: ['http://localhost:4200', 'https://catch-me-if-you-can-yard.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
   allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
 });
@@ -63,14 +63,19 @@ server.register(async function (fastify) {
         console.log('Received:', parsedMessage);
         switch (parsedMessage.type) {
           case 'startGame':
-            currentChannel = parsedMessage.channel;
+            currentChannel = parsedMessage.data.ch;
+            console.log('currentChannel', currentChannel);
             channels[currentChannel] = new Set();
+            console.log(`Client joined channel: ${currentChannel}`);
+
             channels[currentChannel].add(connection);
             console.log(`Client joined channel: ${currentChannel}`);
             break;
 
           case 'joinGame': {
             currentChannel = parsedMessage.channel;
+            console.log('currentChannel', currentChannel);
+
             if (!channels[currentChannel]) {
               return;
             }

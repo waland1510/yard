@@ -153,7 +153,7 @@ export const Header = () => {
           alignSelf="center"
           onClick={toggleMagnify}
         >
-          <FaMagnifyingGlass size={20} />
+          <FaMagnifyingGlassLocation size={20} />
         </Badge>
       )}
     </div>

@@ -1,8 +1,9 @@
-import { runQuery, GameState } from '@yard/shared-utils';
+import { runQuery, GameState, GameMode } from '@yard/shared-utils';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { createGame } from "../helpers/create-game";
 
 const getGameByChannel = `
-  SELECT 
+  SELECT
     g.id AS game_id,
     g.channel,
     g.game_mode,
@@ -43,7 +44,7 @@ const getGameByChannel = `
   GROUP BY g.id;
 `;
 
-const createGame = `
+const createNewGame = `
   INSERT INTO games (channel, game_mode, created_at, updated_at)
   VALUES ($1, $2, NOW(), NOW())
   RETURNING id;
@@ -85,18 +86,18 @@ export default async function (fastify: FastifyInstance) {
     '/api/games',
     async (
       request: FastifyRequest<{
-        Body: GameState;
+        Body: GameMode;
       }>,
       reply: FastifyReply
     ) => {
-      const { channel, gameMode, players } = request.body;
+      const { channel, gameMode, players }  = createGame(request.body);
 
       const client = await fastify.pg.connect();
       try {
         await client.query('BEGIN');
 
         // Create the game
-        const gameResult = await client.query(createGame, [channel, gameMode]);
+        const gameResult = await client.query(createNewGame, [channel, gameMode]);
         const gameId = gameResult.rows[0].id;
 
         // Insert players
@@ -116,7 +117,7 @@ export default async function (fastify: FastifyInstance) {
         await Promise.all(playerPromises);
 
         await client.query('COMMIT');
-        reply.code(201).send({ success: true, gameId });
+        reply.code(201).send({ success: true, channel });
       } catch (error) {
         await client.query('ROLLBACK');
         console.error(error);
@@ -206,7 +207,7 @@ export default async function (fastify: FastifyInstance) {
 
   // Add a move
   fastify.post(
-    '/api/moves', 
+    '/api/moves',
     async (
       request: FastifyRequest<{
         Body: {

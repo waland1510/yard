@@ -1,4 +1,4 @@
-import { GameState, Player } from '@yard/shared-utils';
+import { GameMode, GameState, Player } from '@yard/shared-utils';
 import axios from 'axios';
 
 const api = axios.create({
@@ -11,7 +11,7 @@ const api = axios.create({
   },
 });
 
-export const createGame = async (gameData: GameState) => {
+export const createGame = async (gameData: GameMode) => {
   try {
     const response = await api.post('/api/games', gameData);
     return response.data;
