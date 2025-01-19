@@ -1,11 +1,13 @@
-import { Badge, Flex } from '@chakra-ui/react';
+import { Badge, Text, Flex } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import { isMoveAllowed } from '../../utils/move-allowed';
 import useWebSocket from '../use-websocket';
 import { PlayerPosition } from './player-position';
-import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from "react-icons/fa6";
+import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
+import { showCulpritAtMoves } from '@yard/shared-utils';
+import { FaEye } from 'react-icons/fa';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -23,7 +25,9 @@ export const Header = () => {
   const move = useRunnerStore((state) => state.move);
   const setMove = useRunnerStore((state) => state.setMove);
   const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
-  const setIsMagnifyEnabled = useRunnerStore((state) => state.setIsMagnifyEnabled);
+  const setIsMagnifyEnabled = useRunnerStore(
+    (state) => state.setIsMagnifyEnabled
+  );
 
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
@@ -57,6 +61,12 @@ export const Header = () => {
   return (
     <div className="flex justify-around items-center gap-10">
       <Badge colorScheme="orange">Round: {movesCount}</Badge>
+      <Badge colorScheme="blue">
+        <Flex alignItems={'center'} gap={2}>
+          <FaEye />
+          <Text>{showCulpritAtMoves.find((move) => move >= movesCount)}</Text>
+        </Flex>
+      </Badge>
       <Flex alignItems={'center'}>
         {currentPlayer ? (
           <PlayerPosition position={currentPlayer.position} />
@@ -105,17 +115,16 @@ export const Header = () => {
         })()}
       {currentRole === 'culprit' ? (
         <>
-
           <Badge colorScheme={isSecret ? 'red' : 'gray'}>
-          <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
-          Secret
-          </p>
-        </Badge>
+            <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
+              Secret
+            </p>
+          </Badge>
           <Badge colorScheme={isDouble ? 'red' : 'gray'}>
-          <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
-            Double
-          </p>
-        </Badge>
+            <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
+              Double
+            </p>
+          </Badge>
         </>
       ) : (
         <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
@@ -124,13 +133,29 @@ export const Header = () => {
           </p>
         </Badge>
       )}
-      {
-        isMagnifyEnabled ? (
-          <Badge colorScheme="green" w={26} h={6} display="flex" alignSelf="center" onClick={toggleMagnify} ><FaMagnifyingGlass size={20}/></Badge>
-        ) : (
-          <Badge colorScheme="gray" w={26} h={6} display="flex" alignSelf="center" onClick={toggleMagnify}><FaMagnifyingGlass size={20}/></Badge>
-        )
-      }
+      {isMagnifyEnabled ? (
+        <Badge
+          colorScheme="green"
+          w={26}
+          h={6}
+          display="flex"
+          alignSelf="center"
+          onClick={toggleMagnify}
+        >
+          <FaMagnifyingGlass size={20} />
+        </Badge>
+      ) : (
+        <Badge
+          colorScheme="gray"
+          w={26}
+          h={6}
+          display="flex"
+          alignSelf="center"
+          onClick={toggleMagnify}
+        >
+          <FaMagnifyingGlass size={20} />
+        </Badge>
+      )}
     </div>
   );
 };
