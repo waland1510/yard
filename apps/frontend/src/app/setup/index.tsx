@@ -81,10 +81,7 @@ export const Setup = () => {
 
   return (
     <div className="flex relative w-full h-full">
-      <div className="flex flex-col absolute w-full h-full z-10 p-10  items-center justify-center text-black">
-
-      {/* </div>
-    <div className="flex flex-col gap-5 items-center justify-center h-screen bg-white"> */}
+      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-center justify-center text-black">
       <img
         className="w-96 rounded mb-6"
         src="/images/catch.png"
