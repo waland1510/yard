@@ -8,6 +8,7 @@ import { PlayerPosition } from './player-position';
 import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { FaEye } from 'react-icons/fa';
+import { addMove } from '../../api';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -31,10 +32,13 @@ export const Header = () => {
 
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
+  const gameId = useGameStore((state) => state.id);
+  console.log({ gameId });
 
   const handleSend = () => {
     if (move) {
       sendMessage('makeMove', move);
+      // addMove(move);
       setMove(null);
       if (currentRole === 'culprit') {
         setIsDouble(false);

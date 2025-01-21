@@ -29,7 +29,7 @@ const useWebSocket = (initialChannel?: string) => {
 
       switch (message.type) {
         case 'joinGame':
-          console.log('Player joined:', message.data.username);
+          toast({ description: `New player joined: ${message.data}`, status: "success", position: 'top-right', duration: 9000, isClosable: true })
           break;
         case 'makeMove':
           setPosition(message.data.role, message.data.position);
@@ -44,7 +44,7 @@ const useWebSocket = (initialChannel?: string) => {
           toast({ description: `${message.data.role} moved to ${message.data.position}. Next turn - ${message.data.currentTurn}`, status: "warning", position: 'top-right', duration: 9000, isClosable: true })
           break;
         case 'updateGameState':
-          useGameStore.setState({ ...message.data });
+          // useGameStore.setState({ ...message.data });
           console.log('Game state updated:', message.data.players);
           break;
         case 'impersonate':

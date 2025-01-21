@@ -1,17 +1,10 @@
 import { useState } from 'react';
-// import useWebSocket from '../use-websocket';
 import { useRunnerStore } from '../../../stores/use-runner-store';
 import { Connections } from './connections';
 import { Nodes } from './nodes';
 import { RiverPath } from './river-path';
 
 export const Board = ({ channel }: { channel: string | undefined }) => {
-  // const existingChannel = useGameStore((state) => state.channel);
-  // console.log('existingChannel', existingChannel);
-
-  // const { sendMessage } = useWebSocket(channel);
-
-  // const [isMagnifyEnabled, setIsMagnifyEnabled] = useState(false);
   const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
   const [magnifyArea, setMagnifyArea] = useState({ x: 0, y: 0, radius: 100 });
 

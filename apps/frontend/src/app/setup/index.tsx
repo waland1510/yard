@@ -7,6 +7,7 @@ import ChooseRole from './choose-role';
 import { Mode } from './mode';
 import { Start } from './start';
 import { CreateGame } from './create-game';
+import { VideoBackground } from './video-background';
 
 const setupWorkflow = [
   'startGame',
@@ -27,6 +28,7 @@ export const Setup = () => {
   const navigate = useNavigate();
   const channel = useGameStore((state) => state.channel);
   const setChannel = useGameStore((state) => state.setChannel);
+  const setGame = useGameStore((state) => state.setGame);
   const username = localStorage.getItem('username');
   const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
   const existingChannel = localStorage.getItem('channel');
@@ -36,7 +38,7 @@ export const Setup = () => {
     if (existingChannel) {
       const [game] = await getGameByChannel(existingChannel);
       if (!game) return;
-      useGameStore.setState(game);
+      // setGame(game);
       setChannel(channel);
       navigate(`/game/${existingChannel}`);
     }
@@ -78,7 +80,11 @@ export const Setup = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5 items-center justify-center h-screen bg-white">
+    <div className="flex relative w-full h-full">
+      <div className="flex flex-col absolute w-full h-full z-10 p-10 text-white">
+
+      {/* </div>
+    <div className="flex flex-col gap-5 items-center justify-center h-screen bg-white"> */}
       <img
         className="w-96 rounded mb-6"
         src="/images/logo.jpg"
@@ -86,6 +92,8 @@ export const Setup = () => {
       />
       {username && <p className="text-lg text-gray-700">Welcome, {username}</p>}
       {renderStep()}
+    </div>
+    <VideoBackground />
     </div>
   );
 };

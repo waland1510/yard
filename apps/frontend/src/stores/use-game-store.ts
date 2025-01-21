@@ -11,6 +11,8 @@ import {
 } from '@yard/shared-utils';
 
 export interface ClientGameState extends GameState {
+  setGame: (game: ClientGameState) => void;
+  setId: (id: number) => void;
   updateMoves: (move: Move) => void;
   setMovesCount: (movesCount: number) => void;
   setCurrentTurn: (currentTurn: RoleType) => void;
@@ -29,6 +31,8 @@ export interface ClientGameState extends GameState {
 }
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
+  setGame: (game) => set(game),
+  setId: (id) => set({ id }),
   moves: [],
   status: 'active',
   updateMoves: (move) =>
