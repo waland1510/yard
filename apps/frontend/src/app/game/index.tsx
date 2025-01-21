@@ -177,7 +177,7 @@ export const Game = () => {
         />
         <img
           className="w-20"
-          src="/images/logo.jpg"
+          src="/images/catch.png"
           alt="player"
           onClick={() => navigate('/')}
         />

@@ -81,13 +81,13 @@ export const Setup = () => {
 
   return (
     <div className="flex relative w-full h-full">
-      <div className="flex flex-col absolute w-full h-full z-10 p-10 text-white">
+      <div className="flex flex-col absolute w-full h-full z-10 p-10  items-center justify-center text-black">
 
       {/* </div>
     <div className="flex flex-col gap-5 items-center justify-center h-screen bg-white"> */}
       <img
         className="w-96 rounded mb-6"
-        src="/images/logo.jpg"
+        src="/images/catch.png"
         alt="Game Logo"
       />
       {username && <p className="text-lg text-gray-700">Welcome, {username}</p>}
