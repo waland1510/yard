@@ -80,7 +80,7 @@ export const Setup = () => {
 
   return (
     <div className="flex relative w-full h-full">
-      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-center justify-center text-black">
+      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-start justify-start   text-black">
         <img
           className="w-96 rounded mb-6"
           src="/images/catch.png"
