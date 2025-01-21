@@ -32,7 +32,6 @@ export const Setup = () => {
   const username = localStorage.getItem('username');
   const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
   const existingChannel = localStorage.getItem('channel');
-  console.log({currentStep});
 
   const handleContinueGame = async () => {
     if (existingChannel) {
@@ -82,15 +81,17 @@ export const Setup = () => {
   return (
     <div className="flex relative w-full h-full">
       <div className="flex flex-col absolute w-full h-full z-10 p-10 items-center justify-center text-black">
-      <img
-        className="w-96 rounded mb-6"
-        src="/images/catch.png"
-        alt="Game Logo"
-      />
-      {username && <p className="text-lg text-gray-700">Welcome, {username}</p>}
-      {renderStep()}
-    </div>
-    <VideoBackground />
+        <img
+          className="w-96 rounded mb-6"
+          src="/images/catch.png"
+          alt="Game Logo"
+        />
+        {username && (
+          <p className="text-lg text-gray-700">Welcome, {username}</p>
+        )}
+        {renderStep()}
+      </div>
+      <VideoBackground />
     </div>
   );
 };

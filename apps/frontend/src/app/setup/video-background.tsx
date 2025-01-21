@@ -9,7 +9,7 @@ export const VideoBackground = () => {
       <iframe
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
-        src="https://www.youtube.com/embed/bfSJayt6IpE?si=6Si8R20Q30S07qg7?autoplay=1&controls=0&mute=1&loop=1&modestbranding=1&showinfo=0&start=2&enablejsapi=1"
+        src="https://www.youtube.com/embed/bfSJayt6IpE?autoplay=1&controls=0&mute=1&loop=1&modestbranding=1&showinfo=0&start=2&enablejsapi=1&playlist=bfSJayt6IpE"
         title="YouTube video player"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"/>

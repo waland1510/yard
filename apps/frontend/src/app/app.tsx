@@ -1,7 +1,7 @@
-import { Game } from './game';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import { Setup } from './setup';
 import GameUIWithDrawers from './chakra';
+import { Game } from './game';
+import { Setup } from './setup';
 
 export function App() {
   return (
