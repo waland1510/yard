@@ -8,6 +8,7 @@ import { Mode } from './mode';
 import { Start } from './start';
 import { CreateGame } from './create-game';
 import { VideoBackground } from './video-background';
+import { Card } from '@chakra-ui/react';
 
 const setupWorkflow = [
   'startGame',
@@ -80,16 +81,18 @@ export const Setup = () => {
 
   return (
     <div className="flex relative w-full h-full">
-      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-start justify-start   text-black">
+      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-start justify-start text-black">
         <img
           className="w-96 rounded mb-6"
           src="/images/catch.png"
           alt="Game Logo"
         />
-        {username && (
-          <p className="text-lg text-gray-700">Welcome, {username}</p>
-        )}
-        {renderStep()}
+        <Card>
+          {username && (
+            <p className="text-lg text-gray-700">Welcome, {username}</p>
+          )}
+          {renderStep()}
+        </Card>
       </div>
       <VideoBackground />
     </div>
