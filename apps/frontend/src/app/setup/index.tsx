@@ -1,14 +1,14 @@
+import { Card } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
+import { CreateGame } from './create-game';
 import { Mode } from './mode';
 import { Start } from './start';
-import { CreateGame } from './create-game';
 import { VideoBackground } from './video-background';
-import { Card } from '@chakra-ui/react';
 
 const setupWorkflow = [
   'startGame',
