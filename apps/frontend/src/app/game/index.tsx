@@ -45,7 +45,6 @@ export const Game = () => {
     const checkGame = async () => {
       if (channel) {
         const [game] = await getGameByChannel(channel);
-
         if (game) {
           localStorage.setItem('channel', channel);
           setChannel(channel);
