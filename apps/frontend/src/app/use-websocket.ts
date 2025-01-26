@@ -4,15 +4,15 @@ import { useGameStore } from '../stores/use-game-store';
 import { useRunnerStore } from '../stores/use-runner-store';
 import { Message, MessageType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
+import { usePlayersSubscription } from '../hooks/use-players-subscription';
 
 const useWebSocket = (initialChannel?: string) => {
-  console.log('initialChannel', initialChannel);
-
-  const toast = useToast()
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
+  // console.log('initialChannel', initialChannel);
   const socket = getWebSocket();
+  const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
+  const [messages, setMessages] = useState<Message[]>([]);
   const username = localStorage.getItem('username');
+  const toast = useToast();
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
@@ -21,6 +21,7 @@ const useWebSocket = (initialChannel?: string) => {
   const updatePlayer = useGameStore((state) => state.updatePlayer);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
   const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
+  const players = usePlayersSubscription().map((player) => player.username);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -29,19 +30,44 @@ const useWebSocket = (initialChannel?: string) => {
 
       switch (message.type) {
         case 'joinGame':
-          toast({ description: `New player joined: ${message.data}`, status: "success", position: 'top-right', duration: 9000, isClosable: true })
+          if (players.includes(message.data)) return;
+          toast({
+            description: `New player joined: ${message.data}`,
+            status: 'success',
+            position: 'top-right',
+            duration: 9000,
+            isClosable: true,
+          });
           break;
         case 'makeMove':
           setPosition(message.data.role, message.data.position);
-          updateTicketsCount(message.data.role, message.data.type, message.data.isSecret, message.data.isDouble);
+          updateTicketsCount(
+            message.data.role,
+            message.data.type,
+            message.data.isSecret,
+            message.data.isDouble
+          );
           setIsDoubleMove(message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
           setMovesCount(message.data.movesCount);
-          if(message.data.role === 'culprit') {
+          if (message.data.role === 'culprit') {
             updateMoves(message.data);
-          }
-          console.log('Move made:', message.data);
-          toast({ description: `${message.data.role} moved to ${message.data.position}. Next turn - ${message.data.currentTurn}`, status: "warning", position: 'top-right', duration: 9000, isClosable: true })
+            toast({
+              description: `Mr.C made his move. Next is ${message.data.currentTurn}`,
+              status: 'error',
+              position: 'top-right',
+              duration: 9000,
+              isClosable: true,
+            });
+          } else {
+          toast({
+            description: `${message.data.role} moved to ${message.data.position}. Next is ${message.data.currentTurn}`,
+            status: 'warning',
+            position: 'top-right',
+            duration: 9000,
+            isClosable: true,
+          });
+        }
           break;
         case 'updateGameState':
           // useGameStore.setState({ ...message.data });
@@ -58,12 +84,17 @@ const useWebSocket = (initialChannel?: string) => {
 
     if (socket) {
       socket.onmessage = handleMessage;
-      if (channel && username) {
-        if (socket.readyState === WebSocket.OPEN) {
+
+      if (!channel || !username || !currentRole) return;
+
+      const joinGameIfNeeded = () => {
+        if (!players.includes(username)) {
           sendMessage('joinGame', { channel, username, currentRole });
-        } else {
-          socket.onopen = () => sendMessage('joinGame', { channel, username, currentRole });
         }
+      };
+
+      if (socket.readyState !== WebSocket.OPEN) {
+        socket.onopen = joinGameIfNeeded;
       }
     }
 
@@ -80,20 +111,21 @@ const useWebSocket = (initialChannel?: string) => {
         const message = JSON.stringify({ type, channel, data }); // Include the channel in every message
         socket.send(message);
       } else {
+        console.log({ type, channel, data });
         console.warn('WebSocket is not connected');
       }
     },
     [socket, channel]
   );
 
-  // const joinChannel = (newChannel: string) => {
+  // const joinChannel = (newChannel: string, username, currentRole) => {
   //   setChannel(newChannel);
   //   if (socket && socket.readyState === WebSocket.OPEN) {
-  //     sendMessage('joinGame', { channel: newChannel });
+  //     sendMessage('joinGame', { channel: newChannel, username, currentRole });
   //   }
   // };
 
-  return { messages, sendMessage,  channel };
+  return { messages, sendMessage, channel };
 };
 
 export default useWebSocket;

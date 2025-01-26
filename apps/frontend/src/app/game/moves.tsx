@@ -25,16 +25,16 @@ export const Moves = () => {
       <DrawerHeader>Moves History</DrawerHeader>
       <DrawerBody>
         <VStack spacing={4} overflowY="auto" align="stretch">
-          {moves?.map((move, index) => (
+          {moves?.filter(m => m.role === 'culprit').map((move, index) => (
             <Box
-              key={index}
-              p={3}
-              bg="gray.100"
-              rounded="md"
-              _hover={{ bg: 'gray.200' }}
+            key={index}
+            p={3}
+            bg="gray.100"
+            rounded="md"
+            _hover={{ bg: 'gray.200' }}
             >
               <Text>
-                {index + 1}. {move.type ?? 'secret'} -{' '}
+                {index + 1}. {move.type} -{' '}
                 {showCulpritAtMoves.includes(index + 1) ? move.position : '??'}
               </Text>
             </Box>

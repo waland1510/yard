@@ -17,7 +17,7 @@ import { RoleType } from '@yard/shared-utils';
 import { useEffect } from 'react';
 import { FiArrowLeft, FiMenu } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getGameByChannel, patchPlayer } from '../../api';
+import { getGameByChannel, updatePlayer } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import useWebSocket from '../use-websocket';
@@ -53,8 +53,9 @@ export const Game = () => {
           const currentPlayer = game.players.find((p) => p.username === username);
           if (currentPlayer) {
             setCurrentRole(currentPlayer.role);
+            sendMessage('joinGame', { channel, username, role: currentPlayer.role });
           } else {
-            sendMessage('joinGame', { channel, username, undefined });
+            navigate(`/join/${channel}`);
           }
         }
         if (!username) {
@@ -77,11 +78,12 @@ export const Game = () => {
   } = useDisclosure();
 
   const onRoleChange = (role: RoleType) => {
+    if (role === 'culprit' || currentRole === 'culprit') return;
     setCurrentRole(role);
     const currentPlayer = players.find((p) => p.role === role);
     if (currentPlayer) {
       setCurrentPosition(currentPlayer.position);
-      patchPlayer(currentPlayer.id, { username: username as string });
+      updatePlayer(currentPlayer.id, { username: username as string });
     }
 
     sendMessage('updateGameState', role);
@@ -139,22 +141,6 @@ export const Game = () => {
                 </>
               )}
             </VStack>
-            {/* <Avatar size="xl" name="Detective 3" src="/path-to-avatar.png" />
-              <VStack spacing={2}>
-                <Text fontSize="lg" fontWeight="bold">
-                  Detective 3
-                </Text>
-                <Badge colorScheme="yellow">Taxi: 10</Badge>
-                <Badge colorScheme="green">Bus: 8</Badge>
-                <Badge colorScheme="red">Metro: 4</Badge>
-              </VStack>
-              <Divider />
-              <Text fontSize="sm" color="gray.500">
-                Current Turn
-              </Text>
-              <Badge colorScheme="blue" p={2} rounded="lg">
-                Your Turn
-              </Badge> */}
           </DrawerBody>
         </DrawerContent>
       </Drawer>
@@ -196,26 +182,6 @@ export const Game = () => {
           justify="space-between"
         >
           <Header />
-          {/* <HStack spacing={4}>
-            <Avatar size="sm" src="/path-to-avatar-1.png" />
-            <Text fontSize="lg" fontWeight="bold">
-              Val
-            </Text>
-            <Badge colorScheme="orange">Moves: 1</Badge>
-          </HStack>
-          <HStack spacing={4}>
-            <Text fontSize="sm" color="gray.600">
-              Current Position: <strong>30</strong>
-            </Text>
-            <Text fontSize="sm" color="gray.600">
-              Current Type: <strong>Taxi</strong>
-            </Text>
-          </HStack>
-          <HStack spacing={2}>
-            <Text fontSize="md" fontWeight="bold" color="gray.700">
-              Game Status
-            </Text>
-          </HStack> */}
         </HStack>
 
         {/* Map Section */}
@@ -260,6 +226,7 @@ export const Game = () => {
             className="w-10 h-12"
             src={`/images/${currentTurn}.png`}
             alt="player"
+            onClick={() => onRoleChange(currentTurn)}
           />
           <div className="text-sm">{currentTurn}</div>
         </div>

@@ -1,5 +1,5 @@
 import { GameMode } from '@yard/shared-utils';
-import { createGame, getGameByChannel } from '../../api';
+import { createGame } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import useWebSocket from '../use-websocket';
 
@@ -8,14 +8,15 @@ interface ModeProps {
 }
 
 export const Mode = ({ setCurrentStep }: ModeProps) => {
-  const setChannel = useGameStore((state) => state.setChannel);
+  const { sendMessage } = useWebSocket('');
   const handleNewGame = async (gameMode: GameMode) => {
-    setCurrentStep('createGame');
-    const {channel} = await createGame(gameMode);
+    const { createdGame } = await createGame(gameMode);
 
-    setChannel(channel);
-    const game = await getGameByChannel(channel);
-    useGameStore.setState(game[0]);
+    useGameStore.setState(createdGame);
+    if (createdGame) {
+      setCurrentStep('createGame');
+      sendMessage('startGame', { ch: createdGame.channel });
+    }
   };
   return (
     <div className="text-center">

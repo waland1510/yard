@@ -4,7 +4,7 @@ import { useRunnerStore } from '../../stores/use-runner-store';
 import { RoleType } from '@yard/shared-utils';
 import useWebSocket from '../use-websocket';
 import { useGameStore } from '../../stores/use-game-store';
-import { patchPlayer } from '../../api';
+import { updatePlayer } from '../../api';
 import { PlayerInfo } from '../game/player-info';
 
 interface ChooseRoleProps {
@@ -17,6 +17,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
   const { sendMessage } = useWebSocket(channel);
   const username = localStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
+  const setPlayer = useGameStore((state) => state.setPlayer);
 
   useEffect(() => {
     if (username) {
@@ -38,8 +39,10 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
     useRunnerStore.setState({
       currentPosition: player.position,
     });
+    player.username = username as string;
+    setPlayer(player);
     sendMessage('joinGame', { channel, username, currentRole });
-    await patchPlayer(player.id, { username: username as string });
+    await updatePlayer(player.id, { username: username as string });
     setCurrentStep('invitePlayers');
   };
   return (

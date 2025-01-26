@@ -110,6 +110,15 @@ export interface Message {
 
 export const showCulpritAtMoves = [3, 8, 13, 18];
 
+export function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
+  if (isDouble) {
+    return currentRole;
+  }
+  const roles = Object.values(Role) as RoleType[];
+  const currentIndex = roles.indexOf(currentRole);
+  return roles[(currentIndex + 1) % roles.length];
+}
+
 export const RESET_DB = `DROP TABLE IF EXISTS users, posts CASCADE;
 
 CREATE TABLE users (

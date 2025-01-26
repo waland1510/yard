@@ -1,14 +1,15 @@
-import { runQuery, GameState, GameMode } from '@yard/shared-utils';
+import { runQuery, GameState, GameMode, Player } from '@yard/shared-utils';
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { createGame } from "../helpers/create-game";
+import { createGameState } from "../helpers/create-game";
 
 const getGameByChannel = `
   SELECT
-    g.id AS game_id,
+    g.id,
     g.channel,
-    g.game_mode,
-    g.created_at AS game_created_at,
-    g.updated_at AS game_updated_at,
+    g.current_turn AS "currentTurn",
+    g.game_mode AS "gameMode",
+    g.created_at,
+    g.updated_at,
     json_agg(
       json_build_object(
         'id', p.id,
@@ -45,26 +46,14 @@ const getGameByChannel = `
 `;
 
 const createNewGame = `
-  INSERT INTO games (channel, game_mode, created_at, updated_at)
-  VALUES ($1, $2, NOW(), NOW())
+  INSERT INTO games (channel, game_mode, current_turn, created_at, updated_at)
+  VALUES ($1, $2, $3, NOW(), NOW())
   RETURNING id;
 `;
 
 const insertPlayer = `
   INSERT INTO players (game_id, username, role, position, taxi_tickets, bus_tickets, underground_tickets, secret_tickets, double_tickets)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
-`;
-
-const updateGame = `
-  UPDATE games
-  SET channel = $1, game_mode = $2, updated_at = NOW()
-  WHERE id = $3;
-`;
-
-const updatePlayer = `
-  UPDATE players
-  SET username = $1, role = $2, position = $3, taxi_tickets = $4, bus_tickets = $5, underground_tickets = $6, secret_tickets = $7, double_tickets = $8
-  WHERE id = $9;
 `;
 
 const insertMove = `
@@ -90,17 +79,18 @@ export default async function (fastify: FastifyInstance) {
       }>,
       reply: FastifyReply
     ) => {
-      const { channel, gameMode, players }  = createGame(request.body);
+      // Create game state
+      const {channel, players, gameMode, currentTurn}  = createGameState(request.body);
 
       const client = await fastify.pg.connect();
       try {
         await client.query('BEGIN');
 
-        // Create the game
-        const gameResult = await client.query(createNewGame, [channel, gameMode]);
+        // Save the game to the database
+        const gameResult = await client.query(createNewGame, [channel, gameMode, currentTurn]);
         const gameId = gameResult.rows[0].id;
 
-        // Insert players
+        // Insert players into the database
         const playerPromises = players.map((player) =>
           client.query(insertPlayer, [
             gameId,
@@ -117,7 +107,8 @@ export default async function (fastify: FastifyInstance) {
         await Promise.all(playerPromises);
 
         await client.query('COMMIT');
-        reply.code(201).send({ success: true, channel });
+        const { rows } = await runQuery(fastify.pg, getGameByChannel, [channel]);
+        reply.code(201).send({ success: true, createdGame: rows[0]});
       } catch (error) {
         await client.query('ROLLBACK');
         console.error(error);
@@ -128,30 +119,61 @@ export default async function (fastify: FastifyInstance) {
     }
   );
 
-  // Update a game
-  fastify.put(
-    '/api/games/:id',
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: Partial<GameState>;
-      }>,
-      reply: FastifyReply
-    ) => {
-      const { id } = request.params;
-      const { channel, gameMode } = request.body;
+// Update a game
+fastify.patch(
+  '/api/games/:id',
+  async (
+    request: FastifyRequest<{
+      Params: { id: string };
+      Body: Partial<GameState>;
+    }>,
+    reply: FastifyReply
+  ) => {
+    const { id } = request.params;
+    const body = request.body;
 
-      try {
-        await runQuery(fastify.pg, updateGame, [channel, gameMode, id]);
-        reply.code(200).send({ success: true });
-      } catch (error) {
-        console.error(error);
-        reply
-          .code(500)
-          .send({ success: false, error: 'Failed to update game' });
-      }
+    // Map body fields to database column names
+    const mappedGame = {
+      game_mode: body.gameMode,
+      current_turn: body.currentTurn,
+      moves_count: body.movesCount,
+      is_double_move: body.isDoubleMove,
+      status: body.status,
+    };
+
+    // Filter out undefined or null fields
+    const validEntries = Object.entries(mappedGame).filter(
+      ([_, value]) => value !== undefined
+    );
+
+    if (validEntries.length === 0) {
+      reply.code(400).send({ success: false, error: 'No fields to update' });
+      return;
     }
-  );
+
+    // Build dynamic SQL query
+    const setClause = validEntries
+      .map(([key], index) => `${key} = $${index + 1}`)
+      .join(', ');
+    const values = validEntries.map(([_, value]) => value);
+
+    const query = `
+      UPDATE games
+      SET ${setClause}
+      WHERE id = $${validEntries.length + 1};
+    `;
+
+    try {
+      await runQuery(fastify.pg, query, [...values, id]);
+      reply.code(200).send({ success: true });
+    } catch (error) {
+      console.error(error);
+      reply
+        .code(500)
+        .send({ success: false, error: 'Failed to update game' });
+    }
+  }
+);
 
   // Update a player
   fastify.patch(
@@ -159,16 +181,7 @@ export default async function (fastify: FastifyInstance) {
     async (
       request: FastifyRequest<{
         Params: { id: string };
-        Body: Partial<{
-          username: string;
-          role: string;
-          position: number;
-          taxiTickets: number;
-          busTickets: number;
-          undergroundTickets: number;
-          secretTickets: number;
-          doubleTickets: number;
-        }>;
+        Body: Partial<Player>;
       }>,
       reply: FastifyReply
     ) => {

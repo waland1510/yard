@@ -1,11 +1,11 @@
 import { GameMode, GameState, Player } from '@yard/shared-utils';
 import axios from 'axios';
 
+console.log(import.meta.env.VITE_API_URL)
+
 const api = axios.create({
-  baseURL:
-    process.env.NODE_ENV === 'production'
-      ? 'https://yard-1.onrender.com/'
-      : 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_API_URL,
+
   headers: {
     'Content-Type': 'application/json', // Ensures that the body is sent as JSON
   },
@@ -38,7 +38,7 @@ export const updateGame = async (
   gameData: Partial<GameState>
 ) => {
   try {
-    const response = await api.put(`/api/games/${gameId}`, gameData);
+    const response = await api.patch(`/api/games/${gameId}`, gameData);
     return response.data;
   } catch (error) {
     console.error(`Error updating game with ID ${gameId}:`, error);
@@ -56,7 +56,7 @@ export const createPlayer = async (playerData: Player) => {
   }
 };
 
-export const patchPlayer = async (
+export const updatePlayer = async (
   playerId: number,
   playerData: Partial<Player>
 ) => {

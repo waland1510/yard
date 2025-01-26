@@ -6,9 +6,9 @@ import { isMoveAllowed } from '../../utils/move-allowed';
 import useWebSocket from '../use-websocket';
 import { PlayerPosition } from './player-position';
 import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
-import { showCulpritAtMoves } from '@yard/shared-utils';
+import { getNextRole, showCulpritAtMoves, Player } from '@yard/shared-utils';
 import { FaEye } from 'react-icons/fa';
-import { addMove } from '../../api';
+import { addMove, updateGame, updatePlayer } from '../../api';
 
 export const Header = () => {
   const existingChannel = useGameStore((state) => state.channel);
@@ -33,12 +33,23 @@ export const Header = () => {
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
   const gameId = useGameStore((state) => state.id);
-  console.log({ gameId });
 
   const handleSend = () => {
-    if (move) {
+    if (move && gameId && currentRole && currentPlayer) {
       sendMessage('makeMove', move);
-      // addMove(move);
+      addMove({
+        gameId,
+        move_type: move.type,
+        role: move.role ?? '',
+        position: move.position,
+        isSecret,
+        isDouble,
+      });
+      updatePlayer(currentPlayer.id, {
+        position: move.position,
+        // [move.type + 'Tickets']: currentPlayer[`${move.type}Tickets`] - 1,
+      });
+      updateGame(gameId, { currentTurn: getNextRole(currentRole, isDouble) });
       setMove(null);
       if (currentRole === 'culprit') {
         setIsDouble(false);
@@ -100,12 +111,18 @@ export const Header = () => {
           return (
             <div>
               {isAllowed ? (
-                <button
-                  className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                  onClick={handleSend}
-                >
-                  Confirm {move.position}
-                </button>
+                currentType ? (
+                  <button
+                    className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    onClick={handleSend}
+                  >
+                    Confirm {move.position}
+                  </button>
+                ) : (
+                  <button className="bg-yellow-500 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded">
+                    Select a transport
+                  </button>
+                )
               ) : (
                 <button
                   className="bg-red-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed"

@@ -1,7 +1,7 @@
-import { easyPositions, GameMode, GameState, hardPositions, initialPlayers, mediumPositions, Player } from "@yard/shared-utils";
+import { easyPositions, GameMode, GameState, hardPositions, initialPlayers, mediumPositions } from "@yard/shared-utils";
 
 
-export function createGame(gameMode: GameMode): GameState {
+export function createGameState(gameMode: GameMode): GameState {
   const startingPositions = getStartingPositions(gameMode);
   const channel = Math.random().toString(36).substring(7);
 

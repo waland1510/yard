@@ -8,6 +8,7 @@ import {
   Role,
   RoleType,
   Message,
+  getNextRole,
 } from '@yard/shared-utils';
 import cors from '@fastify/cors'
 
@@ -18,21 +19,10 @@ const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const server = Fastify();
 
 server.register(cors, {
-  origin: ['http://localhost:4200', 'https://catch-me-if-you-can-yard.vercel.app'],
+  origin: [process.env.FRONTEND_URL],
   methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
   allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
 });
-
-
-function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
-  if (isDouble) {
-    return currentRole;
-  }
-  const roles = Object.values(Role) as RoleType[];
-  const currentIndex = roles.indexOf(currentRole);
-  return roles[(currentIndex + 1) % roles.length];
-}
-
 
 const channels: Record<string, Set<any>> = {};
 
@@ -146,10 +136,10 @@ server.register(async function (fastify) {
           );
 
           // Clean up the channel if empty
-          if (channels[currentChannel].size === 0) {
-            delete channels[currentChannel];
-            console.log(`Channel ${currentChannel} deleted`);
-          }
+          // if (channels[currentChannel].size === 0) {
+          //   delete channels[currentChannel];
+          //   console.log(`Channel ${currentChannel} deleted`);
+          // }
         }
       });
     }
