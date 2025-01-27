@@ -30,6 +30,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
         setCurrentStep('invitePlayers');
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRoleChange = async (role: string) => {

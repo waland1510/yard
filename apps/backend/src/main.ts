@@ -24,7 +24,7 @@ server.register(cors, {
   allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
 });
 
-const channels: Record<string, Set<any>> = {};
+const channels: Record<string, Set<WebSocket>> = {};
 
 server.register(app);
 server.register(ws);
@@ -43,7 +43,7 @@ server.register(async function (fastify) {
           case 'startGame':
             currentChannel = parsedMessage.data.ch;
             channels[currentChannel] = new Set();
-            channels[currentChannel].add(connection);
+            channels[currentChannel].add(connection as unknown as WebSocket);
             console.log(`Client joined channel: ${currentChannel}`);
             break;
 
@@ -52,7 +52,7 @@ server.register(async function (fastify) {
             if (!channels[currentChannel]) {
               return;
             }
-            channels[currentChannel].add(connection);
+            channels[currentChannel].add(connection as unknown as WebSocket);
 
             broadcast(currentChannel, {
               type: 'joinGame',
@@ -130,7 +130,7 @@ server.register(async function (fastify) {
 
       connection.on('close', () => {
         if (currentChannel && channels[currentChannel]) {
-          channels[currentChannel].delete(connection);
+          channels[currentChannel].delete(connection as unknown as WebSocket);
           console.log(
             `Client disconnected from channel: ${currentChannel}. Remaining clients: ${channels[currentChannel].size}`
           );

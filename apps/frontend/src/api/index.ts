@@ -1,4 +1,4 @@
-import { GameMode, GameState, Player } from '@yard/shared-utils';
+import { GameMode, GameState, Move, Player } from '@yard/shared-utils';
 import axios from 'axios';
 
 console.log(import.meta.env.VITE_API_URL)
@@ -23,7 +23,7 @@ export const createGame = async (gameData: GameMode) => {
 
 export const getGameByChannel = async (
   channel: string
-): Promise<GameState[]> => {
+): Promise<GameState> => {
   try {
     const response = await api.get(`/api/games/${channel}`);
     return response.data;
@@ -69,14 +69,7 @@ export const updatePlayer = async (
   }
 };
 
-export const addMove = async (moveData: {
-  gameId: number;
-  role: string;
-  move_type: string;
-  isSecret: boolean;
-  isDouble: boolean;
-  position: number;
-}) => {
+export const addMove = async (moveData: Move) => {
   try {
     const response = await api.post('/api/moves', moveData);
     return response.data;

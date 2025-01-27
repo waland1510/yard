@@ -44,7 +44,9 @@ export const Game = () => {
   useEffect(() => {
     const checkGame = async () => {
       if (channel) {
-        const [game] = await getGameByChannel(channel);
+        const game = await getGameByChannel(channel);
+        console.log('game', game);
+
         if (game) {
           localStorage.setItem('channel', channel);
           setChannel(channel);

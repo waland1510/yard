@@ -91,10 +91,11 @@ export const initialPlayers: Player[] = [
 ];
 
 export interface Move {
+  gameId: number;
   role?: RoleType;
   type: MoveType;
-  isSecret?: boolean;
-  isDouble?: boolean;
+  secret?: boolean;
+  double?: boolean;
   position: number;
 }
 

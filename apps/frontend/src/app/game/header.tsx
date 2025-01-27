@@ -6,7 +6,7 @@ import { isMoveAllowed } from '../../utils/move-allowed';
 import useWebSocket from '../use-websocket';
 import { PlayerPosition } from './player-position';
 import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
-import { getNextRole, showCulpritAtMoves, Player } from '@yard/shared-utils';
+import { getNextRole, showCulpritAtMoves } from '@yard/shared-utils';
 import { FaEye } from 'react-icons/fa';
 import { addMove, updateGame, updatePlayer } from '../../api';
 
@@ -39,11 +39,11 @@ export const Header = () => {
       sendMessage('makeMove', move);
       addMove({
         gameId,
-        move_type: move.type,
-        role: move.role ?? '',
+        type: move.type,
+        role: move.role,
         position: move.position,
-        isSecret,
-        isDouble,
+        secret: isSecret,
+        double: isDouble,
       });
       updatePlayer(currentPlayer.id, {
         position: move.position,
