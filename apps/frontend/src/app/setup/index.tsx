@@ -36,7 +36,7 @@ export const Setup = () => {
 
   const handleContinueGame = async () => {
     if (existingChannel) {
-      const [game] = await getGameByChannel(existingChannel);
+      const game = await getGameByChannel(existingChannel);
       if (!game) return;
       // setGame(game);
       setChannel(channel);
