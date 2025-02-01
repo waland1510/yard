@@ -28,6 +28,7 @@ const useWebSocket = (initialChannel?: string) => {
     const handleMessage = (event: MessageEvent) => {
       const message: Message = JSON.parse(event.data);
       setMessages((prev) => [...prev, message]);
+      console.log('Received:', message);
 
       switch (message.type) {
         case 'joinGame':
@@ -45,10 +46,10 @@ const useWebSocket = (initialChannel?: string) => {
           updateTicketsCount(
             message.data.role,
             message.data.type,
-            message.data.isSecret,
-            message.data.isDouble
+            message.data.secret,
+            message.data.double
           );
-          setIsDoubleMove(message.data.isDouble);
+          setIsDoubleMove(message.data.double);
           setCurrentTurn(message.data.currentTurn);
           if (message.data.role === 'culprit') {
             setMovesCount(movesCount + 1);

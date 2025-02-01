@@ -6,7 +6,7 @@ import {
   DrawerHeader,
   Text,
   useDisclosure,
-  VStack
+  VStack,
 } from '@chakra-ui/react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { FiArrowRight } from 'react-icons/fi';
@@ -25,20 +25,24 @@ export const Moves = () => {
       <DrawerHeader>Moves History</DrawerHeader>
       <DrawerBody>
         <VStack spacing={4} overflowY="auto" align="stretch">
-          {moves?.filter(m => m.role === 'culprit').map((move, index) => (
-            <Box
-            key={index}
-            p={3}
-            bg="gray.100"
-            rounded="md"
-            _hover={{ bg: 'gray.200' }}
-            >
-              <Text>
-                {index + 1}. {move.type} -{' '}
-                {showCulpritAtMoves.includes(index + 1) ? move.position : '??'}
-              </Text>
-            </Box>
-          ))}
+          {moves
+            ?.filter((m) => m.role === 'culprit')
+            .map((move, index) => (
+              <Box
+                key={index}
+                p={3}
+                bg="gray.100"
+                rounded="md"
+                _hover={{ bg: 'gray.200' }}
+              >
+                <Text>
+                  {index + 1}. {move.secret ? '🔒' : move.type} -{' '}
+                  {showCulpritAtMoves.includes(index + 1)
+                    ? move.position
+                    : '??'}
+                </Text>
+              </Box>
+            ))}
         </VStack>
       </DrawerBody>
       <DrawerFooter>

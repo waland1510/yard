@@ -7,13 +7,9 @@ export const isMoveAllowed = (
   nodeId: number,
   runnerPosition: number | undefined,
   currentRole: RoleType | undefined,
-
 ): string | undefined => {
-  console.log('nodeId', runnerPosition);
 
   const node = nodes.find((node) => node.id === runnerPosition);
-  console.log('node', node);
-
   if (!node) {
     return undefined;
   }

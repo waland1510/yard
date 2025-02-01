@@ -48,7 +48,6 @@ export const Game = () => {
       if (channel) {
         try {
           const game = await getGameByChannel(channel);
-          console.log('game', game);
           if (!game || game.status === 'finished') {
             localStorage.removeItem('channel');
             toast({
