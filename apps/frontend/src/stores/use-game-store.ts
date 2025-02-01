@@ -14,7 +14,6 @@ export interface ClientGameState extends GameState {
   setGame: (game: ClientGameState) => void;
   setId: (id: number) => void;
   updateMoves: (move: Move) => void;
-  setMovesCount: (movesCount: number) => void;
   setCurrentTurn: (currentTurn: RoleType) => void;
   setPlayer: (player: Player) => void;
   updatePlayer: (role: string, username: string) => void;
@@ -37,8 +36,6 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   status: 'active',
   updateMoves: (move) =>
     set((state) => ({ moves: [...(state.moves || []), move] })),
-  movesCount: 0,
-  setMovesCount: (movesCount) => set({ movesCount }),
   currentTurn: Role.culprit,
   setCurrentTurn: (currentTurn) => set({ currentTurn }),
   players: initialPlayers,

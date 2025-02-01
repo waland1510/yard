@@ -14,7 +14,6 @@ export function createGameState(gameMode: GameMode): GameState {
     })),
     currentTurn: 'culprit',
     moves: [],
-    movesCount: 0,
     isDoubleMove: false,
     status: 'active'
   };

@@ -1,9 +1,6 @@
 import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
-import {
-  getNextRole,
-  Message
-} from '@yard/shared-utils';
+import { getNextRole, Message } from '@yard/shared-utils';
 import Fastify from 'fastify';
 import { app } from './app/app';
 
@@ -50,7 +47,10 @@ server.register(async function (fastify) {
 
             broadcast(currentChannel, {
               type: 'joinGame',
-              data: parsedMessage.data.username,
+              data: {
+                username: parsedMessage.data.username,
+                role: parsedMessage.data.role,
+              },
             });
             break;
           }
@@ -75,8 +75,8 @@ server.register(async function (fastify) {
 
           case 'makeMove':
             if (currentChannel) {
-              const { role, isDouble } = parsedMessage.data;
-              const currentTurn = getNextRole(role, isDouble);
+              const { role, double } = parsedMessage.data;
+              const currentTurn = getNextRole(role, double);
 
               broadcast(currentChannel, {
                 type: 'makeMove',

@@ -16,14 +16,12 @@ const useWebSocket = (initialChannel?: string) => {
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
-  const setMovesCount = useGameStore((state) => state.setMovesCount);
-  const movesCount = useGameStore((state) => state.movesCount);
   const updateMoves = useGameStore((state) => state.updateMoves);
   const updatePlayer = useGameStore((state) => state.updatePlayer);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
   const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
-  const players = usePlayersSubscription().map((player) => player.username);
-
+  const players = usePlayersSubscription();
+  
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message: Message = JSON.parse(event.data);
@@ -32,7 +30,8 @@ const useWebSocket = (initialChannel?: string) => {
 
       switch (message.type) {
         case 'joinGame':
-          if (players.includes(message.data)) return;
+          if (players.find((p) => p.username === (message.data.username))) return;
+          updatePlayer(message.data.role, message.data.username);
           toast({
             description: `New player joined: ${message.data}`,
             status: 'success',
@@ -52,7 +51,6 @@ const useWebSocket = (initialChannel?: string) => {
           setIsDoubleMove(message.data.double);
           setCurrentTurn(message.data.currentTurn);
           if (message.data.role === 'culprit') {
-            setMovesCount(movesCount + 1);
             updateMoves(message.data);
             toast({
               description: `Mr.C made his move. Next is ${message.data.currentTurn}`,
@@ -72,7 +70,6 @@ const useWebSocket = (initialChannel?: string) => {
         }
           break;
         case 'updateGameState':
-          // useGameStore.setState({ ...message.data });
           console.log('Game state updated:', message.data.players);
           break;
         case 'impersonate':
@@ -99,7 +96,7 @@ const useWebSocket = (initialChannel?: string) => {
       if (!channel || !username || !currentRole) return;
 
       const joinGameIfNeeded = () => {
-        if (!players.includes(username)) {
+        if (!players.find((p) => p.username === username)) {
           sendMessage('joinGame', { channel, username, currentRole });
         }
       };

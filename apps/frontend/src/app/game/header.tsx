@@ -22,7 +22,7 @@ export const Header = () => {
   const isDoubleMove = useGameStore((state) => state.isDoubleMove);
   const currentRole = useRunnerStore((state) => state.currentRole);
   const currentTurn = useGameStore((state) => state.currentTurn);
-  const movesCount = useGameStore((state) => state.movesCount);
+  const moves = useGameStore((state) => state.moves);
   const move = useRunnerStore((state) => state.move);
   const setMove = useRunnerStore((state) => state.setMove);
   const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
@@ -109,11 +109,11 @@ export const Header = () => {
   };
   return (
     <div className="flex px-4 justify-around items-center gap-10">
-      <Badge colorScheme="orange">Round: {movesCount}</Badge>
+      <Badge colorScheme="orange">Round: {moves.length}</Badge>
       <Badge colorScheme="blue">
         <Flex alignItems={'center'} gap={2}>
           <FaEye />
-          <Text>{showCulpritAtMoves.find((move) => move >= movesCount)}</Text>
+          <Text>{showCulpritAtMoves.find((move) => move >= moves.length)}</Text>
         </Flex>
       </Badge>
       <Flex alignItems={'center'}>

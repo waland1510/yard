@@ -20,7 +20,7 @@ export const Nodes = () => {
   );
   const runnerPosition = players.find((p) => p.role === role)?.position;
   const runnerRole = players.find((p) => p.position === currentPosition)?.role;
-  const movesCount = useGameStore((state) => state.movesCount);
+  const moves = useGameStore((state) => state.moves);
 
   const handleSend = (position: number) => {
     const availableType = getAvailableType(position, runnerPosition, role) || 'taxi';
@@ -46,7 +46,7 @@ export const Nodes = () => {
           (playerRole !== 'culprit' ||
             role === 'culprit' ||
             (playerRole === 'culprit' &&
-              showCulpritAtMoves.includes(movesCount)));
+              showCulpritAtMoves.includes(moves.length)));
         return (
           <g key={node.id}>
             {hasBus && (

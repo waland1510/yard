@@ -20,7 +20,6 @@ export interface GameState {
   players: Player[];
   currentTurn: RoleType;
   moves: Move[];
-  movesCount: number;
   isDoubleMove: boolean;
   status: 'active' | 'finished';
 }
