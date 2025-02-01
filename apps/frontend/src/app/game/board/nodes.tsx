@@ -6,6 +6,7 @@ import { useRunnerStore } from '../../../stores/use-runner-store';
 import { getAvailableType } from '../../../utils/available-type';
 import { isMoveAllowed } from '../../../utils/move-allowed';
 import { mapData } from '../board-data/grid_map';
+import { AnimatedImage } from './animated-image';
 
 export const Nodes = () => {
   const players = usePlayersSubscription();
@@ -40,7 +41,9 @@ export const Nodes = () => {
         const hasBus = node.bus && node.bus.length > 0;
         const hasUnderground = node.underground && node.underground.length > 0;
         if (node.id < 1) return null;
-        const playerRole = players.find((p) => p.position === node.id)?.role;
+        const player = players.find((p) => p.position === node.id)
+        const playerRole = player?.role;
+        const playersNode = mapData.nodes.find((n) => n.id === player?.previousPosition);
         const showImage =
           playerRole &&
           (playerRole !== 'culprit' ||
@@ -48,6 +51,7 @@ export const Nodes = () => {
             (playerRole === 'culprit' &&
               showCulpritAtMoves.includes(moves.length)));
         return (
+          <>
           <g key={node.id}>
             {hasBus && (
               <circle
@@ -79,21 +83,7 @@ export const Nodes = () => {
               onClick={() => handleSend(node.id)}
               strokeDasharray={node.river ? '5 5' : 'none'}
             />
-            <defs>
-              <clipPath id={`clip-circle-${node.id}`}>
-                <circle cx={node.x} cy={node.y} r="14" />
-              </clipPath>
-            </defs>
-            {showImage && (
-              <image
-                href={`/images/${playerRole}.png`}
-                x={node.x - 14}
-                y={node.y - 14}
-                width="28"
-                height="28"
-                clipPath={`url(#clip-circle-${node.id})`}
-              />
-            )}
+           
             <text
               x={node.x}
               y={node.y + 5}
@@ -112,6 +102,16 @@ export const Nodes = () => {
               {node.id}
             </text>
           </g>
+           {showImage && (
+            <AnimatedImage
+            href={`/images/${playerRole}.png`}
+            previousX={playersNode?.x}
+            previousY={playersNode?.y}
+            targetX={node.x}
+            targetY={node.y}
+          />
+         )}
+        </>
         );
       })}
     </>

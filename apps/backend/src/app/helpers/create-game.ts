@@ -11,6 +11,7 @@ export function createGameState(gameMode: GameMode): GameState {
     players: initialPlayers.map((player) => ({
       ...player,
       position: startingPositions[player.role],
+      previousPosition: startingPositions[player.role],
     })),
     currentTurn: 'culprit',
     moves: [],

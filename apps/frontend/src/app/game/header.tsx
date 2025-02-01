@@ -82,6 +82,7 @@ export const Header = () => {
       });
       updatePlayer(currentPlayer.id, {
         position: move.position,
+        previousPosition: currentPlayer.position,
       });
       updateGame(gameId, { currentTurn: getNextRole(currentRole, isDouble) });
       setMove(null);

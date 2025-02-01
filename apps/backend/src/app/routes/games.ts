@@ -25,7 +25,6 @@ export const gamesTable = pgTable('games', {
   currentTurn: varchar('current_turn', { length: 255 }).notNull(),
   moves: jsonb('moves').notNull(),
   status: varchar('status', { length: 50 }).default('active'),
-  movesCount: integer('moves_count').default(0).notNull(),
   isDoubleMove: boolean('is_double_move').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -39,6 +38,7 @@ export const playersTable = pgTable('players', {
   username: varchar('username', { length: 255 }),
   role: varchar('role', { length: 50 }).notNull(),
   position: integer('position').notNull(),
+  previousPosition: integer('previous_position'),
   taxiTickets: integer('taxi_tickets').default(0),
   busTickets: integer('bus_tickets').default(0),
   undergroundTickets: integer('underground_tickets').default(0),
@@ -222,24 +222,28 @@ export default async function (fastify: FastifyInstance) {
           } as any)
           .execute();
 
-        if (role === 'culprit') {
-          await trx
-            .update(gamesTable)
-            .set({ movesCount: sql`${gamesTable.movesCount} + 1` } as any)
-            .where(eq(gamesTable.id, gameId))
-            .execute();
-        }
-
         await trx
           .update(playersTable)
           .set({
-            taxiTickets: sql`${playersTable.taxiTickets} - ${type === 'taxi' ? 1 : 0}`,
-            busTickets: sql`${playersTable.busTickets} - ${type === 'bus' ? 1 : 0}`,
-            undergroundTickets: sql`${playersTable.undergroundTickets} - ${type === 'underground' ? 1 : 0}`,
-            secretTickets: sql`${playersTable.secretTickets} - ${secret ? 1 : 0}`,
-            doubleTickets: sql`${playersTable.doubleTickets} - ${double ? 1 : 0}`,
+            taxiTickets: sql`${playersTable.taxiTickets} - ${
+              type === 'taxi' ? 1 : 0
+            }`,
+            busTickets: sql`${playersTable.busTickets} - ${
+              type === 'bus' ? 1 : 0
+            }`,
+            undergroundTickets: sql`${playersTable.undergroundTickets} - ${
+              type === 'underground' ? 1 : 0
+            }`,
+            secretTickets: sql`${playersTable.secretTickets} - ${
+              secret ? 1 : 0
+            }`,
+            doubleTickets: sql`${playersTable.doubleTickets} - ${
+              double ? 1 : 0
+            }`,
           } as any)
-          .where(sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`)
+          .where(
+            sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`
+          )
           .execute();
 
         const [updatedGame] = await trx

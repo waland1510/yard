@@ -109,6 +109,7 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
     set((state) => {
       const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
+      player.previousPosition = player.position;
       player.position = Number(position);
       return { players: state.players };
     }),

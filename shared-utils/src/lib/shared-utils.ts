@@ -29,6 +29,7 @@ export interface Player {
   username?: string;
   role: RoleType;
   position: number;
+  previousPosition?: number;
   taxiTickets: number;
   busTickets: number;
   undergroundTickets: number;
@@ -41,6 +42,7 @@ export const initialPlayers: Player[] = [
     id: 1,
     role: 'detective1',
     position: 10,
+    previousPosition: 1,
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
@@ -49,6 +51,7 @@ export const initialPlayers: Player[] = [
     id: 2,
     role: 'detective2',
     position: 20,
+    previousPosition: 2,
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
@@ -57,6 +60,7 @@ export const initialPlayers: Player[] = [
     id: 3,
     role: 'detective3',
     position: 30,
+    previousPosition: 3,
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
@@ -65,6 +69,7 @@ export const initialPlayers: Player[] = [
     id: 4,
     role: 'detective4',
     position: 40,
+    previousPosition: 4,
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
@@ -73,6 +78,7 @@ export const initialPlayers: Player[] = [
     id: 5,
     role: 'detective5',
     position: 50,
+    previousPosition: 5,
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
@@ -81,6 +87,7 @@ export const initialPlayers: Player[] = [
     id: 6,
     role: 'culprit',
     position: 60,
+    previousPosition: 6,
     taxiTickets: 24,
     busTickets: 24,
     undergroundTickets: 24,
