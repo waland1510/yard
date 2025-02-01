@@ -140,6 +140,11 @@ export const connectionsData = [
     types: ['underground', 'bus', 'taxi'],
   },
   {
+    from: 14,
+    to: 25,
+    types: ['taxi'],
+  },
+  {
     from: 15,
     to: 16,
     types: ['underground', 'bus', 'taxi'],

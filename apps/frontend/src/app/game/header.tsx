@@ -1,4 +1,4 @@
-import { Badge, Text, Flex } from '@chakra-ui/react';
+import { Badge, Text, Flex, useToast } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
@@ -32,10 +32,32 @@ export const Header = () => {
 
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
+  const culpritPosition = players.find((player) => player.role === 'culprit')?.position;
+  const detectivesPositions = players.filter((player) => player.role !== 'culprit').map((player) => player.position);
   const gameId = useGameStore((state) => state.id);
+  const toast = useToast();
 
   const handleSend = () => {
     if (move && gameId && currentRole && currentPlayer) {
+      if (currentRole !== 'culprit' &&  move.position === culpritPosition) {
+        toast({
+          title: 'Game Over',
+          position: 'top',
+          description: 'You caught Mr. C',
+          status: 'success',
+          duration: 9000,
+          isClosable: true,
+        });
+        localStorage.removeItem('channel');
+        updateGame(gameId, { status: 'finished' });
+        sendMessage('endGame', { winner: currentRole });
+        return;
+      }
+      if (currentRole === 'culprit' && detectivesPositions.includes(move.position)) {
+        toast({title: 'Move Invalid', description: 'You cannot move to detective position', status: 'error', duration: 9000, isClosable: true});
+        return;
+      }
+
       sendMessage('makeMove', move);
       addMove({
         gameId,

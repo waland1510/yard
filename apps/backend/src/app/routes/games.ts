@@ -1,5 +1,5 @@
-import { GameState, GameMode, Player, Move } from '@yard/shared-utils';
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { Move, GameMode } from '@yard/shared-utils';
+import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import {
   pgTable,
@@ -10,8 +10,12 @@ import {
   boolean,
   timestamp,
 } from 'drizzle-orm/pg-core';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+
+const db = drizzle(process.env.DATABASE_URL, {
+  casing: 'snake_case',
+});
 
 export const gamesTable = pgTable('games', {
   id: serial('id').primaryKey(),
@@ -20,7 +24,8 @@ export const gamesTable = pgTable('games', {
   players: jsonb('players').notNull(),
   currentTurn: varchar('current_turn', { length: 255 }).notNull(),
   moves: jsonb('moves').notNull(),
-  movesCount: integer('moves_count').default(0),
+  status: varchar('status', { length: 50 }).default('active'),
+  movesCount: integer('moves_count').default(0).notNull(),
   isDoubleMove: boolean('is_double_move').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -55,56 +60,31 @@ export const movesTable = pgTable('moves', {
 });
 
 export default async function (fastify: FastifyInstance) {
-  const db = drizzle(process.env.DATABASE_URL);
-
-  fastify.get(
+  fastify.get<{ Params: { channel: string } }>(
     '/api/games/:channel',
-    async (
-      request: FastifyRequest<{ Params: { channel: string } }>,
-      reply: FastifyReply
-    ) => {
-      const { channel } = request.params;
-
+    async (request, reply) => {
       try {
-        // Fetch the main game details
         const game = await db
           .select()
           .from(gamesTable)
-          .where(eq(gamesTable.channel, channel))
+          .where(eq(gamesTable.channel, request.params.channel))
           .execute();
+        if (game.length === 0)
+          return reply
+            .code(404)
+            .send({ success: false, error: 'Game not found' });
 
-        if (game.length === 0) {
-          reply.code(404).send({ success: false, error: 'Game not found' });
-          return;
-        }
-        console.log({ game });
-
-        const gameData = game[0];
-        console.log({ gameData });
-
-        // Fetch players associated with the game
         const players = await db
           .select()
           .from(playersTable)
-          .where(eq(playersTable.gameId, gameData.id))
+          .where(eq(playersTable.gameId, game[0].id))
           .execute();
-        console.log(players);
-
-        // Fetch moves associated with the game
         const moves = await db
           .select()
           .from(movesTable)
-          .where(eq(movesTable.gameId, gameData.id))
+          .where(eq(movesTable.gameId, game[0].id))
           .execute();
-
-        // Combine data
-        const response = {
-          ...gameData,
-          players,
-          moves,
-        };
-
-        reply.send(response);
+        reply.send({ ...game[0], players, moves });
       } catch (error) {
         console.error(error);
         reply
@@ -114,135 +94,70 @@ export default async function (fastify: FastifyInstance) {
     }
   );
 
-  fastify.post(
-    '/api/games',
-    async (
-      request: FastifyRequest<{
-        Body: GameMode;
-      }>,
-      reply: FastifyReply
-    ) => {
-      // Create game state
-      const { channel, players, gameMode, currentTurn } = createGameState(
-        request.body
-      );
+  // Create New Game
+  fastify.post('/api/games', async (request, reply) => {
+    const { channel, players, gameMode, currentTurn } = createGameState(
+      request.body as GameMode
+    );
+    try {
+      await db.transaction(async (trx) => {
+        const [game] = await trx
+          .insert(gamesTable)
+          .values({
+            channel,
+            gameMode,
+            currentTurn,
+            players: [],
+            moves: [],
+            status: 'active',
+          } as any)
+          .returning()
+          .execute();
 
-      try {
-        await db.transaction(async (trx) => {
-          // Save the game to the database
-          const [game] = await trx
-            .insert(gamesTable)
-            .values({
-              channel,
-              gameMode,
-              currentTurn,
-              players: [],
-              moves: [],
-            })
-            .returning({
-              id: gamesTable.id,
-              channel: gamesTable.channel,
-              gameMode: gamesTable.gameMode,
-              currentTurn: gamesTable.currentTurn,
-              movesCount: gamesTable.movesCount,
-              isDoubleMove: gamesTable.isDoubleMove,
-              createdAt: gamesTable.createdAt,
-              updatedAt: gamesTable.updatedAt,
-            })
-            .execute();
-          const gameId: number = game.id;
+        const gameId = game.id;
 
-          // Insert players into the database
-          await trx
-            .insert(playersTable)
-            .values(
-              players.map((player) => ({
-                gameId,
-                username: player.username || null,
-                role: player.role,
-                position: player.position,
-                taxiTickets: player.taxiTickets,
-                busTickets: player.busTickets,
-                undergroundTickets: player.undergroundTickets,
-                secretTickets: player.secretTickets || 0,
-                doubleTickets: player.doubleTickets || 0,
-              }))
-            )
-            .execute();
+        await trx
+          .insert(playersTable)
+          .values(
+            players.map(({ id, ...player }) => ({
+              gameId,
+              ...player,
+            }))
+          )
+          .execute();
 
-          // Fetch the players associated with the created game
-          const fetchedPlayers = await trx
-            .select({
-              id: playersTable.id,
-              gameId: playersTable.gameId,
-              username: playersTable.username,
-              role: playersTable.role,
-              position: playersTable.position,
-              taxiTickets: playersTable.taxiTickets,
-              busTickets: playersTable.busTickets,
-              undergroundTickets: playersTable.undergroundTickets,
-              secretTickets: playersTable.secretTickets,
-              doubleTickets: playersTable.doubleTickets,
-            })
-            .from(playersTable)
-            .where(eq(playersTable.gameId, gameId))
-            .execute();
+        const insertedPlayers = await trx
+          .select()
+          .from(playersTable)
+          .where(eq(playersTable.gameId, gameId))
+          .execute();
 
-          // Combine game and players into the response
-          const createdGameWithPlayers = {
-            ...game,
-            players: fetchedPlayers,
-          };
-
-          reply
-            .code(201)
-            .send({ success: true, createdGame: createdGameWithPlayers });
+        reply.code(201).send({
+          success: true,
+          createdGame: { ...game, players: insertedPlayers },
         });
-      } catch (error) {
-        console.error(error);
-        reply.code(500).send({ success: false, error: 'Failed to save game' });
-      }
+      });
+    } catch (error) {
+      console.error(error);
+      reply.code(500).send({ success: false, error: 'Failed to save game' });
     }
-  );
+  });
 
   // Update a game
-  fastify.patch(
+  fastify.patch<{ Params: { id: string } }>(
     '/api/games/:id',
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: Partial<GameState>;
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body;
 
-      // Map body fields to database column names
-      const mappedGame = {
-        game_mode: body.gameMode,
-        current_turn: body.currentTurn,
-        moves_count: body.movesCount,
-        is_double_move: body.isDoubleMove,
-        status: body.status,
-      };
-
-      // Filter out undefined or null fields
-      const validEntries = Object.entries(mappedGame).filter(
-        ([_, value]) => value !== undefined
-      );
-
-      if (validEntries.length === 0) {
-        reply.code(400).send({ success: false, error: 'No fields to update' });
-        return;
+      if (Object.keys(body).length === 0) {
+        return reply
+          .code(400)
+          .send({ success: false, error: 'No fields to update' });
       }
 
       try {
-        await db
-          .update(gamesTable)
-          .set(Object.fromEntries(validEntries))
-          .where(eq(gamesTable.id, id))
-          .execute();
+        await db.update(gamesTable).set(body).where(eq(gamesTable.id, id));
         reply.code(200).send({ success: true });
       } catch (error) {
         console.error(error);
@@ -254,30 +169,23 @@ export default async function (fastify: FastifyInstance) {
   );
 
   // Update a player
-  fastify.patch(
+  fastify.patch<{ Params: { id: string } }>(
     '/api/players/:id',
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: Partial<Player>;
-      }>,
-      reply: FastifyReply
-    ) => {
-      const { id } = request.params;
+    async (request, reply) => {
+      const id = parseInt(request.params.id, 10);
       const body = request.body;
 
-      // Build dynamic SQL query
-      const fields = Object.keys(body);
-      if (fields.length === 0) {
-        reply.code(400).send({ success: false, error: 'No fields to update' });
-        return;
+      if (Object.keys(body).length === 0) {
+        return reply
+          .code(400)
+          .send({ success: false, error: 'No fields to update' });
       }
 
       try {
         await db
           .update(playersTable)
           .set(body)
-          .where(eq(playersTable.id, parseInt(id, 10)))
+          .where(eq(playersTable.id, id))
           .execute();
         reply.code(200).send({ success: true });
       } catch (error) {
@@ -290,64 +198,61 @@ export default async function (fastify: FastifyInstance) {
   );
 
   // Add a move
-  fastify.post(
-    '/api/moves',
-    async (
-      request: FastifyRequest<{
-        Body: Partial<Move>;
-      }>,
-      reply: FastifyReply
-    ) => {
-      const {
-        gameId,
-        role,
-        type,
-        secret = false,
-        double = false,
-        position,
-      } = request.body;
+  fastify.post<{ Body: Move }>('/api/moves', async (request, reply) => {
+    const {
+      gameId,
+      role,
+      type,
+      secret = false,
+      double = false,
+      position,
+    } = request.body;
 
-      try {
-        await db.transaction(async (trx) => {
+    try {
+      await db.transaction(async (trx) => {
+        await trx
+          .insert(movesTable)
+          .values({
+            gameId,
+            role,
+            type,
+            secret,
+            double,
+            position,
+          } as any)
+          .execute();
+
+        if (role === 'culprit') {
           await trx
-            .insert(movesTable)
-            .values({
-              gameId,
-              role,
-              type,
-              secret,
-              double,
-              position,
-            } as any)
-            .execute();
-
-          // Increment movesCount in the games table
-            // await trx
-            //   .update(gamesTable)
-            // .set({
-            //   movesCount: gamesTable.movesCount.plus(1),
-            // })
-            // .where(eq(gamesTable.id, gameId))
-            // .execute();
-
-          // Fetch updated game data (if required for the response)
-          const [updatedGame] = await trx
-            .select({
-              id: gamesTable.id,
-              movesCount: gamesTable.movesCount,
-              isDoubleMove: gamesTable.isDoubleMove,
-              updatedAt: gamesTable.updatedAt,
-            })
-            .from(gamesTable)
+            .update(gamesTable)
+            .set({ movesCount: sql`${gamesTable.movesCount} + 1` } as any)
             .where(eq(gamesTable.id, gameId))
             .execute();
+        }
 
-          reply.code(201).send({ success: true, updatedGame });
-        });
-      } catch (error) {
-        console.error('Failed to add move:', error);
-        reply.code(500).send({ success: false, error: 'Failed to add move' });
-      }
+        await trx
+          .update(playersTable)
+          .set({
+            taxiTickets: sql`${playersTable.taxiTickets} - ${type === 'taxi' ? 1 : 0}`,
+            busTickets: sql`${playersTable.busTickets} - ${type === 'bus' ? 1 : 0}`,
+            undergroundTickets: sql`${playersTable.undergroundTickets} - ${type === 'underground' ? 1 : 0}`,
+            secretTickets: sql`${playersTable.secretTickets} - ${secret ? 1 : 0}`,
+            doubleTickets: sql`${playersTable.doubleTickets} - ${double ? 1 : 0}`,
+          } as any)
+          .where(sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`)
+          .execute();
+
+        const [updatedGame] = await trx
+          .select()
+          .from(gamesTable)
+          .where(eq(gamesTable.id, gameId))
+          .execute();
+
+        reply.code(201).send({ success: true, updatedGame });
+      });
+    } catch (error) {
+      console.error('Failed to add move:', error);
+      reply.code(500).send({ success: false, error: 'Failed to add move' });
     }
-  );
+  });
 }

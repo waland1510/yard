@@ -4,6 +4,7 @@
   "license": "MIT",
   "scripts": {},
   "private": true,
+  "packageManager": "bun@1.2.1",
   "dependencies": {
     "@chakra-ui/react": "2",
     "@emotion/react": "^11.14.0",

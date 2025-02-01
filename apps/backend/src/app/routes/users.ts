@@ -1,5 +1,5 @@
 import { runQuery } from '@yard/shared-utils';
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyRequest } from 'fastify';
 
 const addUser = `INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *;`;
 const getUserById = 'SELECT * from users   WHERE id = $1';
@@ -22,7 +22,6 @@ export default async function (fastify: FastifyInstance) {
         const { id } = request.params;
         const { rows } = await runQuery(fastify.pg, getUserById, [id]);
         return rows;
-        
       }
     );
 }

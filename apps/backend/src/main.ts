@@ -1,18 +1,12 @@
-import Fastify from 'fastify';
-import { app } from './app/app';
+import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
 import {
-  initialPlayers,
-  Player,
-  GameState,
-  Role,
-  RoleType,
-  Message,
   getNextRole,
+  Message
 } from '@yard/shared-utils';
-import cors from '@fastify/cors'
+import Fastify from 'fastify';
+import { app } from './app/app';
 
-// const host = process.env.HOST ?? 'localhost';
 const host = process.env.HOST ?? '0.0.0.0';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -20,8 +14,8 @@ const server = Fastify();
 
 server.register(cors, {
   origin: [process.env.FRONTEND_URL],
-  methods: ['GET', 'POST', 'PUT', 'PATCH'],  // Allowed methods
-  allowedHeaders: ['Content-Type', 'Authorization'],  // Allowed headers
+  methods: ['GET', 'POST', 'PUT', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 });
 
 const channels: Record<string, Set<WebSocket>> = {};
@@ -58,26 +52,11 @@ server.register(async function (fastify) {
               type: 'joinGame',
               data: parsedMessage.data.username,
             });
-
-            // const player: Player = gameState.players?.find(
-            //   (p) => p.role === parsedMessage.data.currentRole
-            // );
-            // if (player) {
-            //   player.username = parsedMessage.data.username;
-            // } else {
-            //   console.log('Player not found');
-            // }
-
-            // broadcast(currentChannel, {
-            //   type: 'updateGameState',
-            //   data: { ...gameState, movesCount: gameState.moves.length },
-            // });
             break;
           }
 
           case 'updateGameState':
             if (currentChannel) {
-              // gameState.players = parsedMessage.data.players;
               // broadcast(currentChannel, {
               //   type: 'updateGameState',
               //   data: parsedMessage.data,
@@ -87,15 +66,6 @@ server.register(async function (fastify) {
 
           case 'impersonate':
             if (currentChannel) {
-              // const { role, username } = parsedMessage.data;
-              // const player = gameState.players?.find((p) => p.role === role);
-              // if (player) {
-              //   player.username = username;
-              // }
-              // broadcast(currentChannel, {
-              //   type: 'updateGameState',
-              //   data: { ...gameState, movesCount: gameState.moves.length },
-              // });
               broadcast(currentChannel, {
                 type: 'impersonate',
                 data: parsedMessage.data,
@@ -107,19 +77,24 @@ server.register(async function (fastify) {
             if (currentChannel) {
               const { role, isDouble } = parsedMessage.data;
               const currentTurn = getNextRole(role, isDouble);
-              // gameState.currentTurn =currentTurn
-              // if (role === 'culprit') {
-              //   gameState.moves.push(parsedMessage.data);
-              // }
 
               broadcast(currentChannel, {
                 type: 'makeMove',
                 data: {
                   ...parsedMessage.data,
                   currentTurn,
-                  // movesCount: gameState.moves.length,
                 },
               });
+            }
+            break;
+
+          case 'endGame':
+            if (currentChannel) {
+              broadcast(currentChannel, {
+                type: 'endGame',
+                data: parsedMessage,
+              });
+              delete channels[currentChannel];
             }
             break;
 
@@ -134,12 +109,6 @@ server.register(async function (fastify) {
           console.log(
             `Client disconnected from channel: ${currentChannel}. Remaining clients: ${channels[currentChannel].size}`
           );
-
-          // Clean up the channel if empty
-          // if (channels[currentChannel].size === 0) {
-          //   delete channels[currentChannel];
-          //   console.log(`Channel ${currentChannel} deleted`);
-          // }
         }
       });
     }

@@ -17,6 +17,7 @@ const useWebSocket = (initialChannel?: string) => {
   const setPosition = useGameStore((state) => state.setPosition);
   const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
   const setMovesCount = useGameStore((state) => state.setMovesCount);
+  const movesCount = useGameStore((state) => state.movesCount);
   const updateMoves = useGameStore((state) => state.updateMoves);
   const updatePlayer = useGameStore((state) => state.updatePlayer);
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
@@ -49,8 +50,8 @@ const useWebSocket = (initialChannel?: string) => {
           );
           setIsDoubleMove(message.data.isDouble);
           setCurrentTurn(message.data.currentTurn);
-          setMovesCount(message.data.movesCount);
           if (message.data.role === 'culprit') {
+            setMovesCount(movesCount + 1);
             updateMoves(message.data);
             toast({
               description: `Mr.C made his move. Next is ${message.data.currentTurn}`,
@@ -64,7 +65,7 @@ const useWebSocket = (initialChannel?: string) => {
             description: `${message.data.role} moved to ${message.data.position}. Next is ${message.data.currentTurn}`,
             status: 'warning',
             position: 'top-right',
-            duration: 9000,
+            duration: 6000,
             isClosable: true,
           });
         }
@@ -76,6 +77,15 @@ const useWebSocket = (initialChannel?: string) => {
         case 'impersonate':
           updatePlayer(message.data.role, message.data.username);
           console.log('Impersonating:', message.data.role);
+          break;
+        case 'endGame':
+          toast({
+            description: `Game ended. Winner: ${message.data.winner}`,
+            status: 'success',
+            position: 'top-right',
+            duration: 9000,
+            isClosable: true,
+          });
           break;
         default:
           console.warn('Unknown message type:', message.type);

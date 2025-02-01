@@ -11,6 +11,7 @@ import {
   IconButton,
   Text,
   useDisclosure,
+  useToast,
   VStack,
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
@@ -40,27 +41,58 @@ export const Game = () => {
     (state) => state.setCurrentPosition
   );
   const currentTurn = useGameStore((state) => state.currentTurn);
+  const toast = useToast();
 
   useEffect(() => {
     const checkGame = async () => {
       if (channel) {
-        const game = await getGameByChannel(channel);
-        console.log('game', game);
+        try {
+          const game = await getGameByChannel(channel);
+          console.log('game', game);
+          if (!game || game.status === 'finished') {
+            localStorage.removeItem('channel');
+            toast({
+              title: 'Start New Game',
+              description: 'This game has finished',
+              status: 'success',
+              duration: 9000,
+              isClosable: true,
+            });
+            navigate('/');
+            return;
+          }
 
-        if (game) {
-          localStorage.setItem('channel', channel);
-          setChannel(channel);
-          useGameStore.setState(game);
-          const currentPlayer = game.players.find((p) => p.username === username);
-          if (currentPlayer) {
-            setCurrentRole(currentPlayer.role);
-            sendMessage('joinGame', { channel, username, role: currentPlayer.role });
-          } else {
+          if (game) {
+            localStorage.setItem('channel', channel);
+            setChannel(channel);
+            useGameStore.setState(game);
+            const currentPlayer = game.players.find(
+              (p) => p.username === username
+            );
+            if (currentPlayer) {
+              setCurrentRole(currentPlayer.role);
+              sendMessage('joinGame', {
+                channel,
+                username,
+                role: currentPlayer.role,
+              });
+            } else {
+              navigate(`/join/${channel}`);
+            }
+          }
+          if (!username) {
             navigate(`/join/${channel}`);
           }
-        }
-        if (!username) {
-          navigate(`/join/${channel}`);
+        } catch (error) {
+          console.log('error', error);
+          toast({
+            title: 'Error',
+            description: 'Game not found',
+            status: 'error',
+            duration: 9000,
+            isClosable: true,
+          });
+          navigate('/');
         }
       }
     };
@@ -186,11 +218,7 @@ export const Game = () => {
         </HStack>
 
         {/* Map Section */}
-        <Box
-          flex="1"
-          margin="auto"
-          overflow="scroll"
-        >
+        <Box flex="1" margin="auto" overflow="scroll">
           <Board channel={channel} />
         </Box>
       </Flex>
