@@ -13,7 +13,7 @@ export const Start = ({
   return (
     <div className="text-center">
       <p className="text-lg text-gray-700">
-        {existingChannel ? 'Welcome back!' : 'Welcome to the Game'}
+        {existingChannel && 'Welcome back!'}
       </p>
       {existingChannel && (
         <button

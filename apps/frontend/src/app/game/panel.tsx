@@ -103,7 +103,7 @@ export const Panel = () => {
             onClick={
               available
                 ? () => {
-                    useRunnerStore.getState().setCurrentType(item.id as 'taxi');
+                    setCurrentType(item.id as 'taxi');
                   }
                 : undefined
             }

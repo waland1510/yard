@@ -1,33 +1,30 @@
-import { RoleType } from '@yard/shared-utils';
+import { MoveType, RoleType } from '@yard/shared-utils';
 import { mapData } from '../app/game/board-data/grid_map';
 import { MapNode } from '../stores/use-nodes-store';
 
 const nodes: MapNode[] = mapData.nodes;
-export const isMoveAllowed = (
+export const getAvailableType = (
   nodeId: number,
   runnerPosition: number | undefined,
   currentRole: RoleType | undefined,
 
-): string | undefined => {
-  console.log('nodeId', runnerPosition);
-
+): MoveType | undefined => {
   const node = nodes.find((node) => node.id === runnerPosition);
-  console.log('node', node);
 
   if (!node) {
     return undefined;
   }
   if (currentRole === 'culprit' && node.river?.includes(nodeId)) {
-    return 'blue';
+    return 'river';
   }
   if (node.underground?.includes(nodeId)) {
-    return 'red';
+    return 'underground';
   }
   if (node.bus?.includes(nodeId)) {
-    return 'green';
+    return 'bus';
   }
   if (node.taxi?.includes(nodeId)) {
-    return 'orange';
+    return 'taxi';
   }
 
   return undefined;

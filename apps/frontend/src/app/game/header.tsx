@@ -32,14 +32,18 @@ export const Header = () => {
 
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
-  const culpritPosition = players.find((player) => player.role === 'culprit')?.position;
-  const detectivesPositions = players.filter((player) => player.role !== 'culprit').map((player) => player.position);
+  const culpritPosition = players.find(
+    (player) => player.role === 'culprit'
+  )?.position;
+  const detectivesPositions = players
+    .filter((player) => player.role !== 'culprit')
+    .map((player) => player.position);
   const gameId = useGameStore((state) => state.id);
   const toast = useToast();
 
   const handleSend = () => {
     if (move && gameId && currentRole && currentPlayer) {
-      if (currentRole !== 'culprit' &&  move.position === culpritPosition) {
+      if (currentRole !== 'culprit' && move.position === culpritPosition) {
         toast({
           title: 'Game Over',
           position: 'top',
@@ -53,8 +57,17 @@ export const Header = () => {
         sendMessage('endGame', { winner: currentRole });
         return;
       }
-      if (currentRole === 'culprit' && detectivesPositions.includes(move.position)) {
-        toast({title: 'Move Invalid', description: 'You cannot move to detective position', status: 'error', duration: 9000, isClosable: true});
+      if (
+        currentRole === 'culprit' &&
+        detectivesPositions.includes(move.position)
+      ) {
+        toast({
+          title: 'Move Invalid',
+          description: 'You cannot move to detective position',
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        });
         return;
       }
 
@@ -122,14 +135,7 @@ export const Header = () => {
       {currentRole === currentTurn &&
         (() => {
           const isAllowed =
-            move &&
-            isMoveAllowed(
-              move.position,
-              currentPlayer?.position,
-              currentType,
-              isSecret
-            );
-
+            move && isMoveAllowed(move.position, currentPlayer?.position, currentPlayer?.role);
           return (
             <div>
               {isAllowed ? (

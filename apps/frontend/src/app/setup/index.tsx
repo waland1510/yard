@@ -87,9 +87,9 @@ export const Setup = () => {
           src="/images/catch.png"
           alt="Game Logo"
         />
-        <Card>
+        <Card style={{backgroundColor: 'inherit'}} className="w-[900px] h-[300px] p-6">
           {username && (
-            <p className="text-lg text-gray-700">Welcome, {username}</p>
+            <p className="text-lg text-gray-700 text-center">Hey {username.toUpperCase()}</p>
           )}
           {renderStep()}
         </Card>

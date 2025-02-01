@@ -1,15 +1,16 @@
-import { mapData } from '../board-data/grid_map';
-import { useRunnerStore } from '../../../stores/use-runner-store';
-import { usePlayersSubscription } from '../../../hooks/use-players-subscription';
-import { usePlayerSubscription } from '../../../hooks/use-player-subscription';
-import { useGameStore } from '../../../stores/use-game-store';
-import { isMoveAllowed } from '../../../utils/move-allowed';
 import { showCulpritAtMoves } from '@yard/shared-utils';
+import { usePlayerSubscription } from '../../../hooks/use-player-subscription';
+import { usePlayersSubscription } from '../../../hooks/use-players-subscription';
+import { useGameStore } from '../../../stores/use-game-store';
+import { useRunnerStore } from '../../../stores/use-runner-store';
+import { getAvailableType } from '../../../utils/available-type';
+import { isMoveAllowed } from '../../../utils/move-allowed';
+import { mapData } from '../board-data/grid_map';
 
 export const Nodes = () => {
   const players = usePlayersSubscription();
   const currentPosition = usePlayerSubscription().currentPosition;
-  const type = useRunnerStore((state) => state.currentType);
+  const setCurrentType = useRunnerStore((state) => state.setCurrentType);
   const role = useRunnerStore((state) => state.currentRole);
   const isSecret = useRunnerStore((state) => state.isSecret);
   const isDouble = useRunnerStore((state) => state.isDouble);
@@ -18,15 +19,18 @@ export const Nodes = () => {
     (state) => state.setCurrentPosition
   );
   const runnerPosition = players.find((p) => p.role === role)?.position;
+  const runnerRole = players.find((p) => p.position === currentPosition)?.role;
   const movesCount = useGameStore((state) => state.movesCount);
 
   const handleSend = (position: number) => {
+    const availableType = getAvailableType(position, runnerPosition, role) || 'taxi';
+    setCurrentType(availableType);
     setMove({
       role,
-      type,
+      type: availableType,
       position,
-      isSecret,
-      isDouble,
+      secret: isSecret,
+      double: isDouble,
     });
     setCurrentPosition(position);
   };
@@ -100,10 +104,8 @@ export const Nodes = () => {
                 showImage
                   ? 'transparent'
                   : currentPosition === node.id
-                  ? 'red'
-                  : isMoveAllowed(node.id, runnerPosition, type, isSecret)
-                  ? 'orange'
-                  : 'black'
+                  ? 'purple'
+                  : isMoveAllowed(node.id, runnerPosition, runnerRole) ?? 'black'
               }
               onClick={() => handleSend(node.id)}
             >
