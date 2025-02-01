@@ -82,7 +82,6 @@ export const Header = () => {
       });
       updatePlayer(currentPlayer.id, {
         position: move.position,
-        // [move.type + 'Tickets']: currentPlayer[`${move.type}Tickets`] - 1,
       });
       updateGame(gameId, { currentTurn: getNextRole(currentRole, isDouble) });
       setMove(null);
