@@ -10,8 +10,8 @@ const ANIMATION_CONFIG = {
 
 interface AnimatedImageProps {
   href: string;
-  previousX?: number;
-  previousY?: number;
+  previousX: number;
+  previousY: number;
   targetX: number;
   targetY: number;
   isCurrentPlayer: boolean;
@@ -25,7 +25,6 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
   targetY,
   isCurrentPlayer,
 }) => {
-  if (!previousX || !previousY) return null;
 
   const position = useMemo(() => ({
     from: { x: previousX - OFFSET, y: previousY - OFFSET },
@@ -46,15 +45,15 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
         scale: 1.5,
         config: ANIMATION_CONFIG.scale,
       });
-      await next({ 
-        scale: 1, 
-        config: ANIMATION_CONFIG.reset 
+      await next({
+        scale: 1,
+        config: ANIMATION_CONFIG.reset
       });
     },
     reset: true,
   });
 
-  const transform = useMemo(() => 
+  const transform = useMemo(() =>
     to(
       [combinedSpring.x, combinedSpring.y, combinedSpring.scale],
       (x, y, scale) => `translate(${x}, ${y}) scale(${scale})`

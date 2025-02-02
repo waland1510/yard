@@ -13,13 +13,13 @@ import { useMemo, useCallback } from 'react';
 export const Nodes = () => {
   const players = usePlayersSubscription();
   const currentPosition = usePlayerSubscription().currentPosition;
-  const { 
+  const {
     setCurrentType,
     currentRole: role,
     isSecret,
     isDouble,
     setMove,
-    setCurrentPosition 
+    setCurrentPosition
   } = useRunnerStore();
 
   const runnerData = useMemo(() => ({
@@ -30,17 +30,17 @@ export const Nodes = () => {
 
   const handleSend = useCallback((position: number) => {
     const availableType = getAvailableType(position, runnerData.position, role) || 'taxi';
-    
+
     setCurrentType(availableType);
     setMove({
       role,
-      type: availableType, 
+      type: availableType,
       position,
       secret: isSecret,
       double: isDouble,
     });
     setCurrentPosition(position);
-  }, [runnerData.position, role, isSecret, isDouble]);
+  }, [runnerData.position, role, setCurrentType, setMove, isSecret, isDouble, setCurrentPosition]);
   return (
     <>
       {mapData.nodes.map((node) => {
@@ -114,8 +114,8 @@ export const Nodes = () => {
             {showImage && (
               <AnimatedImage
                 href={`/images/${playerRole}.png`}
-                previousX={playersNode?.x}
-                previousY={playersNode?.y}
+                previousX={playersNode?.x || node.x}
+                previousY={playersNode?.y || node.y}
                 targetX={node.x}
                 targetY={node.y}
                 isCurrentPlayer={playerRole === role}

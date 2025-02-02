@@ -21,17 +21,18 @@ const setupWorkflow = [
 
 export const Setup = () => {
   const { channel: joiningChannel } = useParams();
+  const navigate = useNavigate();
+  const { channel, setChannel } = useGameStore();
+  const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
+
+  const username = localStorage.getItem('username');
+  const existingChannel = localStorage.getItem('channel');
+
   useEffect(() => {
     if (channel) {
       setCurrentStep('addUsername');
     }
   }, []);
-  const navigate = useNavigate();
-  const channel = useGameStore((state) => state.channel);
-  const setChannel = useGameStore((state) => state.setChannel);
-  const username = localStorage.getItem('username');
-  const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
-  const existingChannel = localStorage.getItem('channel');
 
   const handleContinueGame = async () => {
     if (existingChannel) {
@@ -85,9 +86,14 @@ export const Setup = () => {
           src="/images/catch.png"
           alt="Game Logo"
         />
-        <Card style={{backgroundColor: 'inherit'}} className="w-[900px] h-[300px] p-6">
+        <Card
+          style={{ backgroundColor: 'inherit' }}
+          className="w-[900px] h-[300px] p-6"
+        >
           {username && (
-            <p className="text-lg text-gray-700 text-center">Hey {username.toUpperCase()}</p>
+            <p className="text-lg text-gray-700 text-center">
+              Hey {username.toUpperCase()}
+            </p>
           )}
           {renderStep()}
         </Card>

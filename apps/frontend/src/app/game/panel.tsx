@@ -10,7 +10,14 @@ import { SecretIcon } from './icons/secret-icon';
 import { DoubleIcon } from './icons/double-icon';
 
 export const Panel = () => {
-  const currentRole = useRunnerStore((state) => state.currentRole);
+  const {
+    isSecret,
+    isDouble,
+    setIsSecret,
+    setIsDouble,
+    setCurrentType,
+    currentRole,
+  } = useRunnerStore();
   const player = useGameStore((state) =>
     state.players.find((p) => p.role === currentRole)
   );
@@ -19,11 +26,6 @@ export const Panel = () => {
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
 
   const node = useNodesStore((state) => state.getNode(runnerPosition || 0));
-  const isSecret = useRunnerStore((state) => state.isSecret);
-  const isDouble = useRunnerStore((state) => state.isDouble);
-  const setIsSecret = useRunnerStore((state) => state.setIsSecret);
-  const setIsDouble = useRunnerStore((state) => state.setIsDouble);
-  const setCurrentType = useRunnerStore((state) => state.setCurrentType);
   const username = localStorage.getItem('username');
 
   if (!node) {

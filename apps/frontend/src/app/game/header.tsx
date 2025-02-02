@@ -11,24 +11,30 @@ import { FaEye } from 'react-icons/fa';
 import { addMove, updateGame, updatePlayer } from '../../api';
 
 export const Header = () => {
-  const existingChannel = useGameStore((state) => state.channel);
-  const { sendMessage } = useWebSocket(existingChannel);
-  const currentPosition = useRunnerStore((state) => state.currentPosition);
-  const currentType = useRunnerStore((state) => state.currentType);
-  const isSecret = useRunnerStore((state) => state.isSecret);
-  const setIsSecret = useRunnerStore((state) => state.setIsSecret);
-  const isDouble = useRunnerStore((state) => state.isDouble);
-  const setIsDouble = useRunnerStore((state) => state.setIsDouble);
-  const isDoubleMove = useGameStore((state) => state.isDoubleMove);
-  const currentRole = useRunnerStore((state) => state.currentRole);
-  const currentTurn = useGameStore((state) => state.currentTurn);
-  const moves = useGameStore((state) => state.moves);
-  const move = useRunnerStore((state) => state.move);
-  const setMove = useRunnerStore((state) => state.setMove);
-  const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
-  const setIsMagnifyEnabled = useRunnerStore(
-    (state) => state.setIsMagnifyEnabled
-  );
+  const {
+    channel,
+    currentTurn,
+    moves,
+    isDoubleMove,
+    id: gameId,
+  } = useGameStore();
+
+  const {
+    currentPosition,
+    currentType,
+    isSecret,
+    setIsSecret,
+    isDouble,
+    setIsDouble,
+    currentRole,
+    move,
+    setMove,
+    isMagnifyEnabled,
+    setIsMagnifyEnabled,
+  } = useRunnerStore();
+
+  const { sendMessage } = useWebSocket(channel);
+  const toast = useToast();
 
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
@@ -38,8 +44,6 @@ export const Header = () => {
   const detectivesPositions = players
     .filter((player) => player.role !== 'culprit')
     .map((player) => player.position);
-  const gameId = useGameStore((state) => state.id);
-  const toast = useToast();
 
   const handleSend = () => {
     if (move && gameId && currentRole && currentPlayer) {
@@ -108,13 +112,15 @@ export const Header = () => {
         return 'gray';
     }
   };
+
+  const culpritMoves = moves.filter((move) => move.role === 'culprit');
   return (
     <div className="flex px-4 justify-around items-center gap-10">
-      <Badge colorScheme="orange">Round: {moves.length}</Badge>
+      <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
       <Badge colorScheme="blue">
         <Flex alignItems={'center'} gap={2}>
           <FaEye />
-          <Text>{showCulpritAtMoves.find((move) => move >= moves.length)}</Text>
+          <Text>{showCulpritAtMoves.find((move) => move >= culpritMoves.length)}</Text>
         </Flex>
       </Badge>
       <Flex alignItems={'center'}>
@@ -135,7 +141,12 @@ export const Header = () => {
       {currentRole === currentTurn &&
         (() => {
           const isAllowed =
-            move && isMoveAllowed(move.position, currentPlayer?.position, currentPlayer?.role);
+            move &&
+            isMoveAllowed(
+              move.position,
+              currentPlayer?.position,
+              currentPlayer?.role
+            );
           return (
             <div>
               {isAllowed ? (

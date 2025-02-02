@@ -32,16 +32,11 @@ export const Game = () => {
   const navigate = useNavigate();
   const { id: channel } = useParams<{ id: string }>();
   const { sendMessage } = useWebSocket(channel);
-  const setChannel = useGameStore((state) => state.setChannel);
-  const players = useGameStore((state) => state.players);
-  const username = localStorage.getItem('username');
-  const currentRole = useRunnerStore((state) => state.currentRole);
-  const setCurrentRole = useRunnerStore((state) => state.setCurrentRole);
-  const setCurrentPosition = useRunnerStore(
-    (state) => state.setCurrentPosition
-  );
-  const currentTurn = useGameStore((state) => state.currentTurn);
   const toast = useToast();
+  const username = localStorage.getItem('username');
+  const { players, setChannel, currentTurn } = useGameStore();
+  const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
+
 
   useEffect(() => {
     const checkGame = async () => {
