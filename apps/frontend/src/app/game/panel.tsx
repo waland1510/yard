@@ -3,6 +3,11 @@ import { useRunnerStore } from '../../stores/use-runner-store';
 import { useNodesStore } from '../../stores/use-nodes-store';
 import { useGameStore } from '../../stores/use-game-store';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
+import { BusIcon } from './icons/bus-icon';
+import { TaxiIcon } from './icons/taxi-icon';
+import { UndergroundIcon } from './icons/underground-icon';
+import { SecretIcon } from './icons/secret-icon';
+import { DoubleIcon } from './icons/double-icon';
 
 export const Panel = () => {
   const currentRole = useRunnerStore((state) => state.currentRole);
@@ -27,40 +32,47 @@ export const Panel = () => {
 
   const items = [
     {
-      icon: '🚖',
+      icon: (
+        <TaxiIcon
+          available={Boolean(node.taxi?.length && player?.taxiTickets)}
+        />
+      ),
       id: 'taxi',
       label: 'Taxi',
-      bg: 'bg-yellow-400',
       count: player?.taxiTickets || 0,
     },
     {
-      icon: '🚌',
+      icon: (
+        <BusIcon available={Boolean(node.bus?.length && player?.busTickets)} />
+      ),
       id: 'bus',
       label: 'Bus',
-      bg: 'bg-green-400',
       count: player?.busTickets || 0,
     },
     {
-      icon: '🚇',
+      icon: (
+        <UndergroundIcon
+          available={Boolean(
+            node.underground?.length && player?.undergroundTickets
+          )}
+        />
+      ),
       id: 'underground',
       label: 'Subway',
-      bg: 'bg-red-500',
       count: player?.undergroundTickets || 0,
     },
   ];
   const culpritItems = [
     {
-      icon: '🏃',
+      icon: <SecretIcon available={Boolean(player?.secretTickets)} />,
       id: 'secret',
       label: 'Hidden',
-      bg: 'bg-black text-white',
       count: player?.secretTickets || 0,
     },
     {
-      icon: '2️⃣',
+      icon: <DoubleIcon available={Boolean(player?.doubleTickets)} />,
       id: 'double',
       label: 'Double',
-      bg: 'bg-gradient-to-r from-yellow-400 to-red-500',
       count: player?.doubleTickets || 0,
     },
   ];
@@ -75,58 +87,50 @@ export const Panel = () => {
   };
 
   return (
-    <div className="p-4 max-w-[120px]">
-
+    <div className="max-w-[120px]">
+      <div className="flex items-center flex-col pb-4">
+        <p>{username}</p>
+        <img className="w-10" src={`/images/${currentRole}.png`} alt="player" />
+        <p>{currentRole}</p>
+      </div>
       <div className="flex flex-col gap-2">
-          {currentRole ? (
-            <div className="flex items-center flex-col gap-4">
-              <img
-                className="w-10"
-                src={`/images/${currentRole}.png`}
-                alt="player"
-              />
-              <p>{username}</p>
+        {items.map((item, index) => {
+          const available =
+            item.id && node[item.id as keyof typeof node] && item.count;
+          return (
+            <div
+              key={index}
+              className="flex items-center cursor-pointer flex-col gap-2"
+              onClick={
+                available
+                  ? () => {
+                      setCurrentType(item.id as 'taxi');
+                    }
+                  : undefined
+              }
+            >
+              <span className="text-2xl">{item.icon}</span>
+              {item.count && <span className="text-lg">{item.count}</span>}
             </div>
-          ) : (
-            <p>Select a player to start</p>
-          )}
-        </div>
-
-      {items.map((item, index) => {
-        const available = item.id && node[item.id as keyof typeof node] && item.count;
-        return (
-          <div
-            key={index}
-            className={`flex items-center cursor-pointer justify-between px-4 py-2 rounded-lg mb-3 ${
-              available ? item.bg : 'bg-gray-200'
-            }`}
-            onClick={
-              available
-                ? () => {
-                    setCurrentType(item.id as 'taxi');
-                  }
-                : undefined
-            }
-          >
-            <span className="text-2xl">{item.icon}</span>
-            {item.count && <span className="ml-4 text-sm">{item.count}</span>}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
       {currentRole === 'culprit' && (
         <div className="flex flex-col gap-3">
           {culpritItems.map((item) => {
             return (
               <div
                 key={item.id}
-                className={`flex items-center cursor-pointer justify-between px-4 py-2 rounded-lg mb-3 ${
-                  item.count > 0 ? item.bg : 'bg-gray-200'
-                }`}
-                onClick={item.count ? () => handleCulpritMoveClick(item.id as 'secret') : undefined}
+                className="flex items-center cursor-pointer flex-col gap-2"
+                onClick={
+                  item.count
+                    ? () => handleCulpritMoveClick(item.id as 'secret')
+                    : undefined
+                }
               >
                 <span className="text-2xl">{item.icon}</span>
                 {item.count > 0 && (
-                  <span className="ml-4 text-sm">{item.count}</span>
+                  <span className="text-lg">{item.count}</span>
                 )}
               </div>
             );

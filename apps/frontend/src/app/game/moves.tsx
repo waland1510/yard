@@ -27,7 +27,9 @@ export const Moves = () => {
         <VStack spacing={4} overflowY="auto" align="stretch">
           {moves
             ?.filter((m) => m.role === 'culprit')
-            .map((move, index) => (
+            .map((move, index) => {
+              console.log('move', move);
+              return (
               <Box
                 key={index}
                 p={3}
@@ -42,7 +44,7 @@ export const Moves = () => {
                     : '??'}
                 </Text>
               </Box>
-            ))}
+            )})}
         </VStack>
       </DrawerBody>
       <DrawerFooter>

@@ -29,7 +29,6 @@ export const Setup = () => {
   const navigate = useNavigate();
   const channel = useGameStore((state) => state.channel);
   const setChannel = useGameStore((state) => state.setChannel);
-  const setGame = useGameStore((state) => state.setGame);
   const username = localStorage.getItem('username');
   const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
   const existingChannel = localStorage.getItem('channel');
@@ -38,7 +37,6 @@ export const Setup = () => {
     if (existingChannel) {
       const game = await getGameByChannel(existingChannel);
       if (!game) return;
-      // setGame(game);
       setChannel(channel);
       navigate(`/game/${existingChannel}`);
     }

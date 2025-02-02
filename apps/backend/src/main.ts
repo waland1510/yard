@@ -82,6 +82,7 @@ server.register(async function (fastify) {
                 type: 'makeMove',
                 data: {
                   ...parsedMessage.data,
+                  type: parsedMessage.data.secret ? 'secret' : parsedMessage.data.type,
                   currentTurn,
                 },
               });

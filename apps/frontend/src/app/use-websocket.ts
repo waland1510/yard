@@ -21,7 +21,7 @@ const useWebSocket = (initialChannel?: string) => {
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
   const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
   const players = usePlayersSubscription();
-  
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message: Message = JSON.parse(event.data);
@@ -33,7 +33,7 @@ const useWebSocket = (initialChannel?: string) => {
           if (players.find((p) => p.username === (message.data.username))) return;
           updatePlayer(message.data.role, message.data.username);
           toast({
-            description: `New player joined: ${message.data}`,
+            description: `${message.data.username} joined as ${message.data.role}`,
             status: 'success',
             position: 'top-right',
             duration: 9000,

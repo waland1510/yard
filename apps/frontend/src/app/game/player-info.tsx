@@ -8,7 +8,11 @@ interface PlayerInfoProps {
   onRoleChange: (role: RoleType) => void;
 }
 
-export const PlayerInfo = ({ player, currentRole, onRoleChange }: PlayerInfoProps) => (
+export const PlayerInfo = ({
+  player,
+  currentRole,
+  onRoleChange,
+}: PlayerInfoProps) => (
   <VStack key={player.id} spacing={2}>
     <Text fontSize="lg" fontWeight="bold">
       {player.username}
@@ -24,10 +28,23 @@ export const PlayerInfo = ({ player, currentRole, onRoleChange }: PlayerInfoProp
       }
     />
     <Text fontSize="lg" fontWeight="bold">
-      {player.role !== 'culprit' ? <PlayerPosition position={player.position}/> : <p>??</p>}
+      {player.role !== 'culprit' ? (
+        <PlayerPosition position={player.position} />
+      ) : (
+        <p>??</p>
+      )}
     </Text>
-    <Badge colorScheme="yellow">Taxi: {player.taxiTickets}</Badge>
-    <Badge colorScheme="green">Bus: {player.busTickets}</Badge>
-    <Badge colorScheme="red">Metro: {[player.undergroundTickets]}</Badge>
+    {player.role === 'culprit' ? (
+      <>
+        <Badge colorScheme="gray">Secret: {player.secretTickets}</Badge>
+        <Badge colorScheme="orange">Double: {player.doubleTickets}</Badge>
+      </>
+    ) : (
+      <>
+        <Badge colorScheme="yellow">Taxi: {player.taxiTickets}</Badge>
+        <Badge colorScheme="green">Bus: {player.busTickets}</Badge>
+        <Badge colorScheme="red">Metro: {[player.undergroundTickets]}</Badge>
+      </>
+    )}
   </VStack>
 );

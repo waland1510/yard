@@ -196,7 +196,7 @@ export const easyPositions = [
     detective2: 36, // green
     detective3: 147, // red
     detective4: 13, // yellow
-    detective5: 108, // black
+    detective5: 107, // black
   },
   {
     culprit: 111,
@@ -223,7 +223,7 @@ export const mediumPositions = [
     detective2: 34, // green
     detective3: 112, // red
     detective4: 13, // yellow
-    detective5: 108, // black
+    detective5: 107, // black
   },
   {
     culprit: 103,

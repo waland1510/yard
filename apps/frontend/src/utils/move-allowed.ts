@@ -17,13 +17,13 @@ export const isMoveAllowed = (
     return 'blue';
   }
   if (node.underground?.includes(nodeId)) {
-    return 'red';
+    return '#d00';
   }
   if (node.bus?.includes(nodeId)) {
-    return 'green';
+    return '#080';
   }
   if (node.taxi?.includes(nodeId)) {
-    return 'orange';
+    return '#dd0';
   }
 
   return undefined;

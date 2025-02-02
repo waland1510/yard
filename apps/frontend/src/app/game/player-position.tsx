@@ -21,7 +21,7 @@ export interface PlayerPositionProps {
               cy={25}
               r="21"
               fill="none"
-              stroke="#0db708"
+              stroke="#080"
               strokeWidth="3"
             />
           )}
@@ -31,7 +31,7 @@ export interface PlayerPositionProps {
               cy={25}
               r="24"
               fill="none"
-              stroke="#ed0013"
+              stroke="#d00"
               strokeWidth="3"
             />
           )}

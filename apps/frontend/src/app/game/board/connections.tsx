@@ -21,12 +21,12 @@ export const Connections = () => {
                   y2={toNode.y}
                   stroke={
                     type === 'taxi'
-                      ? 'yellow'
+                      ? '#dd0'
                       : type === 'bus'
-                      ? 'green'
+                      ? '#080'
                       : type === 'river'
                       ? '#060606'
-                      : 'red'
+                      : '#d00'
                   }
                   strokeWidth={
                     type === 'underground'
