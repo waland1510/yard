@@ -1,29 +1,17 @@
 import {
   Box,
-  Button,
   DrawerBody,
-  DrawerFooter,
-  DrawerHeader,
   Text,
-  useDisclosure,
-  VStack,
+  VStack
 } from '@chakra-ui/react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
-import { FiArrowRight } from 'react-icons/fi';
 import { useGameStore } from '../../stores/use-game-store';
 
 export const Moves = () => {
   const moves = useGameStore((state) => state.moves);
-  const {
-    isOpen: isRightOpen,
-    onOpen: onRightOpen,
-    onClose: onRightClose,
-  } = useDisclosure();
 
   return (
-    <>
-      <DrawerHeader>Moves History</DrawerHeader>
-      <DrawerBody>
+    <DrawerBody>
         <VStack spacing={4} overflowY="auto" align="stretch">
           {moves
             ?.filter((m) => m.role === 'culprit')
@@ -47,11 +35,5 @@ export const Moves = () => {
             )})}
         </VStack>
       </DrawerBody>
-      <DrawerFooter>
-        <Button onClick={onRightClose} rightIcon={<FiArrowRight />}>
-          Close
-        </Button>
-      </DrawerFooter>
-    </>
   );
 };

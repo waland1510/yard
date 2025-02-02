@@ -3,8 +3,9 @@ import { useRunnerStore } from '../../../stores/use-runner-store';
 import { Connections } from './connections';
 import { Nodes } from './nodes';
 import { RiverPath } from './river-path';
+import { Box } from '@chakra-ui/react';
 
-export const Board = ({ channel }: { channel: string | undefined }) => {
+export const Board = () => {
   const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
   const [magnifyArea, setMagnifyArea] = useState({ x: 0, y: 0, radius: 100 });
 
@@ -24,7 +25,7 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
   };
 
   return (
-    <div>
+    <Box>
       <svg
         width="1200"
         height="850"
@@ -74,6 +75,6 @@ export const Board = ({ channel }: { channel: string | undefined }) => {
           </g>
         )}
       </svg>
-    </div>
+    </Box>
   );
 };

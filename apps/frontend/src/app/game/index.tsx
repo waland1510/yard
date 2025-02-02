@@ -1,22 +1,13 @@
 import {
   Box,
-  Button,
-  Drawer,
-  DrawerBody,
-  DrawerContent,
-  DrawerHeader,
-  DrawerOverlay,
   Flex,
-  HStack,
   IconButton,
-  Text,
   useDisclosure,
-  useToast,
-  VStack,
+  useToast
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
 import { useEffect } from 'react';
-import { FiArrowLeft, FiMenu } from 'react-icons/fi';
+import { FiMenu } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel, updatePlayer } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
@@ -24,9 +15,9 @@ import { useRunnerStore } from '../../stores/use-runner-store';
 import useWebSocket from '../use-websocket';
 import { Board } from './board';
 import { Header } from './header';
-import { Moves } from './moves';
+import { LeftDrawer } from './left-drawer';
 import { Panel } from './panel';
-import { PlayerInfo } from './player-info';
+import { RightDrawer } from './right-drawer';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -36,7 +27,6 @@ export const Game = () => {
   const username = localStorage.getItem('username');
   const { players, setChannel, currentTurn } = useGameStore();
   const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
-
 
   useEffect(() => {
     const checkGame = async () => {
@@ -119,60 +109,12 @@ export const Game = () => {
 
   return (
     <Flex height="100vh" bg="#f7f9fc">
-      {/* Left Sidebar Drawer */}
-      <Drawer isOpen={isLeftOpen} placement="left" onClose={onLeftClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerHeader>
-            <Box
-              display="flex"
-              justifyContent="space-between"
-              alignItems="center"
-            >
-              <Button onClick={onLeftClose} leftIcon={<FiArrowLeft />}>
-                Close
-              </Button>
-              <Text>Players Info</Text>
-            </Box>
-          </DrawerHeader>
-          <DrawerBody>
-            <VStack spacing={6} align="stretch">
-              {players && (
-                <>
-                  <div className="flex gap-2 items-end">
-                    {players
-                      .filter((player) => player.role !== currentRole)
-                      .slice(0, 3)
-                      .map((p) => (
-                        <PlayerInfo
-                          key={p.id}
-                          player={p}
-                          currentRole={currentRole}
-                          onRoleChange={onRoleChange}
-                        />
-                      ))}
-                  </div>
-                  <div className="flex gap-2 items-end">
-                    {players
-                      .filter((player) => player.role !== currentRole)
-                      .slice(3)
-                      .map((p) => (
-                        <PlayerInfo
-                          key={p.id}
-                          player={p}
-                          currentRole={currentRole}
-                          onRoleChange={onRoleChange}
-                        />
-                      ))}
-                  </div>
-                </>
-              )}
-            </VStack>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Left Sidebar Compact */}
+      <LeftDrawer
+        isLeftOpen={isLeftOpen}
+        channel={channel}
+        onLeftClose={onLeftClose}
+        onRoleChange={onRoleChange}
+      />
       <Box
         w="120px"
         p={2}
@@ -198,32 +140,12 @@ export const Game = () => {
       </Box>
 
       {/* Main Content */}
-      <Flex flex="1" direction="column">
-        {/* Top Bar */}
-        <HStack
-          w="100%"
-          p={1}
-          bg="white"
-          boxShadow="md"
-          align="center"
-          justify="space-between"
-        >
-          <Header />
-        </HStack>
-
-        {/* Map Section */}
-        <Box flex="1" margin="auto" overflow="scroll">
-          <Board channel={channel} />
-        </Box>
+      <Flex flex="1" align="center" direction="column">
+        <Header />
+        <Board />
       </Flex>
 
-      {/* Right Sidebar Drawer */}
-      <Drawer isOpen={isRightOpen} placement="right" onClose={onRightClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <Moves />
-        </DrawerContent>
-      </Drawer>
+      <RightDrawer isRightOpen={isRightOpen} onRightClose={onRightClose} />
 
       {/* Right Sidebar Compact */}
       <Box
