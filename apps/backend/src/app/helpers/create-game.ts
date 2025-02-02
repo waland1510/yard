@@ -1,13 +1,12 @@
-import { easyPositions, GameMode, GameState, hardPositions, initialPlayers, mediumPositions } from "@yard/shared-utils";
+import {GameState, initialPlayers, } from "@yard/shared-utils";
 
 
-export function createGameState(gameMode: GameMode): GameState {
-  const startingPositions = getStartingPositions(gameMode);
+export function createGameState(): GameState {
+  const startingPositions = getStartingPositions();
   const channel = Math.random().toString(36).substring(7);
 
   return {
     channel,
-    gameMode,
     players: initialPlayers.map((player) => ({
       ...player,
       position: startingPositions[player.role],
@@ -20,23 +19,27 @@ export function createGameState(gameMode: GameMode): GameState {
   };
 }
 
-function getStartingPositions(gameMode: GameMode) {
-  switch (gameMode) {
-    case 'easy':
-      return easyPositions[
-        Math.floor(Math.random() * easyPositions.length)
-      ];
-    case 'medium':
-      return mediumPositions[
-        Math.floor(Math.random() * mediumPositions.length)
-      ];
-    case 'hard':
-      return hardPositions[
-        Math.floor(Math.random() * hardPositions.length)
-      ];
-    default:
-      return easyPositions[
-        Math.floor(Math.random() * easyPositions.length)
-      ];
-  }
+interface StartingPositions {
+  culprit: number;
+  detective1: number;
+  detective2: number;
+  detective3: number;
+  detective4: number;
+  detective5: number;
 }
+
+const getStartingPositions = (): StartingPositions => {
+  const possiblePositions = [13, 26, 29, 34, 50, 53, 91, 94, 103, 112, 117, 132, 138, 141, 155, 174, 197, 198];
+  const shuffled = [...possiblePositions].sort(() => Math.random() - 0.5);
+  
+  return {
+    culprit: shuffled[0],
+    detective1: shuffled[1],
+    detective2: shuffled[2],
+    detective3: shuffled[3],
+    detective4: shuffled[4],
+    detective5: shuffled[5]
+  };
+};
+
+export { getStartingPositions };

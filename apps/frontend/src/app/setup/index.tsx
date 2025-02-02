@@ -6,13 +6,12 @@ import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { CreateGame } from './create-game';
-import { Mode } from './mode';
+// import { Mode } from './mode';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
 
 const setupWorkflow = [
   'startGame',
-  'chooseMode',
   'createGame',
   'addUsername',
   'chooseRole',
@@ -53,8 +52,8 @@ export const Setup = () => {
             setCurrentStep={setCurrentStep}
           />
         );
-      case 'chooseMode':
-        return <Mode setCurrentStep={setCurrentStep} />;
+      // case 'chooseMode':
+      //   return <Mode setCurrentStep={setCurrentStep} />;
       case 'createGame':
         return <CreateGame setCurrentStep={setCurrentStep} />;
       case 'addUsername':

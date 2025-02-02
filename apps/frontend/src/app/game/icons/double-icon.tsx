@@ -26,19 +26,19 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
             stroke="#000"
             strokeLinecap="round"
             strokeLinejoin="round"
-            stroke-width="2"
+            strokeWidth="2"
           />
-          <path d="m2 320.54h44" fill="none" stroke="#fff" stroke-width="16" />
+          <path d="m2 320.54h44" fill="none" stroke="#fff" strokeWidth="16" />
           <text
             x="100"
             y="348.54166"
             fill="#000000"
             fontFamily="sansSerif"
             fontSize="74.667px"
-            font-weight="bold"
+            fontWeight="bold"
             letterSpacing="0px"
             stroke="#ffffff"
-            stroke-width="4"
+            strokeWidth="4"
             textAnchor="middle"
             wordSpacing="0px"
           >
@@ -53,7 +53,7 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
           fill="#000000"
           fontFamily="sansSerif"
           fontSize="74.667px"
-          font-weight="bold"
+          fontWeight="bold"
           letterSpacing="0px"
           textAnchor="middle"
           wordSpacing="0px"
@@ -62,7 +62,7 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
             2×
           </tspan>
         </text>
-        <path d="m154 320.54h44" fill="none" stroke="#fff" stroke-width="16" />
+        <path d="m154 320.54h44" fill="none" stroke="#fff" strokeWidth="16" />
       </g>
     </svg>
   );

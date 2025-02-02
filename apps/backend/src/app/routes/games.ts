@@ -1,4 +1,4 @@
-import { Move, GameMode } from '@yard/shared-utils';
+import { Move } from '@yard/shared-utils';
 import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import {
@@ -20,7 +20,6 @@ const db = drizzle(process.env.DATABASE_URL, {
 export const gamesTable = pgTable('games', {
   id: serial('id').primaryKey(),
   channel: varchar('channel', { length: 255 }).notNull().unique(),
-  gameMode: varchar('game_mode', { length: 255 }).notNull(),
   players: jsonb('players').notNull(),
   currentTurn: varchar('current_turn', { length: 255 }).notNull(),
   moves: jsonb('moves').notNull(),
@@ -96,8 +95,7 @@ export default async function (fastify: FastifyInstance) {
 
   // Create New Game
   fastify.post('/api/games', async (request, reply) => {
-    const { channel, players, gameMode, currentTurn } = createGameState(
-      request.body as GameMode
+    const { channel, players, currentTurn } = createGameState(
     );
     try {
       await db.transaction(async (trx) => {
@@ -105,7 +103,6 @@ export default async function (fastify: FastifyInstance) {
           .insert(gamesTable)
           .values({
             channel,
-            gameMode,
             currentTurn,
             players: [],
             moves: [],

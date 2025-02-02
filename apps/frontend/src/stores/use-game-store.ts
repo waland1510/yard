@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import {
   initialPlayers,
   Player,
-  GameMode,
   Role,
   RoleType,
   Move,
@@ -16,7 +15,6 @@ export interface ClientGameState extends GameState {
   setCurrentTurn: (currentTurn: RoleType) => void;
   setPlayer: (player: Player) => void;
   updatePlayer: (role: string, username: string) => void;
-  setGameMode: (gameMode?: GameMode) => void;
   setChannel: (channel?: string) => void;
   updateTicketsCount: (
     playerRole: string,
@@ -62,8 +60,6 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
       }
       return { players: state.players };
     }),
-  gameMode: undefined,
-  setGameMode: (gameMode?: GameMode) => set({ gameMode }),
   channel: '',
   setChannel: (channel?: string) => {
     if (channel) set({ channel });
