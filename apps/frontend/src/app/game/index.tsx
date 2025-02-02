@@ -3,10 +3,10 @@ import {
   Flex,
   IconButton,
   useDisclosure,
-  useToast
+  useToast,
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { FiMenu } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel, updatePlayer } from '../../api';
@@ -29,59 +29,76 @@ export const Game = () => {
   const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
 
   useEffect(() => {
-    const checkGame = async () => {
-      if (channel) {
-        try {
-          const game = await getGameByChannel(channel);
-          if (!game || game.status === 'finished') {
-            localStorage.removeItem('channel');
-            toast({
-              title: 'Start New Game',
-              description: 'This game has finished',
-              status: 'success',
-              duration: 9000,
-              isClosable: true,
-            });
-            navigate('/');
-            return;
-          }
+    const abortController = new AbortController();
+    let isSubscribed = true;
 
-          if (game) {
-            localStorage.setItem('channel', channel);
-            setChannel(channel);
-            useGameStore.setState(game);
-            const currentPlayer = game.players.find(
-              (p) => p.username === username
-            );
-            if (currentPlayer) {
-              setCurrentRole(currentPlayer.role);
-              sendMessage('joinGame', {
-                channel,
-                username,
-                role: currentPlayer.role,
-              });
-            } else {
-              navigate(`/join/${channel}`);
-            }
-          }
-          if (!username) {
-            navigate(`/join/${channel}`);
-          }
-        } catch (error) {
-          console.log('error', error);
+    const checkGame = async () => {
+      if (!channel) return;
+
+      try {
+        const game = await getGameByChannel(channel, abortController.signal);
+
+        // Only proceed if component is still mounted
+        if (!isSubscribed) return;
+
+        if (!game || game.status === 'finished') {
+          localStorage.removeItem('channel');
           toast({
-            title: 'Error',
-            description: 'Game not found',
-            status: 'error',
+            title: 'Start New Game',
+            description: 'This game has finished',
+            status: 'success',
             duration: 9000,
             isClosable: true,
           });
           navigate('/');
+          return;
         }
+
+        if (game) {
+          localStorage.setItem('channel', channel);
+          setChannel(channel);
+          useGameStore.setState(game);
+          const currentPlayer = game.players.find(
+            (p) => p.username === username
+          );
+          if (currentPlayer) {
+            setCurrentRole(currentPlayer.role);
+            sendMessage('joinGame', {
+              channel,
+              username,
+              role: currentPlayer.role,
+            });
+          } else {
+            navigate(`/join/${channel}`);
+          }
+        }
+        if (!username) {
+          navigate(`/join/${channel}`);
+        }
+      } catch (error) {
+        if (!isSubscribed) return;
+        if (error instanceof Error && error.name === 'AbortError') return;
+
+        console.error('Game check error:', error);
+        toast({
+          title: 'Error',
+          description: 'Game not found',
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        });
+        navigate('/');
       }
     };
+
     checkGame();
-  }, []);
+
+    // Cleanup function
+    return () => {
+      isSubscribed = false;
+      abortController.abort();
+    };
+  }, [channel, username, navigate, toast]); // Added proper dependencies
 
   const {
     isOpen: isLeftOpen,

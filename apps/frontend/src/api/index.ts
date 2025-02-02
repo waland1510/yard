@@ -20,10 +20,11 @@ export const createGame = async () => {
 };
 
 export const getGameByChannel = async (
-  channel: string
+  channel: string,
+  signal?: AbortSignal
 ): Promise<GameState> => {
   try {
-    const response = await api.get(`/api/games/${channel}`);
+    const response = await api.get(`/api/games/${channel}`, { signal });
     return response.data;
   } catch (error) {
     console.error(`Error fetching game with ID ${channel}:`, error);

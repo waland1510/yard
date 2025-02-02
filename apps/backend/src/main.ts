@@ -29,7 +29,6 @@ server.register(async function (fastify) {
 
       connection.on('message', (message) => {
         const parsedMessage: Message = JSON.parse(message.toString());
-        console.log('Received:', parsedMessage);
         switch (parsedMessage.type) {
           case 'startGame':
             currentChannel = parsedMessage.data.ch;

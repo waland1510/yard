@@ -1,3 +1,5 @@
+import { Spinner } from '@chakra-ui/react';
+import { useState } from 'react';
 import { createGame } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import useWebSocket from '../use-websocket';
@@ -13,16 +15,36 @@ export const Start = ({
   handleContinueGame,
   setCurrentStep,
 }: StartProps) => {
+  const [isLoading, setIsLoading] = useState(false);
   const { sendMessage } = useWebSocket('');
-  const handleNewGame = async () => {
-    const { createdGame } = await createGame();
 
-    useGameStore.setState(createdGame);
-    if (createdGame) {
-      setCurrentStep('createGame');
-      sendMessage('startGame', { ch: createdGame.channel });
+  const handleNewGame = async () => {
+    try {
+      setIsLoading(true);
+      const { createdGame } = await createGame();
+      useGameStore.setState(createdGame);
+      if (createdGame) {
+        sendMessage('startGame', { ch: createdGame.channel });
+        setCurrentStep('addUsername');
+      }
+    } catch (error) {
+      console.error('Failed to create game:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="text-center">
+        <div>
+          Please wait while we create your game. If this takes too long, please
+          refresh the page in or wait up to 60 seconds.
+        </div>
+        <Spinner />
+      </div>
+    );
+  }
   return (
     <div className="text-center">
       <p className="text-lg text-gray-700">
@@ -39,7 +61,6 @@ export const Start = ({
       <button
         className="px-6 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-300"
         onClick={() => {
-          setCurrentStep('addUsername');
           handleNewGame();
         }}
       >

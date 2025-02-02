@@ -5,8 +5,6 @@ import { getGameByChannel } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
-import { CreateGame } from './create-game';
-// import { Mode } from './mode';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
 
@@ -28,9 +26,16 @@ export const Setup = () => {
   const existingChannel = localStorage.getItem('channel');
 
   useEffect(() => {
-    if (channel) {
-      setCurrentStep('addUsername');
-    }
+    (async () => {
+      if (channel) {
+        const game = getGameByChannel(channel);
+        if ((await game).status === 'finished') {
+          setCurrentStep('startGame');
+
+        }
+        setCurrentStep('addUsername');
+      }
+    })();
   }, []);
 
   const handleContinueGame = async () => {
@@ -52,10 +57,6 @@ export const Setup = () => {
             setCurrentStep={setCurrentStep}
           />
         );
-      // case 'chooseMode':
-      //   return <Mode setCurrentStep={setCurrentStep} />;
-      case 'createGame':
-        return <CreateGame setCurrentStep={setCurrentStep} />;
       case 'addUsername':
         return <AddUsername setCurrentStep={setCurrentStep} />;
       case 'chooseRole':
@@ -66,15 +67,20 @@ export const Setup = () => {
             <p className="text-lg text-gray-700">Invite Players</p>
             <button
               className="px-6 py-2 bg-yellow-600 text-black rounded-lg shadow-md hover:bg-red-700 transition duration-300"
-              onClick={() => navigate(`/game/${joiningChannel ?? channel}`)}
+              onClick={play}
             >
-              Play
+              Copy Link and Play
             </button>
           </div>
         );
       default:
         return null;
     }
+  };
+
+  const play = () => {
+    navigate(`/game/${joiningChannel ?? channel}`);
+    navigator.clipboard.writeText(`${window.location.origin}/game/${channel}`);
   };
 
   return (
