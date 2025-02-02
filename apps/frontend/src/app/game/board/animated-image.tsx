@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { useSpring, animated } from 'react-spring';
+import React, { useMemo } from 'react';
+import { useSpring, animated, to } from 'react-spring';
+
+const OFFSET = 14;
+const ANIMATION_CONFIG = {
+  movement: { tension: 60, friction: 14 },
+  scale: { duration: 1000 },
+  reset: { duration: 500 }
+} as const;
 
 interface AnimatedImageProps {
   href: string;
@@ -7,6 +14,7 @@ interface AnimatedImageProps {
   previousY?: number;
   targetX: number;
   targetY: number;
+  isCurrentPlayer: boolean;
 }
 
 export const AnimatedImage: React.FC<AnimatedImageProps> = ({
@@ -15,30 +23,63 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
   previousY,
   targetX,
   targetY,
+  isCurrentPlayer,
 }) => {
-  if (!previousX || !previousY) {
-    return null;
-  }
+  if (!previousX || !previousY) return null;
+
+  const position = useMemo(() => ({
+    from: { x: previousX - OFFSET, y: previousY - OFFSET },
+    to: { x: targetX - OFFSET, y: targetY - OFFSET }
+  }), [previousX, previousY, targetX, targetY]);
+
   const springProps = useSpring({
-    from: { x: previousX - 14, y: previousY - 14 },
-    to: { x: targetX - 14, y: targetY - 14 },
-    config: { tension: 60, friction: 14 } 
+    ...position,
+    config: ANIMATION_CONFIG.movement
   });
 
-  return (
-    <>
-      <defs>
-        <clipPath id={`clip-circle-${targetX}-${targetY}`}>
-          <circle cx={targetX} cy={targetY} r="14" />
-        </clipPath>
-      </defs>
+  const combinedSpring = useSpring({
+    from: { x: targetX - OFFSET, y: targetY - OFFSET, scale: 1 },
+    to: async (next) => {
+      await next({
+        x: targetX - OFFSET,
+        y: targetY - OFFSET,
+        scale: 1.5,
+        config: ANIMATION_CONFIG.scale,
+      });
+      await next({ 
+        scale: 1, 
+        config: ANIMATION_CONFIG.reset 
+      });
+    },
+    reset: true,
+  });
+
+  const transform = useMemo(() => 
+    to(
+      [combinedSpring.x, combinedSpring.y, combinedSpring.scale],
+      (x, y, scale) => `translate(${x}, ${y}) scale(${scale})`
+    ),
+    [combinedSpring.x, combinedSpring.y, combinedSpring.scale]
+  );
+
+  if (isCurrentPlayer) {
+    return (
       <animated.image
         href={href}
-        x={springProps.x}
-        y={springProps.y}
+        transform={transform}
         width="28"
         height="28"
       />
-    </>
+    );
+  }
+
+  return (
+    <animated.image
+      href={href}
+      x={springProps.x}
+      y={springProps.y}
+      width="28"
+      height="28"
+    />
   );
 };

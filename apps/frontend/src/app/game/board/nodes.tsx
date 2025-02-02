@@ -8,35 +8,39 @@ import { isMoveAllowed } from '../../../utils/move-allowed';
 import { mapData } from '../board-data/grid_map';
 import { AnimatedImage } from './animated-image';
 import { Fragment } from 'react/jsx-runtime';
+import { useMemo, useCallback } from 'react';
 
 export const Nodes = () => {
   const players = usePlayersSubscription();
   const currentPosition = usePlayerSubscription().currentPosition;
-  const setCurrentType = useRunnerStore((state) => state.setCurrentType);
-  const role = useRunnerStore((state) => state.currentRole);
-  const isSecret = useRunnerStore((state) => state.isSecret);
-  const isDouble = useRunnerStore((state) => state.isDouble);
-  const setMove = useRunnerStore((state) => state.setMove);
-  const setCurrentPosition = useRunnerStore(
-    (state) => state.setCurrentPosition
-  );
-  const runnerPosition = players.find((p) => p.role === role)?.position;
-  const runnerRole = players.find((p) => p.position === currentPosition)?.role;
+  const { 
+    setCurrentType,
+    currentRole: role,
+    isSecret,
+    isDouble,
+    setMove,
+    setCurrentPosition 
+  } = useRunnerStore();
+
+  const runnerData = useMemo(() => ({
+    position: players.find((p) => p.role === role)?.position,
+    currentRole: players.find((p) => p.position === currentPosition)?.role
+  }), [players, role, currentPosition]);
   const moves = useGameStore((state) => state.moves);
 
-  const handleSend = (position: number) => {
-    const availableType =
-      getAvailableType(position, runnerPosition, role) || 'taxi';
+  const handleSend = useCallback((position: number) => {
+    const availableType = getAvailableType(position, runnerData.position, role) || 'taxi';
+    
     setCurrentType(availableType);
     setMove({
       role,
-      type: availableType,
+      type: availableType, 
       position,
       secret: isSecret,
       double: isDouble,
     });
     setCurrentPosition(position);
-  };
+  }, [runnerData.position, role, isSecret, isDouble]);
   return (
     <>
       {mapData.nodes.map((node) => {
@@ -99,7 +103,7 @@ export const Nodes = () => {
                     ? 'transparent'
                     : currentPosition === node.id
                     ? 'purple'
-                    : isMoveAllowed(node.id, runnerPosition, runnerRole) ??
+                    : isMoveAllowed(node.id, runnerData.position, runnerData.currentRole) ??
                       'black'
                 }
                 onClick={() => handleSend(node.id)}
@@ -114,6 +118,7 @@ export const Nodes = () => {
                 previousY={playersNode?.y}
                 targetX={node.x}
                 targetY={node.y}
+                isCurrentPlayer={playerRole === role}
               />
             )}
           </Fragment>
