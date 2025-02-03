@@ -106,7 +106,7 @@ export const Nodes = () => {
                 fill={
                   isMoveAllowed(
                     node.id,
-                    playerStorePosition,
+                    playerStorePosition ?? runnerData.position,
                     runnerData.currentRole
                   ) ?? 'white'
                 }
@@ -144,7 +144,7 @@ export const Nodes = () => {
                     ? 'purple'
                     : isMoveAllowed(
                         node.id,
-                        runnerData.position,
+                        playerStorePosition ?? runnerData.position,
                         runnerData.currentRole
                       )
                     ? 'white'
