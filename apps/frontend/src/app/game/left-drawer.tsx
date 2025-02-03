@@ -10,7 +10,6 @@ import {
   VStack
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
-import { FiArrowLeft } from 'react-icons/fi';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import { PlayerInfo } from './player-info';
@@ -35,7 +34,7 @@ export const LeftDrawer = ({ isLeftOpen, onLeftClose, channel, onRoleChange }: L
             justifyContent="space-between"
             alignItems="center"
           >
-            <Button onClick={onLeftClose} leftIcon={<FiArrowLeft />}>
+            <Button onClick={onLeftClose}>
               Close
             </Button>
             <Text>Players Info</Text>

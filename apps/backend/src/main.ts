@@ -92,7 +92,7 @@ server.register(async function (fastify) {
             if (currentChannel) {
               broadcast(currentChannel, {
                 type: 'endGame',
-                data: parsedMessage,
+                data: parsedMessage.data,
               });
               delete channels[currentChannel];
             }

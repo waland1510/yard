@@ -1,13 +1,13 @@
 import {
   Box,
+  Button,
   Flex,
-  IconButton,
   useDisclosure,
-  useToast,
+  useToast
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
-import { useCallback, useEffect } from 'react';
-import { FiMenu } from 'react-icons/fi';
+import { useEffect } from 'react';
+import { FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel, updatePlayer } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
@@ -125,28 +125,27 @@ export const Game = () => {
   };
 
   return (
-    <Flex height="100vh" bg="#f7f9fc">
+    <Flex height="100vh" bg="#edf2f7">
       <LeftDrawer
         isLeftOpen={isLeftOpen}
         channel={channel}
         onLeftClose={onLeftClose}
         onRoleChange={onRoleChange}
       />
+      {/* Left Sidebar Compact */}
       <Box
-        w="120px"
+        w="100%"
+        maxW={150}
+        h="100vh"
         p={2}
-        bg="white"
-        boxShadow="xl"
-        roundedRight="lg"
+        bg="#edf2f7"
         display="flex"
         flexDirection="column"
         alignItems="center"
       >
-        <IconButton
-          icon={<FiMenu />}
-          onClick={onLeftOpen}
-          aria-label="Open Player Info"
-        />
+        <Button onClick={onLeftOpen} leftIcon={<FiArrowLeft />}>
+          Players
+        </Button>
         <img
           className="w-20"
           src="/images/catch.png"
@@ -158,7 +157,6 @@ export const Game = () => {
 
       {/* Main Content */}
       <Flex flex="1" align="center" direction="column">
-        <Header />
         <Board />
       </Flex>
 
@@ -166,32 +164,31 @@ export const Game = () => {
 
       {/* Right Sidebar Compact */}
       <Box
-        w="120px"
+        w="100%"
+        maxW={150}
         p={2}
-        bg="white"
-        boxShadow="xl"
-        roundedLeft="lg"
+        bg="#edf2f7"
         display="flex"
         flexDirection="column"
         alignItems="center"
       >
-        <IconButton
-          icon={<FiMenu />}
-          onClick={onRightOpen}
-          aria-label="Open Moves History"
-        />
-        <div className="flex flex-col items-center justify-between px-4 py-2 mb-5 rounded-lg bg-gray-200">
-          <span className="text-2xl" role="img" aria-label="dice">
-            🎲
-          </span>
+        <Button onClick={onRightOpen} rightIcon={<FiArrowRight />}>
+          Moves
+        </Button>
+        <div className="flex flex-col gap-3 items-center justify-between px-4 py-2 mb-5">
+          <div className="text-lg">Current Turn</div>
+          <div className="text-sm">{currentTurn}</div>
           <img
             className="w-10 h-12"
             src={`/images/${currentTurn}.png`}
             alt="player"
             onClick={() => onRoleChange(currentTurn)}
           />
-          <div className="text-sm">{currentTurn}</div>
+          <span className="text-2xl" role="img" aria-label="dice">
+            🎲
+          </span>
         </div>
+        <Header />
       </Box>
     </Flex>
   );

@@ -29,7 +29,7 @@ export const Board = () => {
       <svg
         width="1200"
         height="850"
-        style={{ border: '2px solid gray', background: '#f0f0f0' }}
+        style={{ border: '2px solid gray', background: '#aaa' }}
         onMouseMove={handleMouseMove}
       >
         {isMagnifyEnabled && (

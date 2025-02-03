@@ -15,6 +15,7 @@ interface AnimatedImageProps {
   targetX: number;
   targetY: number;
   isCurrentPlayer: boolean;
+  nodeId: number;
 }
 
 export const AnimatedImage: React.FC<AnimatedImageProps> = ({
@@ -24,6 +25,7 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
   targetX,
   targetY,
   isCurrentPlayer,
+  nodeId
 }) => {
 
   const position = useMemo(() => ({
@@ -79,6 +81,7 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
       y={springProps.y}
       width="28"
       height="28"
+      clipPath={`url(#clip-circle-${nodeId})`}
     />
   );
 };

@@ -1,4 +1,6 @@
 import { showCulpritAtMoves } from '@yard/shared-utils';
+import { useCallback, useMemo } from 'react';
+import { Fragment } from 'react/jsx-runtime';
 import { usePlayerSubscription } from '../../../hooks/use-player-subscription';
 import { usePlayersSubscription } from '../../../hooks/use-players-subscription';
 import { useGameStore } from '../../../stores/use-game-store';
@@ -7,8 +9,6 @@ import { getAvailableType } from '../../../utils/available-type';
 import { isMoveAllowed } from '../../../utils/move-allowed';
 import { mapData } from '../board-data/grid_map';
 import { AnimatedImage } from './animated-image';
-import { Fragment } from 'react/jsx-runtime';
-import { useMemo, useCallback } from 'react';
 
 export const Nodes = () => {
   const players = usePlayersSubscription();
@@ -19,28 +19,46 @@ export const Nodes = () => {
     isSecret,
     isDouble,
     setMove,
-    setCurrentPosition
+    setCurrentPosition,
   } = useRunnerStore();
 
-  const runnerData = useMemo(() => ({
-    position: players.find((p) => p.role === role)?.position,
-    currentRole: players.find((p) => p.position === currentPosition)?.role
-  }), [players, role, currentPosition]);
-  const moves = useGameStore((state) => state.moves);
+  const runnerData = useMemo(
+    () => ({
+      position: players.find((p) => p.role === role)?.position,
+      currentRole: players.find((p) => p.position === currentPosition)?.role,
+    }),
+    [players, role, currentPosition]
+  );
+  const { moves, players: storePlayers } = useGameStore();
+  const playerStorePosition = storePlayers.find(
+    (p) => p.role === role
+  )?.position;
+  const handleSend = useCallback(
+    (position: number) => {
+      const availableType =
+        getAvailableType(position, runnerData.position, role) || 'taxi';
 
-  const handleSend = useCallback((position: number) => {
-    const availableType = getAvailableType(position, runnerData.position, role) || 'taxi';
-
-    setCurrentType(availableType);
-    setMove({
+      setCurrentType(availableType);
+      setMove({
+        role,
+        type: availableType,
+        position,
+        secret: isSecret,
+        double: isDouble,
+      });
+      setCurrentPosition(position);
+    },
+    [
+      runnerData.position,
       role,
-      type: availableType,
-      position,
-      secret: isSecret,
-      double: isDouble,
-    });
-    setCurrentPosition(position);
-  }, [runnerData.position, role, setCurrentType, setMove, isSecret, isDouble, setCurrentPosition]);
+      setCurrentType,
+      setMove,
+      isSecret,
+      isDouble,
+      setCurrentPosition,
+    ]
+  );
+
   return (
     <>
       {mapData.nodes.map((node) => {
@@ -85,13 +103,34 @@ export const Nodes = () => {
                 cx={node.x}
                 cy={node.y}
                 r="14"
-                fill="white"
+                fill={
+                  isMoveAllowed(
+                    node.id,
+                    playerStorePosition,
+                    runnerData.currentRole
+                  ) ?? 'white'
+                }
                 stroke="black"
                 strokeWidth="4"
                 onClick={() => handleSend(node.id)}
                 strokeDasharray={node.river ? '5 5' : 'none'}
               />
-
+              <defs>
+                <clipPath id={`clip-circle-${node.id}`}>
+                  <circle cx={node.x} cy={node.y} r="14" />
+                </clipPath>
+              </defs>
+              {showImage && (
+                <AnimatedImage
+                  href={`/images/${playerRole}.png`}
+                  previousX={playersNode?.x || node.x}
+                  previousY={playersNode?.y || node.y}
+                  targetX={node.x}
+                  targetY={node.y}
+                  isCurrentPlayer={playerRole === role}
+                  nodeId={node.id}
+                />
+              )}
               <text
                 x={node.x}
                 y={node.y + 5}
@@ -103,24 +142,19 @@ export const Nodes = () => {
                     ? 'transparent'
                     : currentPosition === node.id
                     ? 'purple'
-                    : isMoveAllowed(node.id, runnerData.position, runnerData.currentRole) ??
-                      'black'
+                    : isMoveAllowed(
+                        node.id,
+                        runnerData.position,
+                        runnerData.currentRole
+                      )
+                    ? 'white'
+                    : 'black'
                 }
                 onClick={() => handleSend(node.id)}
               >
                 {node.id}
               </text>
             </g>
-            {showImage && (
-              <AnimatedImage
-                href={`/images/${playerRole}.png`}
-                previousX={playersNode?.x || node.x}
-                previousY={playersNode?.y || node.y}
-                targetX={node.x}
-                targetY={node.y}
-                isCurrentPlayer={playerRole === role}
-              />
-            )}
           </Fragment>
         );
       })}

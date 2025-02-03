@@ -7,7 +7,6 @@ import {
   DrawerOverlay,
   Text,
 } from '@chakra-ui/react';
-import { FiArrowRight } from 'react-icons/fi';
 import { Moves } from './moves';
 
 interface RightDrawerProps {
@@ -26,8 +25,8 @@ export const RightDrawer = ({
     <DrawerContent>
       <DrawerHeader>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Text>Moves History</Text>
-          <Button onClick={onRightClose} rightIcon={<FiArrowRight />}>
+          <Text>Moves</Text>
+          <Button onClick={onRightClose}>
             Close
           </Button>
         </Box>

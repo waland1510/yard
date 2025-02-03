@@ -81,7 +81,6 @@ export const Panel = () => {
 
   const handleCulpritMoveClick = (type: 'secret' | 'double') => {
     if (type === 'secret' && culpritItems[0].count > 0) {
-      setCurrentType(undefined);
       setIsSecret(!isSecret);
     } else if (type === 'double' && culpritItems[1].count > 0) {
       setIsDouble(!isDouble);
@@ -90,11 +89,13 @@ export const Panel = () => {
 
   return (
     <div className="max-w-[120px]">
-      <div className="flex items-center flex-col pb-4">
-        <p>{username}</p>
+      <div className="flex items-center flex-col pb-4 gap-1">
+        <p>Hey, {username}!</p>
         <img className="w-10" src={`/images/${currentRole}.png`} alt="player" />
+        <p>Your are</p>
         <p>{currentRole}</p>
       </div>
+      <div className="text-lg">Your tickets</div>
       <div className="flex flex-col gap-2">
         {items.map((item, index) => {
           const available =

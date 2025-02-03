@@ -1,4 +1,4 @@
-import { Badge, Text, Flex, useToast, HStack } from '@chakra-ui/react';
+import { Badge, Text, Flex, useToast, VStack } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
@@ -6,7 +6,7 @@ import { isMoveAllowed } from '../../utils/move-allowed';
 import useWebSocket from '../use-websocket';
 import { PlayerPosition } from './player-position';
 import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
-import { getNextRole, showCulpritAtMoves } from '@yard/shared-utils';
+import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
 import { FaEye } from 'react-icons/fa';
 import { addMove, updateGame, updatePlayer } from '../../api';
 
@@ -100,8 +100,8 @@ export const Header = () => {
     setIsMagnifyEnabled(!isMagnifyEnabled);
   };
 
-  const getStatusColorScheme = () => {
-    switch (currentType) {
+  const getStatusColorScheme = (type: MoveType | 'secret') => {
+    switch (type) {
       case 'taxi':
         return 'yellow';
       case 'bus':
@@ -114,119 +114,138 @@ export const Header = () => {
   };
 
   const culpritMoves = moves.filter((move) => move.role === 'culprit');
-  return (
-    <HStack
-      w="100%"
-      p={1}
-      bg="white"
-      boxShadow="md"
-      align="center"
-      justify="start"
-    >
-      <div className="flex px-4 justify-around items-center gap-10">
-        <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
-        <Badge colorScheme="blue">
-          <Flex alignItems={'center'} gap={2}>
-            <FaEye />
-            <Text>
-              {showCulpritAtMoves.find((move) => move >= culpritMoves.length)}
-            </Text>
-          </Flex>
-        </Badge>
-        <Flex alignItems={'center'}>
-          {currentPlayer ? (
-            <PlayerPosition position={currentPlayer.position} />
-          ) : null}
-          <Badge colorScheme={getStatusColorScheme()}>{currentType}</Badge>
-          {currentPosition && currentPosition !== currentPlayer?.position ? (
-            <svg width="30" height="30">
-              <polygon points="20,15 0,5 0,25" fill="black" />
-            </svg>
-          ) : null}
+  const lastCulpritMove = culpritMoves[culpritMoves.length - 1];
+  const lastCulpritMoveType = lastCulpritMove?.secret ? 'secret' : lastCulpritMove?.type;
 
-          {currentPosition && currentPosition !== currentPlayer?.position ? (
-            <PlayerPosition position={currentPosition} />
-          ) : null}
-        </Flex>
-        {currentRole === currentTurn &&
-          (() => {
-            const isAllowed =
-              move &&
-              isMoveAllowed(
-                move.position,
-                currentPlayer?.position,
-                currentPlayer?.role
-              );
-            return (
-              <div>
-                {isAllowed ? (
-                  currentType ? (
-                    <button
-                      className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                      onClick={handleSend}
-                    >
-                      Confirm {move.position}
-                    </button>
-                  ) : (
-                    <button className="bg-yellow-500 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded">
-                      Select a transport
-                    </button>
-                  )
-                ) : (
-                  <button
-                    className="bg-red-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed"
-                    disabled
-                  >
-                    {move ? 'Invalid Move' : 'Your Turn'}
-                  </button>
-                )}
-              </div>
-            );
-          })()}
-        {currentRole === 'culprit' ? (
-          <>
-            <Badge colorScheme={isSecret ? 'red' : 'gray'}>
-              <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
-                Secret
-              </p>
+  return (
+    <VStack
+      w="100%"
+      gap="100px"
+      bg="#edf2f7"
+      align="center"
+      justify="space-between"
+    >
+        <div className="flex flex-col justify-around items-center gap-2">
+        <div className="text-lg">Your position</div>
+          <Flex direction="column" gap={2} alignItems={'center'}>
+            {currentPlayer ? (
+              <PlayerPosition position={currentPlayer.position} />
+            ) : null}
+            <Badge colorScheme={getStatusColorScheme(currentType)}>
+              {currentType}
             </Badge>
-            <Badge colorScheme={isDouble ? 'red' : 'gray'}>
-              <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
+            {currentPosition && currentPosition !== currentPlayer?.position ? (
+             <svg width="30" height="30">
+             <polygon points="15,20 5,0 25,0" fill="black" />
+           </svg>
+            ) : null}
+
+            {currentPosition && currentPosition !== currentPlayer?.position ? (
+              <PlayerPosition position={currentPosition} />
+            ) : null}
+          </Flex>
+          {currentRole === currentTurn &&
+            (() => {
+              const isAllowed =
+                move &&
+                isMoveAllowed(
+                  move.position,
+                  currentPlayer?.position,
+                  currentPlayer?.role
+                );
+              return (
+                <div>
+                  {isAllowed ? (
+                    currentType ? (
+                      <button
+                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                        onClick={handleSend}
+                      >
+                        Confirm {move.position}
+                      </button>
+                    ) : (
+                      <button className="bg-yellow-500 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded">
+                        Select a transport
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      className="bg-red-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed"
+                      disabled
+                    >
+                      {move ? 'Invalid Move' : 'Your Turn'}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+          {currentRole === 'culprit' && (
+            <>
+              <Badge colorScheme={isSecret ? 'red' : 'gray'}>
+                <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
+                  Secret
+                </p>
+              </Badge>
+              <Badge colorScheme={isDouble ? 'red' : 'gray'}>
+                <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
+                  Double
+                </p>
+              </Badge>
+            </>
+          )}
+          {isMagnifyEnabled ? (
+            <Badge
+              colorScheme="green"
+              w={26}
+              h={6}
+              display="flex"
+              alignSelf="center"
+              onClick={toggleMagnify}
+            >
+              <FaMagnifyingGlass size={20} />
+            </Badge>
+          ) : (
+            <Badge
+              colorScheme="gray"
+              w={26}
+              h={6}
+              display="flex"
+              alignSelf="center"
+              onClick={toggleMagnify}
+            >
+              <FaMagnifyingGlassLocation size={20} />
+            </Badge>
+          )}
+        </div>
+        {currentRole !== 'culprit' && (
+          <div className="flex flex-col justify-around py-2 items-center gap-2 w-[100%] bg-lime-200">
+            <img className="w-10" src="/images/culprit.png" alt="culprit" />
+            <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
+            <Badge colorScheme={getStatusColorScheme(lastCulpritMoveType)}>
+              {lastCulpritMoveType}
+            </Badge>
+            {showCulpritAtMoves.includes(culpritMoves.length) ? (
+              <PlayerPosition position={lastCulpritMove?.position} />
+            ) : (
+              <Badge colorScheme="blue">
+                <Flex alignItems={'center'} gap={2}>
+                  <FaEye />
+                  <Text>
+                    {showCulpritAtMoves.find(
+                      (move) => move >= culpritMoves.length
+                    )}
+                  </Text>
+                </Flex>
+              </Badge>
+            )}
+            <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
+              <p className={isDoubleMove ? 'text-2xl font-black' : 'text-sm'}>
                 Double
               </p>
             </Badge>
-          </>
-        ) : (
-          <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
-            <p className={isDoubleMove ? 'text-2xl font-black' : 'text-sm'}>
-              Double
-            </p>
-          </Badge>
+          </div>
         )}
-        {isMagnifyEnabled ? (
-          <Badge
-            colorScheme="green"
-            w={26}
-            h={6}
-            display="flex"
-            alignSelf="center"
-            onClick={toggleMagnify}
-          >
-            <FaMagnifyingGlass size={20} />
-          </Badge>
-        ) : (
-          <Badge
-            colorScheme="gray"
-            w={26}
-            h={6}
-            display="flex"
-            alignSelf="center"
-            onClick={toggleMagnify}
-          >
-            <FaMagnifyingGlassLocation size={20} />
-          </Badge>
-        )}
-      </div>
-    </HStack>
+
+    </VStack>
   );
 };
