@@ -6,10 +6,8 @@ import { Message, MessageType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../hooks/use-players-subscription';
 
-const useWebSocket = (initialChannel?: string) => {
-  // console.log('initialChannel', initialChannel);
+const useWebSocket = (channel?: string) => {
   const socket = getWebSocket();
-  const [channel, setChannel] = useState<string | undefined>(initialChannel); // State to manage the current channel
   const [messages, setMessages] = useState<Message[]>([]);
   const username = localStorage.getItem('username');
   const toast = useToast();
@@ -22,15 +20,32 @@ const useWebSocket = (initialChannel?: string) => {
   const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
   const players = usePlayersSubscription();
 
+  const sendMessage = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (type: MessageType, data: any) => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const message = JSON.stringify({ type, channel, data }); // Include the channel in every message
+        socket.send(message);
+      } else {
+        console.log({ type, channel, data });
+        console.warn('WebSocket is not connected');
+      }
+    },
+    [socket, channel]
+  );
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const message: Message = JSON.parse(event.data);
       setMessages((prev) => [...prev, message]);
-      console.log('Received:', message);
 
       switch (message.type) {
         case 'joinGame':
-          if (players.find((p) => p.username === (message.data.username))) return;
+          if (
+            !message.data.role ||
+            players.find((p) => p.username === message.data.username)
+          )
+            return;
           updatePlayer(message.data.role, message.data.username);
           toast({
             description: `${message.data.username} joined as ${message.data.role}`,
@@ -39,6 +54,7 @@ const useWebSocket = (initialChannel?: string) => {
             duration: 9000,
             isClosable: true,
           });
+
           break;
         case 'makeMove':
           setPosition(message.data.role, message.data.position);
@@ -60,14 +76,14 @@ const useWebSocket = (initialChannel?: string) => {
               isClosable: true,
             });
           } else {
-          toast({
-            description: `${message.data.role} moved to ${message.data.position}. Next is ${message.data.currentTurn}`,
-            status: 'warning',
-            position: 'top-right',
-            duration: 6000,
-            isClosable: true,
-          });
-        }
+            toast({
+              description: `${message.data.role} moved to ${message.data.position}. Next is ${message.data.currentTurn}`,
+              status: 'warning',
+              position: 'top-right',
+              duration: 6000,
+              isClosable: true,
+            });
+          }
           break;
         case 'updateGameState':
           console.log('Game state updated:', message.data.players);
@@ -111,20 +127,21 @@ const useWebSocket = (initialChannel?: string) => {
         socket.onmessage = null; // Cleanup listener on unmount
       }
     };
-  }, [socket, channel]);
-
-  const sendMessage = useCallback(
-    (type: MessageType, data: any) => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const message = JSON.stringify({ type, channel, data }); // Include the channel in every message
-        socket.send(message);
-      } else {
-        console.log({ type, channel, data });
-        console.warn('WebSocket is not connected');
-      }
-    },
-    [socket, channel]
-  );
+  }, [
+    socket,
+    channel,
+    players,
+    updatePlayer,
+    toast,
+    setPosition,
+    updateTicketsCount,
+    setIsDoubleMove,
+    setCurrentTurn,
+    updateMoves,
+    username,
+    currentRole,
+    sendMessage,
+  ]);
 
   // const joinChannel = (newChannel: string, username, currentRole) => {
   //   setChannel(newChannel);

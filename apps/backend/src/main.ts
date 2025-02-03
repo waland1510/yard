@@ -24,7 +24,7 @@ server.register(async function (fastify) {
   fastify.get(
     '/*',
     { websocket: true },
-    (connection /* WebSocket */, req /* FastifyRequest */) => {
+    (connection /* WebSocket */) => {
       let currentChannel: string | null = null;
 
       connection.on('message', (message) => {

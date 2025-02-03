@@ -36,6 +36,7 @@ export const Setup = () => {
         setCurrentStep('addUsername');
       }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleContinueGame = async () => {

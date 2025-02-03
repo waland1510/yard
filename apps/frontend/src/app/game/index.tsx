@@ -98,7 +98,7 @@ export const Game = () => {
       isSubscribed = false;
       abortController.abort();
     };
-  }, [channel, username, navigate, toast]); // Added proper dependencies
+  }, [channel, username, navigate, toast, setChannel, setCurrentRole, sendMessage]);
 
   const {
     isOpen: isLeftOpen,

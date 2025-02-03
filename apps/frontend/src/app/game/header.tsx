@@ -217,7 +217,6 @@ export const Header = () => {
             </Badge>
           )}
         </div>
-        {currentRole !== 'culprit' && (
           <div className="flex flex-col justify-around py-2 items-center gap-2 w-[100%] bg-lime-200">
             <img className="w-10" src="/images/culprit.png" alt="culprit" />
             <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
@@ -244,8 +243,6 @@ export const Header = () => {
               </p>
             </Badge>
           </div>
-        )}
-
     </VStack>
   );
 };
