@@ -3,6 +3,7 @@ import ws from '@fastify/websocket';
 import { getNextRole, Message } from '@yard/shared-utils';
 import Fastify from 'fastify';
 import { app } from './app/app';
+import { hasActiveGame } from './app/routes/games';
 
 const host = process.env.HOST ?? '0.0.0.0';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -27,7 +28,7 @@ server.register(async function (fastify) {
     (connection /* WebSocket */) => {
       let currentChannel: string | null = null;
 
-      connection.on('message', (message) => {
+      connection.on('message', async (message) => {
         const parsedMessage: Message = JSON.parse(message.toString());
         switch (parsedMessage.type) {
           case 'startGame':
@@ -39,8 +40,20 @@ server.register(async function (fastify) {
 
           case 'joinGame': {
             currentChannel = parsedMessage.channel;
+
             if (!channels[currentChannel]) {
-              return;
+               const game = await hasActiveGame(currentChannel);
+               if (game) {
+                channels[currentChannel] = new Set();
+               } else {
+                connection.send(
+                  JSON.stringify({
+                    type: 'error',
+                    data: 'Game not found',
+                  })
+                );
+                return;
+               }      
             }
             channels[currentChannel].add(connection as unknown as WebSocket);
 

@@ -58,6 +58,18 @@ export const movesTable = pgTable('moves', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export async function hasActiveGame(channel: string): Promise<boolean> {
+  const game = await db.select()
+    .from(gamesTable)
+    .where(
+      eq(gamesTable.channel, channel) && 
+      eq(gamesTable.status, 'active')
+    )
+    .execute();
+  
+  return game.length > 0;
+}
+
 export default async function (fastify: FastifyInstance) {
   fastify.get<{ Params: { channel: string } }>(
     '/api/games/:channel',
