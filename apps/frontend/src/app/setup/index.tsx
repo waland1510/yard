@@ -94,7 +94,7 @@ export const Setup = () => {
         />
         <Card
           style={{ backgroundColor: 'inherit' }}
-          className="w-[900px] h-[300px] p-6"
+          className="w-full h-[300px] p-6"
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">

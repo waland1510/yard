@@ -5,7 +5,6 @@ import { RoleType } from '@yard/shared-utils';
 import useWebSocket from '../use-websocket';
 import { useGameStore } from '../../stores/use-game-store';
 import { updatePlayer } from '../../api';
-import { PlayerInfo } from '../game/player-info';
 
 interface ChooseRoleProps {
   setCurrentStep: (step: string) => void;
@@ -30,7 +29,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
         setCurrentStep('invitePlayers');
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRoleChange = async (role: string) => {
@@ -46,35 +45,52 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
     await updatePlayer(player.id, { username: username as string });
     setCurrentStep('invitePlayers');
   };
+  const existingPlayers = players.filter((p) => p.username);
+
   return (
     <div className="text-center">
-      <p className="text-lg text-gray-700">Choose Your Role</p>
       {players && (
-        <div className="flex gap-2 ">
-          {players
-            .filter((player) => !player.username)
-            .map((p) => (
-              <span key={p.id} className="flex flex-col items-center">
-                <img
-                  className="w-10 h-12"
-                  src={`/images/${p.role}.png`}
-                  alt="player"
-                  onClick={() => onRoleChange(p.role)}
-                />
-                <p>{p.role.toUpperCase()}</p>
-              </span>
-            ))}
-          <p>Existing players</p>
-          {players
-            .filter((player) => player.username)
-            .map((p) => (
-              <PlayerInfo
-                key={p.id}
-                player={p}
-                currentRole={currentRole}
-                onRoleChange={onRoleChange}
-              />
-            ))}
+        <div className="flex justify-between">
+          <div className="flex flex-col gap-2">
+            <p className="text-lg text-gray-700">Choose Your Role</p>
+            <div className="flex gap-2 items-center">
+              {players
+                .filter((player) => !player.username)
+                .map((p) => (
+                  <span key={p.id} className="flex flex-col items-center">
+                    <img
+                      className="w-10 h-12"
+                      src={`/images/${p.role}.png`}
+                      alt="player"
+                      onClick={() => onRoleChange(p.role)}
+                    />
+                    <p>{p.role.toUpperCase()}</p>
+                  </span>
+                ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {existingPlayers.length ? (
+              <div className="flex flex-col gap-2 items-center">
+                <p>Already joined</p>
+                <div className="flex gap-2 items-center">
+                  {players
+                    .filter((player) => player.username)
+                    .map((p) => (
+                      <span key={p.id} className="flex flex-col items-center">
+                        <img
+                          className="w-10 h-12"
+                          src={`/images/${p.role}.png`}
+                          alt="player"
+                          onClick={() => onRoleChange(p.role)}
+                        />
+                        <p>{p.username}</p>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
     </div>

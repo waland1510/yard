@@ -2,9 +2,10 @@ import { mapData } from "./board-data/grid_map";
 
 export interface PlayerPositionProps {
   position: number;
+  showPosition?: boolean;
 }
 
- export const PlayerPosition = ({position}: PlayerPositionProps) => {
+ export const PlayerPosition = ({position, showPosition = true}: PlayerPositionProps) => {
     const node = mapData.nodes.find((node) => node.id === position);
     if (!node) {
       return null;
@@ -15,7 +16,7 @@ export interface PlayerPositionProps {
     return (
       <svg width="52" height="52">
         <g>
-          {hasBus && (
+          {hasBus && showPosition && (
             <circle
               cx={25}
               cy={25}
@@ -25,7 +26,7 @@ export interface PlayerPositionProps {
               strokeWidth="3"
             />
           )}
-          {hasUnderground && (
+          {hasUnderground && showPosition && (
             <circle
               cx={25}
               cy={25}
@@ -52,7 +53,7 @@ export interface PlayerPositionProps {
             fontSize="16"
             fill="black"
           >
-            {position}
+            {showPosition ? position : '??'}
           </text>
         </g>
       </svg>

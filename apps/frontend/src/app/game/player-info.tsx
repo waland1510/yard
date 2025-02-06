@@ -1,6 +1,7 @@
 import { VStack, Text, Badge } from '@chakra-ui/react';
-import { Player, RoleType } from '@yard/shared-utils';
+import { Player, RoleType, showCulpritAtMoves } from '@yard/shared-utils';
 import { PlayerPosition } from './player-position';
+import { useGameStore } from '../../stores/use-game-store';
 
 interface PlayerInfoProps {
   player: Player;
@@ -12,8 +13,11 @@ export const PlayerInfo = ({
   player,
   currentRole,
   onRoleChange,
-}: PlayerInfoProps) => (
-  <VStack key={player.id} spacing={2}>
+}: PlayerInfoProps) => {
+  const {moves} = useGameStore();
+  const showCulpritPosition = showCulpritAtMoves.includes(moves.length);
+  return (
+  <VStack key={player.id} spacing={2} marginBottom="auto">
     <Text fontSize="lg" fontWeight="bold">
       {player.username}
     </Text>
@@ -27,13 +31,10 @@ export const PlayerInfo = ({
           : undefined
       }
     />
-    <Text fontSize="lg" fontWeight="bold">
-      {player.role !== 'culprit' ? (
-        <PlayerPosition position={player.position} />
-      ) : (
-        <p>??</p>
-      )}
-    </Text>
+    <PlayerPosition
+      position={player.position}
+      showPosition={player.role !== 'culprit' || showCulpritPosition}
+    />
     {player.role === 'culprit' ? (
       <>
         <Badge colorScheme="gray">Secret: {player.secretTickets}</Badge>
@@ -47,4 +48,4 @@ export const PlayerInfo = ({
       </>
     )}
   </VStack>
-);
+)};
