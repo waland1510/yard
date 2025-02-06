@@ -6,7 +6,7 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel, updatePlayer } from '../../api';
@@ -18,6 +18,7 @@ import { Header } from './header';
 import { LeftDrawer } from './left-drawer';
 import { Panel } from './panel';
 import { RightDrawer } from './right-drawer';
+import { Setup } from '../setup';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -27,11 +28,11 @@ export const Game = () => {
   const username = localStorage.getItem('username');
   const { players, setChannel, currentTurn } = useGameStore();
   const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const abortController = new AbortController();
     let isSubscribed = true;
-
     const checkGame = async () => {
       if (!channel) return;
 
@@ -55,6 +56,7 @@ export const Game = () => {
         }
 
         if (game) {
+          setLoading(false);
           localStorage.setItem('channel', channel);
           setChannel(channel);
           useGameStore.setState(game);
@@ -123,6 +125,8 @@ export const Game = () => {
     sendMessage('updateGameState', role);
     sendMessage('impersonate', { role, username });
   };
+
+  if (loading) return <Setup  renderSteps={false}/>;
 
   return (
     <Flex height="100vh" bg="#edf2f7">

@@ -1,4 +1,4 @@
-import { Card } from '@chakra-ui/react';
+import { Card, Spinner } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel } from '../../api';
@@ -16,7 +16,11 @@ const setupWorkflow = [
   'invitePlayers',
 ];
 
-export const Setup = () => {
+interface SetupProps {
+  renderSteps: boolean;
+}
+
+export const Setup = ({ renderSteps = true }: SetupProps) => {
   const { channel: joiningChannel } = useParams();
   const navigate = useNavigate();
   const { channel, setChannel } = useGameStore();
@@ -31,12 +35,11 @@ export const Setup = () => {
         const game = getGameByChannel(channel);
         if ((await game).status === 'finished') {
           setCurrentStep('startGame');
-
         }
         setCurrentStep('addUsername');
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleContinueGame = async () => {
@@ -94,14 +97,24 @@ export const Setup = () => {
         />
         <Card
           style={{ backgroundColor: 'inherit' }}
-          className="w-full h-[300px] p-6"
+          className="w-full h-[300px] p-6 justify-center"
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">
               Hey {username.toUpperCase()}
             </p>
           )}
-          {renderStep()}
+          {renderSteps ? (
+            renderStep()
+          ) : (
+            <div className="text-center">
+              <div>
+                Please wait while we create your game. If this takes too long,
+                please refresh the page in or wait up to 60 seconds.
+              </div>
+              <Spinner />
+            </div>
+          )}
         </Card>
       </div>
       <VideoBackground />
