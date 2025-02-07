@@ -5,7 +5,7 @@ import { RoleType } from '@yard/shared-utils';
 import useWebSocket from '../use-websocket';
 import { useGameStore } from '../../stores/use-game-store';
 import { updatePlayer } from '../../api';
-
+import { useTranslation } from "react-i18next";
 interface ChooseRoleProps {
   setCurrentStep: (step: string) => void;
 }
@@ -17,6 +17,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
   const username = localStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPlayer = useGameStore((state) => state.setPlayer);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (username) {
@@ -52,19 +53,19 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
       {players && (
         <div className="flex justify-between">
           <div className="flex flex-col gap-2">
-            <p className="text-lg text-gray-700">Choose Your Role</p>
-            <div className="flex gap-2 items-center">
+            <p className="text-lg text-gray-700">{t('chooseRole')}</p>
+            <div className="flex gap-10 items-center">
               {players
                 .filter((player) => !player.username)
                 .map((p) => (
                   <span key={p.id} className="flex flex-col items-center">
                     <img
-                      className="w-10 h-12"
+                      className="w-20 h-22"
                       src={`/images/${p.role}.png`}
                       alt="player"
                       onClick={() => onRoleChange(p.role)}
                     />
-                    <p>{p.role.toUpperCase()}</p>
+                    <p>{t(p.role)}</p>
                   </span>
                 ))}
             </div>
@@ -72,14 +73,14 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
           <div className="flex gap-2">
             {existingPlayers.length ? (
               <div className="flex flex-col gap-2 items-center">
-                <p>Already joined</p>
-                <div className="flex gap-2 items-center">
+                <p>{t('joined')}</p>
+                <div className="flex gap-10 items-center">
                   {players
                     .filter((player) => player.username)
                     .map((p) => (
                       <span key={p.id} className="flex flex-col items-center">
                         <img
-                          className="w-10 h-12"
+                          className="w-20 h-22"
                           src={`/images/${p.role}.png`}
                           alt="player"
                           onClick={() => onRoleChange(p.role)}

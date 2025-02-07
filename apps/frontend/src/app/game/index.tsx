@@ -23,6 +23,7 @@ import { LeftDrawer } from './left-drawer';
 import { Panel } from './panel';
 import { RightDrawer } from './right-drawer';
 import { Setup } from '../setup';
+import { useTranslation } from 'react-i18next';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export const Game = () => {
   const { players, setChannel, currentTurn } = useGameStore();
   const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
   const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -48,8 +50,8 @@ export const Game = () => {
         if (!game || game.status === 'finished') {
           localStorage.removeItem('channel');
           toast({
-            title: 'Start New Game',
-            description: 'This game has finished',
+            title: t('startNewGame'),
+            description: t('gameFinished'),
             status: 'success',
             duration: 9000,
             isClosable: true,
@@ -86,8 +88,8 @@ export const Game = () => {
 
         console.error('Game check error:', error);
         toast({
-          title: 'Error',
-          description: 'Game not found',
+          title: t('error'),
+          description: t('notFound'),
           status: 'error',
           duration: 9000,
           isClosable: true,
@@ -109,6 +111,7 @@ export const Game = () => {
     setChannel,
     setCurrentRole,
     sendMessage,
+    t,
   ]);
 
   const {
@@ -147,7 +150,7 @@ export const Game = () => {
 
       <VStack maxW={150} bg="#8CC690" p={4} spacing={4} align="center">
         <Button onClick={onLeftOpen} leftIcon={<FiArrowLeft />}>
-          Players
+          {t('players')}
         </Button>
         <img
           className="w-20"
@@ -165,10 +168,10 @@ export const Game = () => {
 
       <VStack maxW={150} bg="#8CC690" p={4} spacing={4} align="center">
         <Button onClick={onRightOpen} rightIcon={<FiArrowRight />}>
-          Moves
+          {t('moves')}
         </Button>
         <Heading size="md" color="gray.900">
-          {currentRole === currentTurn ? 'Your Turn' : 'Next Turn'}
+          {currentRole === currentTurn ? t('yourTurn') : t('nextTurn')}
         </Heading>
         <Box
           display="flex"
@@ -193,7 +196,7 @@ export const Game = () => {
             currentTurn !== 'culprit' &&
             currentRole !== currentTurn && (
               <Text fontSize="sm" color="teal.600" textAlign="center">
-                Click to impersonate
+                {t('impersonate')}
               </Text>
             )}
           <Box fontSize="2xl" mt={2}>

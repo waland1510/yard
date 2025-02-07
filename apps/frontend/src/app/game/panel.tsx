@@ -8,6 +8,7 @@ import { TaxiIcon } from './icons/taxi-icon';
 import { UndergroundIcon } from './icons/underground-icon';
 import { SecretIcon } from './icons/secret-icon';
 import { DoubleIcon } from './icons/double-icon';
+import { useTranslation } from "react-i18next";
 
 export const Panel = () => {
   const {
@@ -21,7 +22,7 @@ export const Panel = () => {
   const player = useGameStore((state) =>
     state.players.find((p) => p.role === currentRole)
   );
-
+  const { t } = useTranslation();
   const players = usePlayersSubscription();
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
   const node = useNodesStore((state) => state.getNode(runnerPosition || 0));
@@ -89,7 +90,7 @@ export const Panel = () => {
     <div className="w-[120px] flex flex-col bg-[#ACD8AF] rounded-lg text-slate-900 shadow-lg">
       <div className="flex flex-col items-center gap-3">
         <div className="flex flex-col items-center">
-        <p className="text-xl font-semibold py-0">Hey,</p>
+        <p className="text-xl font-semibold py-0">{t('hey')}, </p>
         <p className="text-xl font-semibold py-0">{username?.slice(0,10)}!</p>
         </div>
         <img

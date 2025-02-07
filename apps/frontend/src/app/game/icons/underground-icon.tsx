@@ -1,10 +1,11 @@
 import React from 'react';
-
+import { useTranslation } from "react-i18next";
 interface UndergroundIconProps {
   available?: boolean;
 }
 
 export const UndergroundIcon: React.FC<UndergroundIconProps> = ({ available }) => {
+  const { t } = useTranslation();
   return (
     <svg
       width="100"
@@ -56,7 +57,7 @@ export const UndergroundIcon: React.FC<UndergroundIconProps> = ({ available }) =
           wordSpacing="0px"
         >
           <tspan x="99.5" y="326.54147">
-            UNDERGROUND
+            {t("underground").toUpperCase()}
           </tspan>
         </text>
       </g>

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { createGame } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import useWebSocket from '../use-websocket';
+import { useTranslation } from 'react-i18next';
 
 interface StartProps {
   existingChannel: string | null;
@@ -17,7 +18,7 @@ export const Start = ({
 }: StartProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const { sendMessage } = useWebSocket('');
-
+  const { t } = useTranslation();
   const handleNewGame = async () => {
     try {
       setIsLoading(true);
@@ -38,8 +39,7 @@ export const Start = ({
     return (
       <div className="text-center">
         <div>
-          Please wait while we create your game. If this takes too long, please
-          refresh the page in or wait up to 60 seconds.
+         {t('waitForServer')}
         </div>
         <Spinner />
       </div>
@@ -48,14 +48,14 @@ export const Start = ({
   return (
     <div className="text-center">
       <p className="text-lg text-gray-700">
-        {existingChannel && 'Welcome back!'}
+        {existingChannel && t('welcome')}
       </p>
       {existingChannel && (
         <button
           className="px-6 py-2 bg-yellow-600 text-black rounded-lg shadow-md hover:bg-red-700 transition duration-300"
           onClick={handleContinueGame}
         >
-          Continue Existing Game
+         {t('continueGame')}
         </button>
       )}
       <button
@@ -64,7 +64,7 @@ export const Start = ({
           handleNewGame();
         }}
       >
-        Start New Game
+        {t('start')}
       </button>
     </div>
   );

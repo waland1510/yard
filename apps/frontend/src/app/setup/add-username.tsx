@@ -1,5 +1,4 @@
-import React from 'react';
-
+import { useTranslation } from "react-i18next";
 interface AddUsernameProps {
   setCurrentStep: (step: string) => void;
 }
@@ -9,10 +8,11 @@ export const AddUsername = ({setCurrentStep}: AddUsernameProps) => {
   const handleAddUsername = () => {
     setCurrentStep('chooseRole');
   };
+  const { t } = useTranslation();
   return (
     <div className="text-center">
     <p className="text-lg text-gray-700">
-      {username ? 'Update Username' : 'Add Username'}
+      {username ? t('updateUsername') : t('addUsername')}
     </p>
     <input
       type="text"
@@ -28,7 +28,7 @@ export const AddUsername = ({setCurrentStep}: AddUsernameProps) => {
       className="px-6 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-300"
       onClick={handleAddUsername}
     >
-      Continue
+      {t('continue')}
     </button>
   </div>
   );

@@ -1,10 +1,11 @@
 import React from 'react';
-
+import { useTranslation } from "react-i18next";
 interface TaxiIconProps {
   available?: boolean;
 }
 
 export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
+  const { t } = useTranslation();
   return (
     <svg
       width="100"
@@ -40,7 +41,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           wordSpacing="0px"
         >
           <tspan x="100" y="348.54166">
-            TAXI
+            {t('taxi').toUpperCase()}
           </tspan>
         </text>
         <text
@@ -54,7 +55,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           wordSpacing="0px"
         >
           <tspan x="100" y="348.54166">
-            TAXI
+            {t('taxi').toUpperCase()}
           </tspan>
         </text>
         <rect
@@ -83,7 +84,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           wordSpacing="0px"
         >
           <tspan x="100" y="348.54166">
-            TAXI
+            {t('taxi').toUpperCase()}
           </tspan>
         </text>
         <text
@@ -97,7 +98,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           wordSpacing="0px"
         >
           <tspan x="100" y="348.54166">
-            TAXI
+            {t('taxi').toUpperCase()}
           </tspan>
         </text>
       </g>

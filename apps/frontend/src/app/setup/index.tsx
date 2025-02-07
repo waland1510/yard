@@ -7,6 +7,7 @@ import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
+import { useTranslation } from "react-i18next";
 
 const setupWorkflow = [
   'startGame',
@@ -17,7 +18,7 @@ const setupWorkflow = [
 ];
 
 interface SetupProps {
-  renderSteps: boolean;
+  renderSteps?: boolean;
 }
 
 export const Setup = ({ renderSteps = true }: SetupProps) => {
@@ -25,7 +26,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const navigate = useNavigate();
   const { channel, setChannel } = useGameStore();
   const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
-
+  const { t } = useTranslation();
   const username = localStorage.getItem('username');
   const existingChannel = localStorage.getItem('channel');
 
@@ -70,12 +71,12 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
       case 'invitePlayers':
         return (
           <div className="text-center">
-            <p className="text-lg text-gray-700">Invite Players</p>
+            <p className="text-lg text-gray-700">{t('invite')}</p>
             <button
               className="px-6 py-2 bg-yellow-600 text-black rounded-lg shadow-md hover:bg-red-700 transition duration-300"
               onClick={play}
             >
-              Copy Link and Play
+              {t('copyAndPlay')}
             </button>
           </div>
         );
@@ -103,7 +104,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">
-              Hey {username.toUpperCase()}
+              {t('hey')} {username.toUpperCase()}
             </p>
           )}
           {renderSteps ? (
@@ -111,8 +112,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
           ) : (
             <div className="text-center">
               <div>
-                Please wait while we create your game. If this takes too long,
-                please refresh the page in or wait up to 60 seconds.
+               {t('waitForServer')}
               </div>
               <Spinner />
             </div>

@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa6';
 import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
 import { addMove, updateGame, updatePlayer } from '../../api';
+import { useTranslation } from "react-i18next";
 
 export const Header = () => {
   const {
@@ -34,7 +35,7 @@ export const Header = () => {
     isMagnifyEnabled,
     setIsMagnifyEnabled,
   } = useRunnerStore();
-
+  const { t } = useTranslation();
   const { sendMessage } = useWebSocket(channel);
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
@@ -123,7 +124,7 @@ export const Header = () => {
       >
         {currentPlayer && <PlayerPosition position={currentPlayer.position} />}
         <Badge colorScheme={getStatusColorScheme(currentType)}>
-          {currentType}
+          {t(currentType)}
         </Badge>
         {currentPosition && currentPosition !== currentPlayer?.position ? (
           <PlayerPosition position={currentPosition} />
@@ -135,16 +136,16 @@ export const Header = () => {
           onClick={handleSend}
           isDisabled={!allowed}
         >
-          {allowed ? `Confirm ${move.position}` : 'Invalid move'}
+          {allowed ? `Confirm ${move.position}` : t('invalidMove')}
         </Button>
       )}
       {currentRole === 'culprit' && (
         <Flex gap={2}>
           <Badge colorScheme={isSecret ? 'red' : 'gray'}>
-            {isSecret ? 'Secret' : 'Normal'}
+            {isSecret ? t('secret') : t('normal')}
           </Badge>
           <Badge colorScheme={isDouble ? 'red' : 'gray'}>
-            {isDouble ? 'Double' : 'Single'}
+            {isDouble ? t('double') : t('single')}
           </Badge>
         </Flex>
       )}
@@ -159,7 +160,7 @@ export const Header = () => {
           )
         }
       >
-        {isMagnifyEnabled ? 'Disable' : 'Enable'}
+        {isMagnifyEnabled ? t('disable') : t('enable')}
       </Button>
       <Flex
         direction="column"
@@ -171,7 +172,7 @@ export const Header = () => {
         gridGap={2}
       >
         <Image src="/images/culprit.png" w={10} />
-        <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
+        <Badge colorScheme="orange">{t('round')}: {culpritMoves.length}</Badge>
         <Badge colorScheme={getStatusColorScheme(lastCulpritMoveType)}>
           {lastCulpritMoveType}
         </Badge>
@@ -188,7 +189,7 @@ export const Header = () => {
           </Badge>
         )}
         <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
-          {isDoubleMove ? 'Double' : 'Single'}
+          {isDoubleMove ? t('double') : t('single')}
         </Badge>
       </Flex>
     </VStack>

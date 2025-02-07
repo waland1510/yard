@@ -5,6 +5,7 @@ import { useRunnerStore } from '../stores/use-runner-store';
 import { Message, MessageType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../hooks/use-players-subscription';
+import { useTranslation } from 'react-i18next';
 
 const useWebSocket = (channel?: string) => {
   const socket = getWebSocket();
@@ -19,6 +20,7 @@ const useWebSocket = (channel?: string) => {
   const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
   const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
   const players = usePlayersSubscription();
+  const { t } = useTranslation();
 
   const sendMessage = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +50,9 @@ const useWebSocket = (channel?: string) => {
             return;
           updatePlayer(message.data.role, message.data.username);
           toast({
-            description: `${message.data.username} joined as ${message.data.role}`,
+            description: `${message.data.username} joined as ${t(
+              message.data.role
+            )}`,
             status: 'success',
             position: 'top-right',
             duration: 9000,
@@ -69,16 +73,23 @@ const useWebSocket = (channel?: string) => {
           if (message.data.role === 'culprit') {
             updateMoves(message.data);
             toast({
-              description: `Mr.C made his move. Next is ${message.data.currentTurn}`,
+              description: t('culpritMove', {
+                culprit: t('culprit'),
+                nextTurn: t(message.data.currentTurn),
+              }),
               status: 'error',
               position: 'top-right',
-              duration: 9000,
+              duration: 6000,
               isClosable: true,
             });
           } else {
             toast({
-              description: `${message.data.role} moved to ${message.data.position}. Next is ${message.data.currentTurn}`,
-              status: 'warning',
+              description: t('playerMove', {
+                player: t(message.data.role),
+                position: message.data.position,
+                nextTurn: t(message.data.currentTurn),
+              }),
+              status: 'success',
               position: 'top-right',
               duration: 6000,
               isClosable: true,
@@ -94,7 +105,7 @@ const useWebSocket = (channel?: string) => {
           break;
         case 'endGame':
           toast({
-            description: `Game ended. Winner: ${message.data.winner}`,
+            description: `${t('gameOver')} ${message.data.winner}`,
             status: 'success',
             position: 'top-right',
             duration: 9000,
@@ -141,6 +152,7 @@ const useWebSocket = (channel?: string) => {
     username,
     currentRole,
     sendMessage,
+    t,
   ]);
 
   // const joinChannel = (newChannel: string, username, currentRole) => {

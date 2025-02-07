@@ -1,10 +1,11 @@
 import React from 'react';
-
+import { useTranslation } from "react-i18next";
 interface SecretIconProps {
   available?: boolean;
 }
 
 export const SecretIcon: React.FC<SecretIconProps> = ({ available }) => {
+  const { t } = useTranslation();
   return (
     <svg width="100" height="50" version="1.1" viewBox="0 0 200 100">
     <g transform="translate(0 -270.54)">
@@ -50,7 +51,7 @@ export const SecretIcon: React.FC<SecretIconProps> = ({ available }) => {
         wordSpacing="0px"
       >
         <tspan x="99.5" y="326.54147">
-          INCOGNITO
+          {t('incognito').toUpperCase()}
         </tspan>
       </text>
     </g>

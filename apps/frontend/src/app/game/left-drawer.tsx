@@ -16,7 +16,7 @@ import { RoleType } from '@yard/shared-utils';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import { PlayerInfo } from './player-info';
-
+import { useTranslation } from "react-i18next";
 interface LeftDrawerProps {
   isLeftOpen: boolean;
   onLeftClose: () => void;
@@ -32,7 +32,7 @@ export const LeftDrawer = ({
 }: LeftDrawerProps) => {
   const { players } = useGameStore();
   const { currentRole } = useRunnerStore();
-
+  const { t } = useTranslation();
   return (
     <Drawer isOpen={isLeftOpen} placement="left" onClose={onLeftClose}>
       <DrawerOverlay />
@@ -44,15 +44,15 @@ export const LeftDrawer = ({
             alignItems="center"
           >
             <Button variant="outline" colorScheme="teal" onClick={onLeftClose}>
-              Close
+              {t('close')}
             </Button>
             <Flex alignItems="center" direction="column">
               <Text fontSize="lg" fontWeight="bold" color={'teal.900'}>
-                Players Info
+                {t('playersInfo')}
               </Text>
               {currentRole !== 'culprit' && (
                 <Text fontSize="sm" color="gray.900">
-                  Click to impersonate
+                  {t('impersonate')}
                 </Text>
               )}
             </Flex>
