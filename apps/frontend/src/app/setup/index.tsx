@@ -31,12 +31,14 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
 
   useEffect(() => {
     (async () => {
+      if (joiningChannel) {
+        setCurrentStep('addUsername');
+      }
       if (channel) {
         const game = getGameByChannel(channel);
         if ((await game).status === 'finished') {
           setCurrentStep('startGame');
         }
-        setCurrentStep('addUsername');
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

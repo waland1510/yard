@@ -1,9 +1,4 @@
-import {
-  Box,
-  DrawerBody,
-  Text,
-  VStack
-} from '@chakra-ui/react';
+import { Box, DrawerBody, Text, VStack } from '@chakra-ui/react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { useGameStore } from '../../stores/use-game-store';
 
@@ -11,29 +6,31 @@ export const Moves = () => {
   const moves = useGameStore((state) => state.moves);
 
   return (
-    <DrawerBody>
-        <VStack spacing={4} overflowY="auto" align="stretch">
-          {moves
-            ?.filter((m) => m.role === 'culprit')
-            .map((move, index) => {
-              console.log('move', move);
-              return (
-              <Box
-                key={index}
-                p={3}
-                bg="gray.100"
-                rounded="md"
-                _hover={{ bg: 'gray.200' }}
-              >
-                <Text>
-                  {index + 1}. {move.secret ? '🔒' : move.type} -{' '}
-                  {showCulpritAtMoves.includes(index + 1)
-                    ? move.position
-                    : '??'}
-                </Text>
-              </Box>
-            )})}
-        </VStack>
-      </DrawerBody>
+    <DrawerBody bg="#8CC690" color="white" overflowY="auto" maxH="100%">
+    <VStack spacing={4} align="stretch">
+      {Array.from({ length: 24 }).map((_, index) => {
+        const move = moves?.find((m, i) => i === index && m.role === 'culprit');
+        const isSpecialMove = showCulpritAtMoves.includes(index + 1 );
+        return (
+          <Box
+            key={index}
+            p={4}
+            bg={move ? "#ACD8AF" : "#2A3C2C"}
+            shadow="md"
+            rounded="md"
+            color={move ? "black" : "white"}
+            borderLeft={isSpecialMove ? "4px solid red" : "none"}
+          >
+            <Text fontSize="md" fontWeight="medium">
+              {index + 1}. {move ? (move.secret ? '🔒' : move.type.toUpperCase()) : '...'} -{' '}
+              {move && showCulpritAtMoves.includes(index + 1)
+                ? move.position
+                : '??'}
+            </Text>
+          </Box>
+        );
+      })}
+    </VStack>
+  </DrawerBody>
   );
 };

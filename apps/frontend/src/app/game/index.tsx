@@ -2,8 +2,12 @@ import {
   Box,
   Button,
   Flex,
+  VStack,
+  Heading,
+  Divider,
   useDisclosure,
-  useToast
+  useToast,
+  Text,
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
 import { useEffect, useState } from 'react';
@@ -39,7 +43,6 @@ export const Game = () => {
       try {
         const game = await getGameByChannel(channel, abortController.signal);
 
-        // Only proceed if component is still mounted
         if (!isSubscribed) return;
 
         if (!game || game.status === 'finished') {
@@ -94,13 +97,19 @@ export const Game = () => {
     };
 
     checkGame();
-
-    // Cleanup function
     return () => {
       isSubscribed = false;
       abortController.abort();
     };
-  }, [channel, username, navigate, toast, setChannel, setCurrentRole, sendMessage]);
+  }, [
+    channel,
+    username,
+    navigate,
+    toast,
+    setChannel,
+    setCurrentRole,
+    sendMessage,
+  ]);
 
   const {
     isOpen: isLeftOpen,
@@ -121,32 +130,22 @@ export const Game = () => {
       setCurrentPosition(currentPlayer.position);
       updatePlayer(currentPlayer.id, { username: username as string });
     }
-
     sendMessage('updateGameState', role);
     sendMessage('impersonate', { role, username });
   };
 
-  if (loading) return <Setup  renderSteps={false}/>;
+  if (loading) return <Setup renderSteps={false} />;
 
   return (
-    <Flex height="100vh" bg="#edf2f7">
+    <Flex height="100vh" bg="#1a202c" color="white">
       <LeftDrawer
         isLeftOpen={isLeftOpen}
         channel={channel}
         onLeftClose={onLeftClose}
         onRoleChange={onRoleChange}
       />
-      {/* Left Sidebar Compact */}
-      <Box
-        w="100%"
-        maxW={150}
-        h="100vh"
-        p={2}
-        bg="#edf2f7"
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-      >
+
+      <VStack maxW={150} bg="#8CC690" p={4} spacing={4} align="center">
         <Button onClick={onLeftOpen} leftIcon={<FiArrowLeft />}>
           Players
         </Button>
@@ -156,44 +155,50 @@ export const Game = () => {
           alt="player"
           onClick={() => navigate('/')}
         />
+        <Divider />
         <Panel />
-      </Box>
+      </VStack>
 
-      {/* Main Content */}
       <Flex flex="1" align="center" direction="column">
         <Board />
       </Flex>
 
-      <RightDrawer isRightOpen={isRightOpen} onRightClose={onRightClose} />
-
-      {/* Right Sidebar Compact */}
-      <Box
-        w="100%"
-        maxW={150}
-        p={2}
-        bg="#edf2f7"
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
-      >
+      <VStack maxW={150} bg="#8CC690" p={4} spacing={4} align="center">
         <Button onClick={onRightOpen} rightIcon={<FiArrowRight />}>
           Moves
         </Button>
-        <div className="flex flex-col gap-3 items-center justify-between px-4 py-2 mb-5">
-          <div className="text-lg">Current Turn</div>
-          <div className="text-sm">{currentTurn}</div>
+        <Heading size="md" color="gray.900">
+          {currentRole === currentTurn ? 'Your Turn' : 'Next Turn'}
+        </Heading>
+        <Box
+          display="flex"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          cursor={currentRole !== 'culprit' ? 'pointer' : 'not-allowed'}
+          onClick={() => onRoleChange(currentTurn)}
+        >
           <img
             className="w-10 h-12"
             src={`/images/${currentTurn}.png`}
             alt="player"
-            onClick={() => onRoleChange(currentTurn)}
           />
-          <span className="text-2xl" role="img" aria-label="dice">
-            🎲
-          </span>
-        </div>
+          {currentRole !== 'culprit' && (
+            <Text fontSize="sm" color="teal.600" textAlign="center">
+              Click to impersonate
+            </Text>
+          )}
+          <Box fontSize="2xl" mt={2}>
+            <span role="img" aria-label="dice">
+              🎲
+            </span>
+          </Box>
+        </Box>
+        <Divider />
         <Header />
-      </Box>
+      </VStack>
+
+      <RightDrawer isRightOpen={isRightOpen} onRightClose={onRightClose} />
     </Flex>
   );
 };

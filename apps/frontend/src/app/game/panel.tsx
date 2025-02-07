@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Fragment } from 'react';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import { useNodesStore } from '../../stores/use-nodes-store';
 import { useGameStore } from '../../stores/use-game-store';
@@ -24,13 +24,10 @@ export const Panel = () => {
 
   const players = usePlayersSubscription();
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
-
   const node = useNodesStore((state) => state.getNode(runnerPosition || 0));
   const username = localStorage.getItem('username');
 
-  if (!node) {
-    return null;
-  }
+  if (!node) return null;
 
   const items = [
     {
@@ -64,6 +61,7 @@ export const Panel = () => {
       count: player?.undergroundTickets || 0,
     },
   ];
+
   const culpritItems = [
     {
       icon: <SecretIcon available={Boolean(player?.secretTickets)} />,
@@ -88,56 +86,51 @@ export const Panel = () => {
   };
 
   return (
-    <div className="max-w-[120px]">
-      <div className="flex items-center flex-col pb-4 gap-1">
-        <p>Hey, {username}!</p>
-        <img className="w-10" src={`/images/${currentRole}.png`} alt="player" />
-        <p>Your are</p>
-        <p>{currentRole}</p>
+    <div className="w-[120px] flex flex-col bg-[#ACD8AF] rounded-lg text-slate-900 shadow-lg">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center">
+        <p className="text-xl font-semibold py-0">Hey,</p>
+        <p className="text-xl font-semibold py-0">{username?.slice(0,10)}!</p>
+        </div>
+        <img
+          className="w-10 h-12 rounded-full"
+          src={`/images/${currentRole}.png`}
+          alt="player"
+        />
       </div>
-      <div className="text-lg">Your tickets</div>
-      <div className="flex flex-col gap-2">
-        {items.map((item, index) => {
-          const available =
-            item.id && node[item.id as keyof typeof node] && item.count;
-          return (
-            <div
-              key={index}
-              className="flex items-center cursor-pointer flex-col gap-2"
+      <div className="flex flex-col gap-2 mt-4 text-center">
+        {items.map((item) => (
+          <Fragment key={item.id}>
+            <button
+              className="flex items-center justify-center rounded-md transition"
               onClick={
-                available
-                  ? () => {
-                      setCurrentType(item.id as 'taxi');
-                    }
-                  : undefined
+                item.count ? () => setCurrentType(item.id as 'taxi') : undefined
               }
             >
               <span className="text-2xl">{item.icon}</span>
-              {item.count && <span className="text-lg">{item.count}</span>}
-            </div>
-          );
-        })}
+            </button>
+            <div className="text-lg font-medium">{item.count}</div>
+          </Fragment>
+        ))}
       </div>
+
       {currentRole === 'culprit' && (
-        <div className="flex flex-col gap-3">
-          {culpritItems.map((item) => {
-            return (
-              <div
-                key={item.id}
-                className="flex items-center cursor-pointer flex-col gap-2"
+        <div className="flex flex-col gap-2 text-center">
+          {culpritItems.map((item) => (
+            <Fragment key={item.id}>
+              <button
+                className="flex items-center justify-center rounded-md transition"
                 onClick={
                   item.count
                     ? () => handleCulpritMoveClick(item.id as 'secret')
                     : undefined
                 }
               >
-                <span className="text-2xl">{item.icon}</span>
-                {item.count > 0 && (
-                  <span className="text-lg">{item.count}</span>
-                )}
-              </div>
-            );
-          })}
+                <div className="text-2xl">{item.icon}</div>
+              </button>
+              <div className="text-lg font-medium">{item.count}</div>
+            </Fragment>
+          ))}
         </div>
       )}
     </div>

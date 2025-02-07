@@ -6,8 +6,11 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerOverlay,
+  Flex,
   Text,
-  VStack
+  VStack,
+  Wrap,
+  WrapItem,
 } from '@chakra-ui/react';
 import { RoleType } from '@yard/shared-utils';
 import { useGameStore } from '../../stores/use-game-store';
@@ -21,56 +24,69 @@ interface LeftDrawerProps {
   onRoleChange: (role: RoleType) => void;
 }
 
-export const LeftDrawer = ({ isLeftOpen, onLeftClose, channel, onRoleChange }: LeftDrawerProps) => {
+export const LeftDrawer = ({
+  isLeftOpen,
+  onLeftClose,
+  channel,
+  onRoleChange,
+}: LeftDrawerProps) => {
   const { players } = useGameStore();
   const { currentRole } = useRunnerStore();
+
   return (
     <Drawer isOpen={isLeftOpen} placement="left" onClose={onLeftClose}>
       <DrawerOverlay />
-      <DrawerContent>
-        <DrawerHeader>
+      <DrawerContent bg="#8CC690" color="white" shadow="lg">
+        <DrawerHeader borderBottomWidth="1px">
           <Box
             display="flex"
             justifyContent="space-between"
             alignItems="center"
           >
-            <Button onClick={onLeftClose}>
+            <Button variant="outline" colorScheme="teal" onClick={onLeftClose}>
               Close
             </Button>
-            <Text>Players Info</Text>
+            <Flex alignItems="center" direction="column">
+              <Text fontSize="lg" fontWeight="bold" color={'teal.900'}>
+                Players Info
+              </Text>
+              {currentRole !== 'culprit' && (
+                <Text fontSize="sm" color="gray.900">
+                  Click to impersonate
+                </Text>
+              )}
+            </Flex>
           </Box>
         </DrawerHeader>
+
         <DrawerBody>
-          <VStack spacing={6} align="stretch">
+          <VStack spacing={4} align="stretch">
             {players && (
-              <>
-                <div className="flex gap-2 items-end">
-                  {players
-                    .filter((player) => player.role !== currentRole)
-                    .slice(0, 3)
-                    .map((p) => (
+              <Wrap spacing={4} justify="center">
+                {players
+                  .filter((player) => player.role !== currentRole)
+                  .map((p) => (
+                    <WrapItem
+                      key={p.id}
+                      cursor={
+                        currentRole !== 'culprit' && p.role !== 'culprit'
+                          ? 'pointer'
+                          : 'not-allowed'
+                      }
+                      onClick={
+                        currentRole !== 'culprit' && p.role !== 'culprit'
+                          ? () => onRoleChange(p.role)
+                          : undefined
+                      }
+                    >
                       <PlayerInfo
-                        key={p.id}
                         player={p}
                         currentRole={currentRole}
                         onRoleChange={onRoleChange}
                       />
-                    ))}
-                </div>
-                <div className="flex gap-2 items-end">
-                  {players
-                    .filter((player) => player.role !== currentRole)
-                    .slice(3)
-                    .map((p) => (
-                      <PlayerInfo
-                        key={p.id}
-                        player={p}
-                        currentRole={currentRole}
-                        onRoleChange={onRoleChange}
-                      />
-                    ))}
-                </div>
-              </>
+                    </WrapItem>
+                  ))}
+              </Wrap>
             )}
           </VStack>
         </DrawerBody>

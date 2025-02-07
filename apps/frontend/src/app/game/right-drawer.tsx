@@ -22,11 +22,13 @@ export const RightDrawer = ({
 }: RightDrawerProps) => (
   <Drawer isOpen={isRightOpen} placement="right" onClose={onRightClose}>
     <DrawerOverlay />
-    <DrawerContent>
-      <DrawerHeader>
+    <DrawerContent bg="#8CC690" color="white" shadow="lg">
+      <DrawerHeader borderBottomWidth="1px">
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Text>Moves</Text>
-          <Button onClick={onRightClose}>
+          <Text fontSize="lg" fontWeight="bold" color={'teal.900'}>
+            Moves
+          </Text>
+          <Button variant="outline" colorScheme="teal" onClick={onRightClose}>
             Close
           </Button>
         </Box>

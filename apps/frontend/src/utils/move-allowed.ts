@@ -14,7 +14,7 @@ export const isMoveAllowed = (
     return undefined;
   }
   if (currentRole === 'culprit' && node.river?.includes(nodeId)) {
-    return 'blue';
+    return '#08f';
   }
   if (node.underground?.includes(nodeId)) {
     return '#d00';

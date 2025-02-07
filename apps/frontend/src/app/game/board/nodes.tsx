@@ -9,6 +9,7 @@ import { getAvailableType } from '../../../utils/available-type';
 import { isMoveAllowed } from '../../../utils/move-allowed';
 import { mapData } from '../board-data/grid_map';
 import { AnimatedImage } from './animated-image';
+import { useToast } from '@chakra-ui/react';
 
 export const Nodes = () => {
   const players = usePlayersSubscription();
@@ -17,11 +18,12 @@ export const Nodes = () => {
     setCurrentType,
     currentRole: role,
     isSecret,
+    setIsSecret,
     isDouble,
     setMove,
     setCurrentPosition,
   } = useRunnerStore();
-
+  const toast = useToast();
   const runnerData = useMemo(
     () => ({
       position: players.find((p) => p.role === role)?.position,
@@ -38,6 +40,16 @@ export const Nodes = () => {
       const availableType =
         getAvailableType(position, runnerData.position, role) || 'taxi';
 
+      if (availableType === 'river') {
+        setIsSecret(true);
+        toast({
+          title: 'This move requires a secret ticket',
+          description: 'The secret ticket was selected for you',
+          status: 'info',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
       setCurrentType(availableType);
       setMove({
         role,
@@ -56,6 +68,8 @@ export const Nodes = () => {
       isSecret,
       isDouble,
       setCurrentPosition,
+      setIsSecret,
+      toast,
     ]
   );
 
@@ -107,7 +121,7 @@ export const Nodes = () => {
                   isMoveAllowed(
                     node.id,
                     playerStorePosition ?? runnerData.position,
-                    runnerData.currentRole
+                    role
                   ) ?? 'white'
                 }
                 stroke="black"
@@ -145,7 +159,7 @@ export const Nodes = () => {
                     : isMoveAllowed(
                         node.id,
                         playerStorePosition ?? runnerData.position,
-                        runnerData.currentRole
+                        role
                       )
                     ? 'white'
                     : 'black'

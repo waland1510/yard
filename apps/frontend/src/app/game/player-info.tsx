@@ -17,19 +17,14 @@ export const PlayerInfo = ({
   const {moves} = useGameStore();
   const showCulpritPosition = showCulpritAtMoves.includes(moves.length);
   return (
-  <VStack key={player.id} spacing={2} marginBottom="auto">
-    <Text fontSize="lg" fontWeight="bold">
-      {player.username}
+  <VStack key={player.id} marginBottom="auto" bg="#ACD8AF" p={3} rounded="lg">
+    <Text fontSize="lg" fontWeight="bold" color="teal.900">
+      {player.username?.slice(0,10) ?? 'Waiting...'}
     </Text>
     <img
       className="w-10 h-12"
       src={`/images/${player.role}.png`}
       alt="player"
-      onClick={
-        currentRole !== 'culprit' && player.role !== 'culprit'
-          ? () => onRoleChange(player.role)
-          : undefined
-      }
     />
     <PlayerPosition
       position={player.position}

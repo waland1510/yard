@@ -1,13 +1,16 @@
-import { Badge, Text, Flex, useToast, VStack } from '@chakra-ui/react';
+import { Badge, Text, Flex, VStack, Button, Image } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../../hooks/use-players-subscription';
 import { useGameStore } from '../../stores/use-game-store';
 import { useRunnerStore } from '../../stores/use-runner-store';
 import { isMoveAllowed } from '../../utils/move-allowed';
 import useWebSocket from '../use-websocket';
 import { PlayerPosition } from './player-position';
-import { FaMagnifyingGlass, FaMagnifyingGlassLocation } from 'react-icons/fa6';
+import {
+  FaMagnifyingGlass,
+  FaMagnifyingGlassLocation,
+  FaEye,
+} from 'react-icons/fa6';
 import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
-import { FaEye } from 'react-icons/fa';
 import { addMove, updateGame, updatePlayer } from '../../api';
 
 export const Header = () => {
@@ -18,7 +21,6 @@ export const Header = () => {
     isDoubleMove,
     id: gameId,
   } = useGameStore();
-
   const {
     currentPosition,
     currentType,
@@ -34,8 +36,6 @@ export const Header = () => {
   } = useRunnerStore();
 
   const { sendMessage } = useWebSocket(channel);
-  const toast = useToast();
-
   const players = usePlayersSubscription();
   const currentPlayer = players.find((player) => player.role === currentRole);
   const culpritPosition = players.find(
@@ -48,15 +48,6 @@ export const Header = () => {
   const handleSend = () => {
     if (move && gameId && currentRole && currentPlayer) {
       if (currentRole !== 'culprit' && move.position === culpritPosition) {
-        toast({
-          title: 'Game Over',
-          position: 'top',
-          description: 'You caught Mr. C',
-          status: 'success',
-          duration: 9000,
-          isClosable: true,
-        });
-        localStorage.removeItem('channel');
         updateGame(gameId, { status: 'finished' });
         sendMessage('endGame', { winner: currentRole });
         return;
@@ -65,16 +56,8 @@ export const Header = () => {
         currentRole === 'culprit' &&
         detectivesPositions.includes(move.position)
       ) {
-        toast({
-          title: 'Move Invalid',
-          description: 'You cannot move to detective position',
-          status: 'error',
-          duration: 9000,
-          isClosable: true,
-        });
         return;
       }
-
       sendMessage('makeMove', move);
       addMove({
         gameId,
@@ -96,9 +79,7 @@ export const Header = () => {
       }
     }
   };
-  const toggleMagnify = () => {
-    setIsMagnifyEnabled(!isMagnifyEnabled);
-  };
+  const toggleMagnify = () => setIsMagnifyEnabled(!isMagnifyEnabled);
 
   const getStatusColorScheme = (type: MoveType | 'secret') => {
     switch (type) {
@@ -115,134 +96,101 @@ export const Header = () => {
 
   const culpritMoves = moves.filter((move) => move.role === 'culprit');
   const lastCulpritMove = culpritMoves[culpritMoves.length - 1];
-  const lastCulpritMoveType = lastCulpritMove?.secret ? 'secret' : lastCulpritMove?.type;
+  const lastCulpritMoveType = lastCulpritMove?.secret
+    ? 'secret'
+    : lastCulpritMove?.type;
 
+  const allowed =
+    move &&
+    isMoveAllowed(move.position, currentPlayer?.position, currentPlayer?.role);
   return (
     <VStack
       w="100%"
-      gap="100px"
-      bg="#edf2f7"
-      align="center"
-      justify="space-between"
+      bg="#8CC690"
+      p={4}
+      borderRadius="md"
+      spacing={4}
+      color="white"
     >
-        <div className="flex flex-col justify-around items-center gap-2">
-        <div className="text-lg">Your position</div>
-          <Flex direction="column" gap={2} alignItems={'center'}>
-            {currentPlayer ? (
-              <PlayerPosition position={currentPlayer.position} />
-            ) : null}
-            <Badge colorScheme={getStatusColorScheme(currentType)}>
-              {currentType}
-            </Badge>
-            {currentPosition && currentPosition !== currentPlayer?.position ? (
-             <svg width="30" height="30">
-             <polygon points="15,20 5,0 25,0" fill="black" />
-           </svg>
-            ) : null}
-
-            {currentPosition && currentPosition !== currentPlayer?.position ? (
-              <PlayerPosition position={currentPosition} />
-            ) : null}
-          </Flex>
-          {currentRole === currentTurn &&
-            (() => {
-              const isAllowed =
-                move &&
-                isMoveAllowed(
-                  move.position,
-                  currentPlayer?.position,
-                  currentPlayer?.role
-                );
-              return (
-                <div>
-                  {isAllowed ? (
-                    currentType ? (
-                      <button
-                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                        onClick={handleSend}
-                      >
-                        Confirm {move.position}
-                      </button>
-                    ) : (
-                      <button className="bg-yellow-500 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded">
-                        Select a transport
-                      </button>
-                    )
-                  ) : (
-                    <button
-                      className="bg-red-500 text-white font-bold py-2 px-4 rounded cursor-not-allowed"
-                      disabled
-                    >
-                      {move ? 'Invalid Move' : 'Your Turn'}
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
-          {currentRole === 'culprit' && (
-            <>
-              <Badge colorScheme={isSecret ? 'red' : 'gray'}>
-                <p className={isSecret ? 'text-2xl font-black' : 'text-sm'}>
-                  Secret
-                </p>
-              </Badge>
-              <Badge colorScheme={isDouble ? 'red' : 'gray'}>
-                <p className={isDouble ? 'text-2xl font-black' : 'text-sm'}>
-                  Double
-                </p>
-              </Badge>
-            </>
-          )}
-          {isMagnifyEnabled ? (
-            <Badge
-              colorScheme="green"
-              w={26}
-              h={6}
-              display="flex"
-              alignSelf="center"
-              onClick={toggleMagnify}
-            >
-              <FaMagnifyingGlass size={20} />
-            </Badge>
+      <Flex
+        direction="column"
+        align="center"
+        w="120px"
+        bg="#ACD8AF"
+        p={4}
+        borderRadius="md"
+        gridGap={2}
+      >
+        {currentPlayer && <PlayerPosition position={currentPlayer.position} />}
+        <Badge colorScheme={getStatusColorScheme(currentType)}>
+          {currentType}
+        </Badge>
+        {currentPosition && currentPosition !== currentPlayer?.position ? (
+          <PlayerPosition position={currentPosition} />
+        ) : null}
+      </Flex>
+      {currentRole === currentTurn && move && (
+        <Button
+          colorScheme={move ? 'green' : 'red'}
+          onClick={handleSend}
+          isDisabled={!allowed}
+        >
+          {allowed ? `Confirm ${move.position}` : 'Invalid move'}
+        </Button>
+      )}
+      {currentRole === 'culprit' && (
+        <Flex gap={2}>
+          <Badge colorScheme={isSecret ? 'red' : 'gray'}>
+            {isSecret ? 'Secret' : 'Normal'}
+          </Badge>
+          <Badge colorScheme={isDouble ? 'red' : 'gray'}>
+            {isDouble ? 'Double' : 'Single'}
+          </Badge>
+        </Flex>
+      )}
+      <Button
+        w={120}
+        onClick={toggleMagnify}
+        leftIcon={
+          isMagnifyEnabled ? (
+            <FaMagnifyingGlass />
           ) : (
-            <Badge
-              colorScheme="gray"
-              w={26}
-              h={6}
-              display="flex"
-              alignSelf="center"
-              onClick={toggleMagnify}
-            >
-              <FaMagnifyingGlassLocation size={20} />
-            </Badge>
-          )}
-        </div>
-          <div className="flex flex-col justify-around py-2 items-center gap-2 w-[100%] bg-lime-200">
-            <img className="w-10" src="/images/culprit.png" alt="culprit" />
-            <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
-            <Badge colorScheme={getStatusColorScheme(lastCulpritMoveType)}>
-              {lastCulpritMoveType}
-            </Badge>
-            {showCulpritAtMoves.includes(culpritMoves.length) ? (
-              <PlayerPosition position={lastCulpritMove?.position} />
-            ) : (
-              <Badge colorScheme="blue">
-                <Flex alignItems={'center'} gap={2}>
-                  <FaEye />
-                  <Text>
-                    {showCulpritAtMoves.find(
-                      (move) => move >= culpritMoves.length
-                    )}
-                  </Text>
-                </Flex>
-              </Badge>
-            )}
-            <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
-              <p className={isDoubleMove ? 'text-2xl font-black' : 'text-sm'}>
-                Double
-              </p>
-            </Badge>
-          </div>
+            <FaMagnifyingGlassLocation />
+          )
+        }
+      >
+        {isMagnifyEnabled ? 'Disable' : 'Enable'}
+      </Button>
+      <Flex
+        direction="column"
+        align="center"
+        bg="#ACD8AF"
+        w="120px"
+        p={4}
+        borderRadius="md"
+        gridGap={2}
+      >
+        <Image src="/images/culprit.png" w={10} />
+        <Badge colorScheme="orange">Round: {culpritMoves.length}</Badge>
+        <Badge colorScheme={getStatusColorScheme(lastCulpritMoveType)}>
+          {lastCulpritMoveType}
+        </Badge>
+        {showCulpritAtMoves.includes(culpritMoves.length) ? (
+          <PlayerPosition position={lastCulpritMove?.position} />
+        ) : (
+          <Badge colorScheme="blue">
+            <Flex alignItems="center" gap={2}>
+              <FaEye />{' '}
+              <Text>
+                {showCulpritAtMoves.find((move) => move >= culpritMoves.length)}
+              </Text>
+            </Flex>
+          </Badge>
+        )}
+        <Badge colorScheme={isDoubleMove ? 'red' : 'gray'}>
+          {isDoubleMove ? 'Double' : 'Single'}
+        </Badge>
+      </Flex>
     </VStack>
   );
 };
