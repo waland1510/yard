@@ -113,7 +113,7 @@ export interface Message {
   data: any;
 }
 
-export const showCulpritAtMoves = [3, 8, 13, 18];
+export const showCulpritAtMoves = [3, 8, 13, 18, 24];
 
 export function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
   if (isDouble) {
