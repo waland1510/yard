@@ -68,6 +68,7 @@ export const LeftDrawer = ({
                   .map((p) => (
                     <WrapItem
                       key={p.id}
+                      w={'128px'}
                       cursor={
                         currentRole !== 'culprit' && p.role !== 'culprit'
                           ? 'pointer'

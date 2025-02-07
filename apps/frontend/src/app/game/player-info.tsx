@@ -17,7 +17,7 @@ export const PlayerInfo = ({
   const {moves} = useGameStore();
   const showCulpritPosition = showCulpritAtMoves.includes(moves.length);
   return (
-  <VStack key={player.id} marginBottom="auto" bg="#ACD8AF" p={3} rounded="lg">
+  <VStack key={player.id} w="128px" marginBottom="auto" bg="#ACD8AF" p={3} rounded="lg">
     <Text fontSize="lg" fontWeight="bold" color="teal.900">
       {player.username?.slice(0,10) ?? 'Waiting...'}
     </Text>

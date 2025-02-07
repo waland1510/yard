@@ -175,7 +175,13 @@ export const Game = () => {
           flexDirection="column"
           justifyContent="center"
           alignItems="center"
-          cursor={currentRole !== 'culprit' ? 'pointer' : 'not-allowed'}
+          cursor={
+            currentRole !== 'culprit' &&
+            currentTurn !== 'culprit' &&
+            currentRole !== currentTurn
+              ? 'pointer'
+              : 'not-allowed'
+          }
           onClick={() => onRoleChange(currentTurn)}
         >
           <img
@@ -183,11 +189,13 @@ export const Game = () => {
             src={`/images/${currentTurn}.png`}
             alt="player"
           />
-          {currentRole !== 'culprit' && (
-            <Text fontSize="sm" color="teal.600" textAlign="center">
-              Click to impersonate
-            </Text>
-          )}
+          {currentRole !== 'culprit' &&
+            currentTurn !== 'culprit' &&
+            currentRole !== currentTurn && (
+              <Text fontSize="sm" color="teal.600" textAlign="center">
+                Click to impersonate
+              </Text>
+            )}
           <Box fontSize="2xl" mt={2}>
             <span role="img" aria-label="dice">
               🎲
