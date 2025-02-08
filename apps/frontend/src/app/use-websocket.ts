@@ -135,7 +135,7 @@ const useWebSocket = (channel?: string) => {
 
     return () => {
       if (socket) {
-        socket.onmessage = null; // Cleanup listener on unmount
+        socket.onmessage = null;
       }
     };
   }, [
