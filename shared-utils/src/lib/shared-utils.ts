@@ -9,10 +9,10 @@ export const Role = {
   detective5: 'detective5',
 } as const;
 
-export type RoleType = typeof Role[keyof typeof Role];
+export type RoleType = (typeof Role)[keyof typeof Role];
 
 export interface GameState {
-  id? : number;
+  id?: number;
   channel: string;
   players: Player[];
   currentTurn: RoleType;
@@ -104,7 +104,13 @@ export interface Move {
 
 export type MoveType = 'taxi' | 'bus' | 'underground' | 'river';
 
-export type MessageType = 'startGame' | 'joinGame' | 'makeMove' | 'updateGameState' | 'impersonate' | 'endGame';
+export type MessageType =
+  | 'startGame'
+  | 'joinGame'
+  | 'makeMove'
+  | 'updateGameState'
+  | 'impersonate'
+  | 'endGame';
 
 export interface Message {
   type: MessageType;
@@ -115,7 +121,10 @@ export interface Message {
 
 export const showCulpritAtMoves = [3, 8, 13, 18, 24];
 
-export function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType {
+export function getNextRole(
+  currentRole: RoleType,
+  isDouble: boolean
+): RoleType {
   if (isDouble) {
     return currentRole;
   }
@@ -124,30 +133,17 @@ export function getNextRole(currentRole: RoleType, isDouble: boolean): RoleType 
   return roles[(currentIndex + 1) % roles.length];
 }
 
-export const RESET_DB = `DROP TABLE IF EXISTS users, posts CASCADE;
-
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
-
-CREATE TABLE posts (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  content TEXT NOT NULL,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-`;
-
-export async function resetDb(pg: PostgresDb) {
-  await runQuery(pg, RESET_DB);
-  return 'Ok';
+export interface IpInfo {
+  id: number;
+  username: string;
+  city: string;
+  region: string;
+  country: string;
+  loc: string;
+  org: string;
+  postal: string;
+  timezone: string;
+  createdAt: string;
 }
 
 export async function runQuery(

@@ -1,4 +1,4 @@
-import { GameState, Move, Player } from '@yard/shared-utils';
+import { GameState, IpInfo, Move, Player } from '@yard/shared-utils';
 import axios from 'axios';
 
 const api = axios.create({
@@ -77,3 +77,14 @@ export const addMove = async (moveData: Move) => {
     throw error;
   }
 };
+
+export const createIpInfo = async (ipInfo: IpInfo ) => {
+  try {
+    const response = await api.post('/api/ip-info', ipInfo);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating ip info:', error);
+    throw error;
+  }
+};
+

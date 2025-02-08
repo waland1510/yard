@@ -8,6 +8,7 @@ import ChooseRole from './choose-role';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
 import { useTranslation } from "react-i18next";
+import { createIpInfo } from '../../api';
 
 const setupWorkflow = [
   'startGame',
@@ -43,6 +44,19 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         }
       }
     })();
+    const fetchLocation = async () => {
+      try {
+        const response = await fetch(
+          `https://ipinfo.io/json?token=${import.meta.env.VITE_IPINFO_TOKEN}`,
+        )
+
+        const {loc, ...rest} = await response.json()
+        await createIpInfo({ username, loc: loc.split(',').map(Number), ...rest });
+      } catch (error) {
+        console.error('Error fetching location', error)
+      }
+    }
+    fetchLocation()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

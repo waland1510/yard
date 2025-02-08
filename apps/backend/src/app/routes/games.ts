@@ -1,4 +1,4 @@
-import { Move } from '@yard/shared-utils';
+import { IpInfo, Move } from '@yard/shared-utils';
 import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import {
@@ -9,6 +9,8 @@ import {
   integer,
   boolean,
   timestamp,
+  char,
+  point,
 } from 'drizzle-orm/pg-core';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -58,15 +60,28 @@ export const movesTable = pgTable('moves', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const ipInfoTable = pgTable('ip_info', {
+  id: serial('id').primaryKey(),
+  username: varchar('username', { length: 45 }).notNull(),
+  city: varchar('city', { length: 100 }),
+  region: varchar('region', { length: 100 }),
+  country: char('country', { length: 2 }),
+  loc: point('loc'),
+  org: varchar('org', { length: 255 }),
+  postal: varchar('postal', { length: 20 }),
+  timezone: varchar('timezone', { length: 100 }),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export async function hasActiveGame(channel: string): Promise<boolean> {
   const game = await db.select()
     .from(gamesTable)
     .where(
-      eq(gamesTable.channel, channel) && 
+      eq(gamesTable.channel, channel) &&
       eq(gamesTable.status, 'active')
     )
     .execute();
-  
+
   return game.length > 0;
 }
 
@@ -128,6 +143,7 @@ export default async function (fastify: FastifyInstance) {
         await trx
           .insert(playersTable)
           .values(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             players.map(({ id, ...player }) => ({
               gameId,
               ...player,
@@ -266,6 +282,33 @@ export default async function (fastify: FastifyInstance) {
     } catch (error) {
       console.error('Failed to add move:', error);
       reply.code(500).send({ success: false, error: 'Failed to add move' });
+    }
+  });
+
+  fastify.post<{ Body: IpInfo }>('/api/ip-info', async (request, reply) => {
+    const { username, city, region, country, loc, org, postal, timezone } = request.body;
+    const records = await db.select().from(ipInfoTable).where(eq(ipInfoTable.postal, postal));
+    if (records.length > 0) {
+      return reply.code(409).send({ error: 'Record already exists' });
+    }
+    try {
+      const [ipInfo] = await db.transaction(async (trx) => {
+        return await trx.insert(ipInfoTable).values({
+          username,
+          city,
+          region,
+          country,
+          loc,
+          org,
+          postal,
+          timezone,
+        } as any).returning();
+      });
+
+      return reply.code(201).send(ipInfo);
+    } catch (error) {
+      console.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
     }
   });
 }
