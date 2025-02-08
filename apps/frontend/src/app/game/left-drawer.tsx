@@ -38,15 +38,12 @@ export const LeftDrawer = ({
       <DrawerOverlay />
       <DrawerContent bg="#8CC690" color="white" shadow="lg">
         <DrawerHeader borderBottomWidth="1px">
-          <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
+          <Flex
           >
             <Button variant="outline" colorScheme="teal" onClick={onLeftClose}>
               {t('close')}
             </Button>
-            <Flex alignItems="center" direction="column">
+            <Flex direction="column" textAlign={"end"}>
               <Text fontSize="lg" fontWeight="bold" color={'teal.900'}>
                 {t('playersInfo')}
               </Text>
@@ -56,7 +53,7 @@ export const LeftDrawer = ({
                 </Text>
               )}
             </Flex>
-          </Box>
+          </Flex>
         </DrawerHeader>
 
         <DrawerBody>

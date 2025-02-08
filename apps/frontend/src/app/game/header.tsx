@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa6';
 import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
 import { addMove, updateGame, updatePlayer } from '../../api';
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 
 export const Header = () => {
   const {
@@ -136,11 +136,15 @@ export const Header = () => {
           onClick={handleSend}
           isDisabled={!allowed}
         >
-          {allowed ? `Confirm ${move.position}` : t('invalidMove')}
+          {allowed
+            ? t('confirm', {
+                position: move.position,
+              })
+            : t('invalidMove')}
         </Button>
       )}
       {currentRole === 'culprit' && (
-        <Flex gap={2}>
+        <Flex direction="column" gap={2} textAlign={'center'}>
           <Badge colorScheme={isSecret ? 'red' : 'gray'}>
             {isSecret ? t('secret') : t('normal')}
           </Badge>
@@ -172,7 +176,9 @@ export const Header = () => {
         gridGap={2}
       >
         <Image src="/images/culprit.png" w={10} />
-        <Badge colorScheme="orange">{t('round')}: {culpritMoves.length}</Badge>
+        <Badge colorScheme="orange">
+          {t('round')}: {culpritMoves.length}
+        </Badge>
         <Badge colorScheme={getStatusColorScheme(lastCulpritMoveType)}>
           {lastCulpritMoveType}
         </Badge>

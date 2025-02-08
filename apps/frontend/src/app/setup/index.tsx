@@ -1,4 +1,4 @@
-import { Card, Spinner } from '@chakra-ui/react';
+import { Card, Spinner, useToast } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getGameByChannel } from '../../api';
@@ -29,6 +29,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const { t } = useTranslation();
   const username = localStorage.getItem('username');
   const existingChannel = localStorage.getItem('channel');
+  const  toast = useToast();
 
   useEffect(() => {
     (async () => {
@@ -88,6 +89,13 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const play = () => {
     navigate(`/game/${joiningChannel ?? channel}`);
     navigator.clipboard.writeText(`${window.location.origin}/game/${channel}`);
+    toast({
+      title: t('linkCopied'),
+      description: t('shareLink'),
+      status: 'success',
+      duration: 10000,
+      isClosable: true,
+    });
   };
 
   return (
