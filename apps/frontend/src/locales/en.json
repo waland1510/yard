@@ -1,6 +1,7 @@
 {
   "hey": "Hey",
   "from": "from {{city}}",
+  "enterName": "Enter your name",
   "players": "Players",
   "start": "Start Game",
   "startNewGame": "Start New Game",

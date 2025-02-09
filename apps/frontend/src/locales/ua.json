@@ -1,6 +1,7 @@
 {
   "hey": "Привіт",
   "from": "з {{city}}",
+  "enterName": "Введіть своє ім'я",
   "players": "Гравці",
   "start": "Почати гру",
   "startNewGame": "Почати нову гру",
@@ -8,8 +9,8 @@
   "gameFinished": "Гру завершено",
   "welcome": "Ласкаво просимо назад!",
   "continueGame": "Продовжити існуючу гру",
-  "addUsername": "Додати ім'я користувача",
-  "updateUsername": "Оновити ім'я користувача",
+  "addUsername": "Додати ім'я",
+  "updateUsername": "Оновити ім'я",
   "continue": "Продовжити",
   "chooseRole": "Виберіть свою роль",
   "joined": "Вже приєднано",

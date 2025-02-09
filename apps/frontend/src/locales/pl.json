@@ -1,6 +1,7 @@
 {
   "hey": "Cześć",
   "from": "z {{city}}",
+  "enterName": "Wprowadź swoje imię",
   "players": "Gracze",
   "start": "Rozpocznij grę",
   "startNewGame": "Rozpocznij nową grę",
