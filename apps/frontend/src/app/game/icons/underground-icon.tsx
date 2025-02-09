@@ -23,8 +23,8 @@ export const UndergroundIcon: React.FC<UndergroundIconProps> = ({ available }) =
             height="98"
             rx="20"
             ry="20"
-            fill={available ? "#d00" : "#000"}
-            stroke="#000"
+            fill={available ? "#d00" : "gray"}
+            stroke="gray"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
@@ -49,7 +49,7 @@ export const UndergroundIcon: React.FC<UndergroundIconProps> = ({ available }) =
         <text
           x="100"
           y="326.54147"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="16px"
           letterSpacing="-1px"

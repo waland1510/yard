@@ -22,8 +22,8 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
             height="98"
             rx="20"
             ry="20"
-            fill={available ? '#f60' : '#000'}
-            stroke="#000"
+            fill={available ? '#f60' : 'gray'}
+            stroke="gray"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
@@ -32,7 +32,7 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
           <text
             x="100"
             y="348.54166"
-            fill="#000000"
+            fill="gray000"
             fontFamily="sansSerif"
             fontSize="74.667px"
             fontWeight="bold"
@@ -50,7 +50,7 @@ export const DoubleIcon: React.FC<DoubleIconProps> = ({ available }) => {
         <text
           x="100"
           y="348.54166"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="74.667px"
           fontWeight="bold"

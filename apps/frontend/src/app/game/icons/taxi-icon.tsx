@@ -23,7 +23,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           rx="20"
           ry="20"
           fill="#dd0"
-          stroke="#000"
+          stroke="gray"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="2"
@@ -31,7 +31,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
         <text
           x="100"
           y="348.54166"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="30px"
           letterSpacing="0px"
@@ -47,7 +47,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
         <text
           x="100"
           y="348.54166"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="30px"
           letterSpacing="0px"
@@ -66,7 +66,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
           rx="20"
           ry="20"
           fill={available ? "#dd0" : "#e6e6e6"}
-          stroke="#000"
+          stroke="gray"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="2"
@@ -74,7 +74,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
         <text
           x="100"
           y="348.54166"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="30px"
           letterSpacing="0px"
@@ -90,7 +90,7 @@ export const TaxiIcon: React.FC<TaxiIconProps> = ({ available }) => {
         <text
           x="100"
           y="348.54166"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sansSerif"
           fontSize="30px"
           letterSpacing="0px"

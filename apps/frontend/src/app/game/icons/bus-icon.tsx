@@ -17,8 +17,8 @@ export const BusIcon: React.FC<BusIconProps> = ({ available }) => {
             height="98"
             rx="20"
             ry="20"
-            fill={available ? '#080' : '#000'}
-            stroke="#000"
+            fill={available ? '#080' : 'gray'}
+            stroke="gray"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
@@ -43,7 +43,7 @@ export const BusIcon: React.FC<BusIconProps> = ({ available }) => {
         <text
           x="100"
           y="326.54147"
-          fill="#000000"
+          fill="gray000"
           fontFamily="sans-serif"
           fontSize="16px"
           letterSpacing="-1px"

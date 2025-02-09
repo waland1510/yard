@@ -1,5 +1,6 @@
 {
   "hey": "Salut",
+  "from": "de {{city}}",
   "players": "Joueurs",
   "start": "Commencer le jeu",
   "startNewGame": "Démarrer une nouvelle partie",

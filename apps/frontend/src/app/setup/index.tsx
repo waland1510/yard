@@ -27,6 +27,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const navigate = useNavigate();
   const { channel, setChannel } = useGameStore();
   const [currentStep, setCurrentStep] = useState(setupWorkflow[0]);
+  const [city, setCity] = useState<string | null>(null);
   const { t } = useTranslation();
   const username = localStorage.getItem('username');
   const existingChannel = localStorage.getItem('channel');
@@ -49,8 +50,8 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         const response = await fetch(
           `https://ipinfo.io/json?token=${import.meta.env.VITE_IPINFO_TOKEN}`,
         )
-
         const {loc, ...rest} = await response.json()
+        setCity(rest.city)
         await createIpInfo({ username, loc: loc.split(',').map(Number), ...rest });
       } catch (error) {
         console.error('Error fetching location', error)
@@ -126,7 +127,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">
-              {t('hey')} {username.toUpperCase()}
+              {t('hey')} {username.toUpperCase()}{city ? ` ${t('from', {city})}`: ''}
             </p>
           )}
           {renderSteps ? (

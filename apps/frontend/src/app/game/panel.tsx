@@ -8,7 +8,7 @@ import { TaxiIcon } from './icons/taxi-icon';
 import { UndergroundIcon } from './icons/underground-icon';
 import { SecretIcon } from './icons/secret-icon';
 import { DoubleIcon } from './icons/double-icon';
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 
 export const Panel = () => {
   const {
@@ -40,6 +40,7 @@ export const Panel = () => {
       id: 'taxi',
       label: 'Taxi',
       count: player?.taxiTickets || 0,
+      disabled: !node.taxi?.length || !player?.taxiTickets,
     },
     {
       icon: (
@@ -48,6 +49,7 @@ export const Panel = () => {
       id: 'bus',
       label: 'Bus',
       count: player?.busTickets || 0,
+      disabled: !node.bus?.length || !player?.busTickets,
     },
     {
       icon: (
@@ -60,6 +62,7 @@ export const Panel = () => {
       id: 'underground',
       label: 'Subway',
       count: player?.undergroundTickets || 0,
+      disabled: !node.underground?.length || !player?.undergroundTickets,
     },
   ];
 
@@ -90,8 +93,10 @@ export const Panel = () => {
     <div className="w-[120px] flex flex-col bg-[#ACD8AF] rounded-lg text-slate-900 shadow-lg">
       <div className="flex flex-col items-center gap-3">
         <div className="flex flex-col items-center">
-        <p className="text-xl font-semibold py-0">{t('hey')}, </p>
-        <p className="text-xl font-semibold py-0">{username?.slice(0,10)}!</p>
+          <p className="text-xl font-semibold py-0">{t('hey')}, </p>
+          <p className="text-xl font-semibold py-0">
+            {username?.slice(0, 10)}!
+          </p>
         </div>
         <img
           className="w-10 h-12 rounded-full"
@@ -100,13 +105,33 @@ export const Panel = () => {
         />
       </div>
       <div className="flex flex-col gap-2 mt-4 text-center">
+        {currentRole === 'culprit' && (
+          <div className="flex flex-col gap-2 text-center">
+            {culpritItems.map((item) => (
+              <Fragment key={item.id}>
+                <button
+                  className="flex items-center justify-center rounded-md transition-transform transform active:scale-90 disabled:scale-100 disabled:pointer-events-none"
+                  onClick={
+                    item.count
+                      ? () => handleCulpritMoveClick(item.id as 'secret')
+                      : undefined
+                  }
+                >
+                  <div className="text-2xl">{item.icon}</div>
+                </button>
+                <div className="text-lg font-medium">{item.count}</div>
+              </Fragment>
+            ))}
+          </div>
+        )}
         {items.map((item) => (
           <Fragment key={item.id}>
             <button
-              className="flex items-center justify-center rounded-md transition"
+              className="flex items-center justify-center rounded-md transition-transform transform active:scale-90 disabled:scale-100 disabled:pointer-events-none"
               onClick={
                 item.count ? () => setCurrentType(item.id as 'taxi') : undefined
               }
+              disabled={item.disabled}
             >
               <span className="text-2xl">{item.icon}</span>
             </button>
@@ -114,26 +139,6 @@ export const Panel = () => {
           </Fragment>
         ))}
       </div>
-
-      {currentRole === 'culprit' && (
-        <div className="flex flex-col gap-2 text-center">
-          {culpritItems.map((item) => (
-            <Fragment key={item.id}>
-              <button
-                className="flex items-center justify-center rounded-md transition"
-                onClick={
-                  item.count
-                    ? () => handleCulpritMoveClick(item.id as 'secret')
-                    : undefined
-                }
-              >
-                <div className="text-2xl">{item.icon}</div>
-              </button>
-              <div className="text-lg font-medium">{item.count}</div>
-            </Fragment>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
