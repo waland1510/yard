@@ -49,5 +49,21 @@
   "playerMove": "{{player}} przesunął się na {{position}}. Następny jest {{nextTurn}}",
   "linkCopied": "Link skopiowany",
   "shareLink": "Udostępnij ten link znajomym, aby rozpocząć grę",
-  "confirm": "Potwierdź {{position}}"
+  "confirm": "Potwierdź {{position}}",
+  "gameRules": "Zasady gry",
+  "rulesContent": [
+    "Gra toczy się między jednym przestępcą (Pan C) a maksymalnie pięcioma detektywami.",
+    "Przestępca porusza się w ukryciu, a detektywi współpracują, aby go schwytać.",
+    "Gracze przemieszczają się za pomocą taksówki, autobusu, metra lub tajnych biletów.",
+    "Przestępca wygrywa, jeśli uniknie schwytania do ostatniej rundy.",
+    "Detektywi wygrywają, jeśli staną na tym samym polu co przestępca.",
+    "W pięciu konkretnych momentach gry, Pan C musi ujawnić swoją aktualną pozycję.",
+    "Przystanki promowe połączone czarnymi liniami mogą być używane tylko przez Pana C.",
+    "Aby skorzystać z promu, Pan C musi użyć tajnego biletu.",
+    "Pan C może również używać tajnych biletów, aby pokryć każdy inny ruch.",
+    "Pan C ma ograniczoną liczbę tajnych i podwójnych biletów.",
+    "Detektywi mają ograniczoną liczbę wszystkich biletów transportowych.",
+    "Gracze mogą zmieniać role między detektywami, ale nie z Panem C.",
+    "Pan C nie może zmieniać roli."
+  ]
 }

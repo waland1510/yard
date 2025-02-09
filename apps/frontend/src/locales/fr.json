@@ -49,5 +49,21 @@
   "secretRequired": "Ce mouvement nécessite un ticket secret",
   "secretSelected": "Le ticket secret a été sélectionné pour vous",
   "culpritMove": "{{culprit}} a fait son mouvement. Le prochain est {{nextTurn}}",
-  "playerMove": "{{player}} s'est déplacé vers {{position}}. Le prochain est {{nextTurn}}"
+  "playerMove": "{{player}} s'est déplacé vers {{position}}. Le prochain est {{nextTurn}}",
+  "gameRules": "Règles du jeu",
+  "rulesContent": [
+    "Le jeu se joue avec un coupable (M. C) et jusqu'à cinq détectives.",
+    "Le coupable se déplace en secret, tandis que les détectives travaillent ensemble pour l'attraper.",
+    "Les joueurs se déplacent en utilisant taxi, bus, métro ou billets secrets.",
+    "Le coupable gagne s'il évite d'être capturé jusqu'au dernier tour.",
+    "Les détectives gagnent s'ils atterrissent sur la même case que le coupable.",
+    "À cinq moments spécifiques du jeu, M. C doit révéler sa position actuelle.",
+    "Les arrêts de ferry reliés par des lignes noires ne peuvent être utilisés que par M. C.",
+    "Pour utiliser le ferry, M. C doit utiliser un billet secret.",
+    "M. C peut également utiliser des billets secrets pour couvrir tout autre mouvement.",
+    "M. C a un nombre limité de billets secrets et doubles.",
+    "Les détectives ont un nombre limité de tous les billets de transport.",
+    "Les joueurs peuvent échanger leurs rôles entre détectives, mais pas avec M. C.",
+    "M. C ne peut pas changer de rôle."
+  ]
 }

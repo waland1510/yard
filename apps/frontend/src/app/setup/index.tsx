@@ -7,8 +7,18 @@ import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 import { createIpInfo } from '../../api';
+import {
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  Button,
+} from '@chakra-ui/react';
+import { useDisclosure } from '@chakra-ui/hooks';
 
 const setupWorkflow = [
   'startGame',
@@ -31,7 +41,8 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const { t } = useTranslation();
   const username = localStorage.getItem('username');
   const existingChannel = localStorage.getItem('channel');
-  const  toast = useToast();
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     (async () => {
@@ -48,16 +59,20 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
     const fetchLocation = async () => {
       try {
         const response = await fetch(
-          `https://ipinfo.io/json?token=${import.meta.env.VITE_IPINFO_TOKEN}`,
-        )
-        const {loc, ...rest} = await response.json()
-        setCity(rest.city)
-        await createIpInfo({ username, loc: loc.split(',').map(Number), ...rest });
+          `https://ipinfo.io/json?token=${import.meta.env.VITE_IPINFO_TOKEN}`
+        );
+        const { loc, ...rest } = await response.json();
+        setCity(rest.city);
+        await createIpInfo({
+          username,
+          loc: loc.split(',').map(Number),
+          ...rest,
+        });
       } catch (error) {
-        console.error('Error fetching location', error)
+        console.error('Error fetching location', error);
       }
-    }
-    fetchLocation()
+    };
+    fetchLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -112,10 +127,30 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
       isClosable: true,
     });
   };
-
+  const rules = t('rulesContent', { returnObjects: true });
   return (
     <div className="flex relative w-full h-full">
+      <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader bg='#ACD8AF'>{t('gameRules')}</DrawerHeader>
+          <DrawerBody bg='#ACD8AF'>
+            {Array.isArray(rules) ? (
+              <ul className="list-disc pl-4">
+                {rules.map((rule, index) => (
+                  <li key={index}>{rule}</li>
+                ))}
+              </ul>
+            ) : null}
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
       <div className="flex flex-col absolute w-full h-full z-10 p-10 items-start justify-start text-black">
+        <Button className="absolute top-0 right-0 ml-auto bg-[#ACD8AF]" onClick={onOpen}>
+          {t('gameRules')}
+        </Button>
         <img
           className="w-96 rounded mb-6"
           src="/images/catch.png"
@@ -127,16 +162,15 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">
-              {t('hey')} {username.toUpperCase()}{city ? ` ${t('from', {city})}`: ''}
+              {t('hey')} {username.toUpperCase()}
+              {city ? ` ${t('from', { city })}` : ''}
             </p>
           )}
           {renderSteps ? (
             renderStep()
           ) : (
             <div className="text-center">
-              <div>
-               {t('waitForServer')}
-              </div>
+              <div>{t('waitForServer')}</div>
               <Spinner />
             </div>
           )}

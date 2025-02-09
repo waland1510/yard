@@ -49,5 +49,21 @@
   "secretRequired": "This move requires a secret ticket",
   "secretSelected": "The secret ticket was selected for you",
   "culpritMove": "{{culprit}} made his move. Next is {{nextTurn}}",
-  "playerMove": "{{player}} moved to {{position}}. Next is {{nextTurn}}"
+  "playerMove": "{{player}} moved to {{position}}. Next is {{nextTurn}}",
+  "gameRules": "Game Rules",
+  "rulesContent": [
+    "The game is played with one culprit (Mr. C) and up to five detectives.",
+    "The culprit moves secretly, while detectives work together to catch him.",
+    "Players take turns moving using taxi, bus, underground, or secret tickets.",
+    "The culprit wins if he avoids capture until the last round.",
+    "The detectives win if they land on the same space as the culprit.",
+    "At five specific times during the game, Mr. C has to reveal their current position.",
+    "Ferry stops connected by black lines can only be used by Mr. C.",
+    "To use the ferry, Mr. C must use a secret ticket.",
+    "Mr. C can also use secret tickets to cover any other move.",
+    "Mr. C has a limited number of secret and double tickets.",
+    "Detectives have a limited number of all transport tickets.",
+    "Players can switch roles between detectives but not Mr. C.",
+    "Mr. C cannot switch roles."
+  ]
 }
