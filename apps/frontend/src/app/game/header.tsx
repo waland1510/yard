@@ -59,7 +59,7 @@ export const Header = () => {
       ) {
         return;
       }
-      sendMessage('makeMove', move);
+      sendMessage('makeMove', { ...move, secret: isSecret, double: isDouble });
       addMove({
         gameId,
         type: move.type,
