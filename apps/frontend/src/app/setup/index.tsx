@@ -130,35 +130,21 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const rules = t('rulesContent', { returnObjects: true });
   return (
     <div className="flex relative w-full h-full">
-      <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
-        <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader bg='#ACD8AF'>{t('gameRules')}</DrawerHeader>
-          <DrawerBody bg='#ACD8AF'>
-            {Array.isArray(rules) ? (
-              <ul className="list-disc pl-4">
-                {rules.map((rule, index) => (
-                  <li key={index}>{rule}</li>
-                ))}
-              </ul>
-            ) : null}
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-
-      <div className="flex flex-col absolute w-full h-full z-10 p-10 items-start justify-start text-black">
-        <Button className="absolute top-0 right-0 ml-auto bg-[#ACD8AF]" onClick={onOpen}>
+      <div className="flex flex-col absolute w-full h-[100vh] z-10 p-10 items-start justify-start text-black">
+        <Button
+          className="absolute top-0 right-0 ml-auto bg-[#ACD8AF]"
+          onClick={onOpen}
+        >
           {t('gameRules')}
         </Button>
         <img
-          className="w-96 rounded mb-6"
+          className="w-96 rounded"
           src="/images/catch.png"
           alt="Game Logo"
         />
         <Card
           style={{ backgroundColor: 'inherit' }}
-          className="w-full h-[300px] p-6 justify-center"
+          className="w-full h-[300px] px-6 justify-center"
         >
           {username && (
             <p className="text-lg text-gray-700 text-center">
@@ -177,6 +163,22 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         </Card>
       </div>
       <VideoBackground />
+      <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader bg="#ACD8AF">{t('gameRules')}</DrawerHeader>
+          <DrawerBody bg="#ACD8AF">
+            {Array.isArray(rules) ? (
+              <ul className="list-disc pl-4">
+                {rules.map((rule, index) => (
+                  <li key={index}>{rule}</li>
+                ))}
+              </ul>
+            ) : null}
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };

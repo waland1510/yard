@@ -1,8 +1,7 @@
-
 export const VideoBackground = () => {
   return (
-    <div>
       <video
+        className="w-full h-[100vh] object-cover"
         autoPlay
         loop
         muted
@@ -10,6 +9,5 @@ export const VideoBackground = () => {
       >
         <source src="/images/game.mov" type="video/mp4" />
       </video>
-    </div>
   );
 };
