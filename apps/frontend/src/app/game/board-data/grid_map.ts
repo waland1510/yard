@@ -445,7 +445,7 @@ export const mapData = {
     },
     {
       id: 71,
-      taxi: [70, 72],
+      taxi: [55, 70, 72, 89],
       x: 1000,
       y: 300,
     },
