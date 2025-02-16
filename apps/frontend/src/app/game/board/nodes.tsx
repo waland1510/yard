@@ -1,5 +1,4 @@
 import { showCulpritAtMoves } from '@yard/shared-utils';
-import { useCallback, useMemo } from 'react';
 import { Fragment } from 'react/jsx-runtime';
 import { usePlayerSubscription } from '../../../hooks/use-player-subscription';
 import { usePlayersSubscription } from '../../../hooks/use-players-subscription';
@@ -24,18 +23,15 @@ export const Nodes = () => {
     setCurrentPosition,
   } = useRunnerStore();
   const toast = useToast();
-  const runnerData = useMemo(
-    () => ({
+  const runnerData = {
       position: players.find((p) => p.role === role)?.position,
       currentRole: players.find((p) => p.position === currentPosition)?.role,
-    }),
-    [players, role, currentPosition]
-  );
+    };
   const { moves, players: storePlayers } = useGameStore();
   const playerStorePosition = storePlayers.find(
     (p) => p.role === role
   )?.position;
-  const handleSend = useCallback(
+  const handleSend =
     (position: number) => {
       const availableType =
         getAvailableType(position, runnerData.position, role) || 'taxi';
@@ -59,19 +55,7 @@ export const Nodes = () => {
         double: isDouble,
       });
       setCurrentPosition(position);
-    },
-    [
-      runnerData.position,
-      role,
-      setCurrentType,
-      setMove,
-      isSecret,
-      isDouble,
-      setCurrentPosition,
-      setIsSecret,
-      toast,
-    ]
-  );
+    };
 
   return (
     <>

@@ -4,14 +4,14 @@ import { useGameStore } from '../../stores/use-game-store';
 import { useTranslation } from "react-i18next";
 
 export const Moves = () => {
-  const moves = useGameStore((state) => state.moves);
+  const moves = useGameStore((state) => state.moves).filter((m) => m.role === 'culprit');
   const { t } = useTranslation();
 
   return (
     <DrawerBody bg="#8CC690" color="white" overflowY="auto" maxH="100%">
     <VStack spacing={4} align="stretch">
       {Array.from({ length: 24 }).map((_, index) => {
-        const move = moves?.find((m, i) => i === index && m.role === 'culprit');
+        const move = moves?.find((m, i) => i === index);
         const isSpecialMove = showCulpritAtMoves.includes(index + 1 );
         return (
           <Box

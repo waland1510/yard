@@ -831,7 +831,7 @@ export const connectionsData = [
   },
   {
     from: 88,
-    to: 117,
+    to: 129,
     types: ['taxi'],
   },
   {
