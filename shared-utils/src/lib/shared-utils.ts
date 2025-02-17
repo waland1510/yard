@@ -11,6 +11,8 @@ export const Role = {
 
 export type RoleType = (typeof Role)[keyof typeof Role];
 
+export type Status = 'active' | 'finished';
+
 export interface GameState {
   id?: number;
   channel: string;
@@ -18,7 +20,7 @@ export interface GameState {
   currentTurn: RoleType;
   moves: Move[];
   isDoubleMove: boolean;
-  status: 'active' | 'finished';
+  status: Status;
 }
 
 export interface Player {

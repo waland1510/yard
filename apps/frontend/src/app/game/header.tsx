@@ -21,6 +21,7 @@ export const Header = () => {
     moves,
     isDoubleMove,
     id: gameId,
+    setStatus,
   } = useGameStore();
   const {
     currentPosition,
@@ -50,6 +51,7 @@ export const Header = () => {
     if (move && gameId && currentRole && currentPlayer) {
       if (currentRole !== 'culprit' && move.position === culpritPosition) {
         updateGame(gameId, { status: 'finished' });
+        setStatus('finished');
         sendMessage('endGame', { winner: currentRole });
         return;
       }

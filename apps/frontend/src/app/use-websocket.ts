@@ -12,13 +12,16 @@ const useWebSocket = (channel?: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const username = localStorage.getItem('username');
   const toast = useToast();
-  const currentRole = useRunnerStore((state) => state.currentRole);
-  const setPosition = useGameStore((state) => state.setPosition);
-  const setCurrentTurn = useGameStore((state) => state.setCurrentTurn);
-  const updateMoves = useGameStore((state) => state.updateMoves);
-  const updatePlayer = useGameStore((state) => state.updatePlayer);
-  const updateTicketsCount = useGameStore((state) => state.updateTicketsCount);
-  const setIsDoubleMove = useGameStore((state) => state.setIsDoubleMove);
+  const { currentRole } = useRunnerStore();
+  const {
+    setPosition,
+    setCurrentTurn,
+    updateMoves,
+    updatePlayer,
+    updateTicketsCount,
+    setIsDoubleMove,
+    setStatus,
+  } = useGameStore();
   const players = usePlayersSubscription();
   const { t } = useTranslation();
 
@@ -104,8 +107,9 @@ const useWebSocket = (channel?: string) => {
           console.log('Impersonating:', message.data.role);
           break;
         case 'endGame':
+          setStatus('finished');
           toast({
-            description: `${t('gameOver')} ${message.data.winner}`,
+            description: t('gameOver', {winner: t(message.data.winner)}),
             status: 'success',
             position: 'top-right',
             duration: 9000,

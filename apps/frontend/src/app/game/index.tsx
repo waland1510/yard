@@ -31,7 +31,7 @@ export const Game = () => {
   const { sendMessage } = useWebSocket(channel);
   const toast = useToast();
   const username = localStorage.getItem('username');
-  const { players, setChannel, currentTurn } = useGameStore();
+  const { players, setChannel, currentTurn, status } = useGameStore();
   const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
@@ -171,7 +171,7 @@ export const Game = () => {
           {t('moves')}
         </Button>
         <Heading size="md" color="gray.900">
-          {currentRole === currentTurn ? t('yourTurn') : t('nextTurn')}
+          {status === 'finished' ? t('winner') : currentRole === currentTurn ? t('yourTurn') : t('nextTurn')}
         </Heading>
         <Box
           display="flex"

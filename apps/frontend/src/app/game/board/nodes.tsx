@@ -113,6 +113,22 @@ export const Nodes = () => {
                 onClick={() => handleSend(node.id)}
                 strokeDasharray={node.river ? '5 5' : 'none'}
               />
+              <defs>
+                <clipPath id={`clip-circle-${node.id}`}>
+                  <circle cx={node.x} cy={node.y} r="14" />
+                </clipPath>
+              </defs>
+              {showImage && playerRole === "culprit" && (
+                <AnimatedImage
+                  href={`/images/${playerRole}.png`}
+                  previousX={playersNode?.x || node.x}
+                  previousY={playersNode?.y || node.y}
+                  targetX={node.x}
+                  targetY={node.y}
+                  isCurrentPlayer={playerRole === role}
+                  nodeId={node.id}
+                />
+              )}
               <text
                 x={node.x}
                 y={node.y + 5}
@@ -137,7 +153,7 @@ export const Nodes = () => {
                 {node.id}
               </text>
             </g>
-            {showImage && (
+            {showImage && playerRole !== "culprit" &&(
                 <AnimatedImage
                   href={`/images/${playerRole}.png`}
                   previousX={playersNode?.x || node.x}

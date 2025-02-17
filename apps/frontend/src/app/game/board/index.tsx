@@ -3,10 +3,14 @@ import { useRunnerStore } from '../../../stores/use-runner-store';
 import { Connections } from './connections';
 import { Nodes } from './nodes';
 import { RiverPath } from './river-path';
-import { Box } from '@chakra-ui/react';
+import { Box, Center, Text } from '@chakra-ui/react';
+import { useGameStore } from '../../../stores/use-game-store';
+import { useTranslation } from 'react-i18next';
 
 export const Board = () => {
-  const isMagnifyEnabled = useRunnerStore((state) => state.isMagnifyEnabled);
+  const {isMagnifyEnabled} = useRunnerStore();
+  const { t } = useTranslation();
+  const { status, currentTurn } = useGameStore();
   const [magnifyArea, setMagnifyArea] = useState({ x: 0, y: 0, radius: 100 });
 
   const handleMouseMove = (event: {
@@ -26,10 +30,15 @@ export const Board = () => {
 
   return (
     <Box>
+      {status === 'finished' && (
+        <Center position="absolute" top="0" left="0" width="100%" height="100%" bg="rgba(0, 0, 0, 0.5)">
+          <Text fontSize="4xl" color="white">{t('gameOver', {winner: t(currentTurn)})}</Text>
+        </Center>
+      )}
       <svg
         width="1200"
         height="850"
-        style={{ border: '2px solid gray', background: '#aaa' }}
+        style={{ border: '2px solid gray', background: '#aaa', opacity: status === 'finished' ? 0.3 : 1 }}
         onMouseMove={handleMouseMove}
       >
         {isMagnifyEnabled && (

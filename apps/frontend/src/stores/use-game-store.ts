@@ -7,10 +7,12 @@ import {
   Move,
   GameState,
   MoveType,
+  Status,
 } from '@yard/shared-utils';
 
 export interface ClientGameState extends GameState {
   setId: (id: number) => void;
+  setStatus: (status: Status) => void;
   updateMoves: (move: Move) => void;
   setCurrentTurn: (currentTurn: RoleType) => void;
   setPlayer: (player: Player) => void;
@@ -30,6 +32,7 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   setId: (id) => set({ id }),
   moves: [],
   status: 'active',
+  setStatus: (status) => set({ status }),
   updateMoves: (move) =>
     set((state) => ({ moves: [...(state.moves || []), move] })),
   currentTurn: Role.culprit,
