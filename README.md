@@ -1,82 +1,90 @@
-# Yard
+# Scotland Yard Online
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A real-time multiplayer web implementation of the classic deduction board game, built with Nx workspace. One player takes on the role of a fugitive (Mr. X) moving secretly through London while up to 5 detective players work together to track them down.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+## Game Features
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/tutorials/react-monorepo-tutorial?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+- **Multiple Player Roles**
+  - 1 Culprit (Mr. X) trying to evade capture
+  - Up to 5 Detectives working together to catch the culprit
+  - Real-time gameplay with turn-based moves
 
-## Finish your CI setup
+- **Transportation System**
+  - Multiple transportation methods:
+    - Taxi (short range moves)
+    - Bus (medium range moves) 
+    - Underground (long range moves)
+    - Secret moves and river routes
+  - Limited tickets for each transport type
+  - Special moves:
+    - Double moves for the culprit
+    - Secret moves to hide transportation type
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/wAWmvRqCCJ)
+## Technical Stack
 
+- Frontend:
+  - React with TypeScript
+  - Chakra UI for styling
+  - WebSocket for real-time communication
+  - Zustand for state management
+  - i18n for internationalization
 
-## Run tasks
+- Backend:
+  - Fastify server
+  - PostgreSQL database (Neon)
+  - WebSocket for real-time updates
+  - Drizzle ORM
 
-To run the dev server for your app, use:
+## Getting Started
 
-```sh
+1. Clone the repository
+```bash
+git clone git@github.com:waland1510/yard.git
+cd yard
+```
+
+2. Install dependencies
+```bash
+bun install
+```
+
+3. Set up environment variables
+
+```bash
+# apps/frontend/.env.development
+VITE_API_URL=http://localhost:3000
+VITE_WS_URL=ws://localhost:3000/wss
+```
+
+```bash
+# apps/backend/.env.development
+FRONTEND_URL=http://localhost:4200
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/yard
+```
+
+4. Development Server
+```bash
+# Start the frontend development server
 npx nx serve frontend
+
+# Start the backend development server
+npx nx serve backend
 ```
 
-To create a production bundle:
-
-```sh
+5. Build for Production
+```bash
+# Build frontend
 npx nx build frontend
+
+# Build backend
+npx nx build backend
 ```
 
-To see all available targets to run for a project, run:
+## Playing the Game
 
-```sh
-npx nx show project frontend
-```
+1. Start a new game or join an existing one
+2. Choose your role (Culprit or Detective)
+3. Use the available transportation methods to move
+4. Coordinate with other detectives to catch the culprit
+5. Track culprit's revealed positions and deduce their location
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/react:app demo
-```
-
-To generate a new library, use:
-
-```sh
-npx nx g @nx/react:lib mylib
-```
-
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/tutorials/react-monorepo-tutorial?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
