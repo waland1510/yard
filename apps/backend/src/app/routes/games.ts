@@ -1,6 +1,7 @@
-import { IpInfo, Move } from '@yard/shared-utils';
+import { IpInfo, Move, Player, GameState } from '@yard/shared-utils';
 import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
+import { AIPlayerService } from '../helpers/ai-player';
 import {
   pgTable,
   serial,
@@ -18,6 +19,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 const db = drizzle(process.env.DATABASE_URL, {
   casing: 'snake_case',
 });
+
+const aiService = new AIPlayerService();
 
 export const gamesTable = pgTable('games', {
   id: serial('id').primaryKey(),
@@ -45,6 +48,7 @@ export const playersTable = pgTable('players', {
   undergroundTickets: integer('underground_tickets').default(0),
   secretTickets: integer('secret_tickets').default(0),
   doubleTickets: integer('double_tickets').default(0),
+  isAI: boolean('is_ai').default(false),
 });
 
 export const movesTable = pgTable('moves', {
@@ -235,6 +239,7 @@ export default async function (fastify: FastifyInstance) {
 
     try {
       await db.transaction(async (trx) => {
+        // Add the move
         await trx
           .insert(movesTable)
           .values({
@@ -247,6 +252,7 @@ export default async function (fastify: FastifyInstance) {
           } as any)
           .execute();
 
+        // Update player tickets
         await trx
           .update(playersTable)
           .set({
@@ -265,17 +271,100 @@ export default async function (fastify: FastifyInstance) {
             doubleTickets: sql`${playersTable.doubleTickets} - ${
               double ? 1 : 0
             }`,
+            position,
+            previousPosition: sql`${playersTable.position}`
           } as any)
           .where(
             sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`
           )
           .execute();
 
-        const [updatedGame] = await trx
+        // Get updated game state
+        const [game] = await trx
           .select()
           .from(gamesTable)
           .where(eq(gamesTable.id, gameId))
           .execute();
+
+        const players = await trx
+          .select()
+          .from(playersTable)
+          .where(eq(playersTable.gameId, gameId))
+          .execute();
+
+        const moves = await trx
+          .select()
+          .from(movesTable)
+          .where(eq(movesTable.gameId, gameId))
+          .execute();
+
+        // Check if next player is AI and make their move
+        const nextPlayer = players.find(p => p.role === game.currentTurn);
+        if (nextPlayer?.isAI) {
+          // Create properly typed game state
+          const gameState: GameState = {
+            ...game,
+            players: players as Player[],
+            moves: moves as Move[]
+          };
+
+          const aiMove = await aiService.calculateMove(gameState, nextPlayer as Player);
+
+          // Add AI move to the database
+          await trx
+            .insert(movesTable)
+            .values({
+              gameId,
+              role: aiMove.role,
+              type: aiMove.type,
+              secret: aiMove.secret,
+              double: aiMove.double,
+              position: aiMove.position
+            } as any)
+            .execute();
+
+          // Update AI player position and tickets
+          await trx
+            .update(playersTable)
+            .set({
+              position: aiMove.position,
+              previousPosition: nextPlayer.position,
+              taxiTickets: sql`${playersTable.taxiTickets} - ${
+                aiMove.type === 'taxi' ? 1 : 0
+              }`,
+              busTickets: sql`${playersTable.busTickets} - ${
+                aiMove.type === 'bus' ? 1 : 0
+              }`,
+              undergroundTickets: sql`${playersTable.undergroundTickets} - ${
+                aiMove.type === 'underground' ? 1 : 0
+              }`,
+              secretTickets: sql`${playersTable.secretTickets} - ${
+                aiMove.secret ? 1 : 0
+              }`,
+              doubleTickets: sql`${playersTable.doubleTickets} - ${
+                aiMove.double ? 1 : 0
+              }`
+            } as any)
+            .where(
+              sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${nextPlayer.role}`
+            )
+            .execute();
+        }
+
+        // Get final game state after all moves
+        const updatedGame = {
+          ...game,
+          players: await trx
+            .select()
+            .from(playersTable)
+            .where(eq(playersTable.gameId, gameId))
+            .execute(),
+          moves: await trx
+            .select()
+            .from(movesTable)
+            .where(eq(movesTable.gameId, gameId))
+            .execute()
+        };
 
         reply.code(201).send({ success: true, updatedGame });
       });

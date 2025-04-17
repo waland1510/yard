@@ -6,6 +6,8 @@ import useWebSocket from '../use-websocket';
 import { useGameStore } from '../../stores/use-game-store';
 import { updatePlayer } from '../../api';
 import { useTranslation } from "react-i18next";
+import { Checkbox } from '@chakra-ui/react';
+
 interface ChooseRoleProps {
   setCurrentStep: (step: string) => void;
 }
@@ -30,22 +32,42 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
         setCurrentStep('invitePlayers');
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onRoleChange = async (role: string) => {
+  const onRoleChange = async (role: string, isAI: boolean = false) => {
     const player = players.find((p) => p.role === role);
     if (!player) return;
-    useRunnerStore.setState({ currentRole: role as RoleType });
-    useRunnerStore.setState({
-      currentPosition: player.position,
-    });
-    player.username = username as string;
+    
+    if (!isAI) {
+      useRunnerStore.setState({ currentRole: role as RoleType });
+      useRunnerStore.setState({
+        currentPosition: player.position,
+      });
+    }
+    
+    player.username = isAI ? `AI_${role}` : username as string;
+    player.isAI = isAI;
     setPlayer(player);
-    sendMessage('joinGame', { channel, username, currentRole });
-    await updatePlayer(player.id, { username: username as string });
-    setCurrentStep('invitePlayers');
+    
+    if (!isAI) {
+      sendMessage('joinGame', { channel, username, role: player.role });
+      await updatePlayer(player.id, { 
+        username: username as string,
+        isAI: false 
+      });
+    } else {
+      await updatePlayer(player.id, { 
+        username: `AI_${role}`,
+        isAI: true 
+      });
+    }
+
+    // If this is the first player being selected, move to the next step
+    if (players.filter(p => p.username).length === 0) {
+      setCurrentStep('invitePlayers');
+    }
   };
+
   const existingPlayers = players.filter((p) => p.username);
 
   return (
@@ -58,15 +80,21 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
               {players
                 .filter((player) => !player.username)
                 .map((p) => (
-                  <span key={p.id} className="flex flex-col items-center">
+                  <div key={p.id} className="flex flex-col items-center gap-2">
                     <img
-                      className="w-20 h-22"
+                      className="w-20 h-22 cursor-pointer"
                       src={`/images/${p.role}.png`}
                       alt="player"
                       onClick={() => onRoleChange(p.role)}
                     />
                     <p>{t(p.role)}</p>
-                  </span>
+                    <Checkbox
+                      colorScheme="green"
+                      onChange={(e) => onRoleChange(p.role, e.target.checked)}
+                    >
+                      {t('ai')}
+                    </Checkbox>
+                  </div>
                 ))}
             </div>
           </div>
@@ -83,9 +111,9 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
                           className="w-20 h-22"
                           src={`/images/${p.role}.png`}
                           alt="player"
-                          onClick={() => onRoleChange(p.role)}
                         />
                         <p>{p.username}</p>
+                        {p.isAI && <p className="text-sm text-gray-500">(AI)</p>}
                       </span>
                     ))}
                 </div>

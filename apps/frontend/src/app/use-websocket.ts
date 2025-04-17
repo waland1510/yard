@@ -1,111 +1,79 @@
-import { useEffect, useState, useCallback } from 'react';
-import { getWebSocket } from './websocket-manager';
-import { useGameStore } from '../stores/use-game-store';
-import { useRunnerStore } from '../stores/use-runner-store';
-import { Message, MessageType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
-import { usePlayersSubscription } from '../hooks/use-players-subscription';
+import { Message, RoleType } from '@yard/shared-utils';
+import { useEffect, useRef, useState } from 'react';
+import { useGameStore } from '../stores/use-game-store';
+import { updatePlayer } from '../api';
 import { useTranslation } from 'react-i18next';
 
-const useWebSocket = (channel?: string) => {
-  const socket = getWebSocket();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const username = localStorage.getItem('username');
-  const toast = useToast();
-  const { currentRole } = useRunnerStore();
-  const {
-    setPosition,
-    setCurrentTurn,
-    updateMoves,
-    updatePlayer,
-    updateTicketsCount,
-    setIsDoubleMove,
-    setStatus,
-  } = useGameStore();
-  const players = usePlayersSubscription();
-  const { t } = useTranslation();
+const WS_URL = import.meta.env.VITE_WS_URL;
 
-  const sendMessage = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (type: MessageType, data: any) => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const message = JSON.stringify({ type, channel, data }); // Include the channel in every message
-        socket.send(message);
-      } else {
-        console.log({ type, channel, data });
-        console.warn('WebSocket is not connected');
-      }
-    },
-    [socket, channel]
-  );
+export default function useWebSocket(channel: string | undefined) {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const { players, currentTurn, status, setStatus, updatePlayer } = useGameStore();
+  const toast = useToast();
+  const { t } = useTranslation();
+  const username = localStorage.getItem('username');
+  const currentRole = localStorage.getItem('currentRole') as RoleType;
+  const socketRef = useRef<WebSocket | null>(null);
+
+  const sendMessage = (type: Message['type'], data: Message['data']) => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type,
+          data,
+          channel,
+        })
+      );
+    }
+  };
 
   useEffect(() => {
+    if (!WS_URL) return;
+
+    const ws = new WebSocket(WS_URL);
+    setSocket(ws);
+    socketRef.current = ws;
+
     const handleMessage = (event: MessageEvent) => {
       const message: Message = JSON.parse(event.data);
-      setMessages((prev) => [...prev, message]);
 
       switch (message.type) {
         case 'joinGame':
-          if (
-            !message.data.role ||
-            players.find((p) => p.username === message.data.username)
-          )
-            return;
           updatePlayer(message.data.role, message.data.username);
-          toast({
-            description: `${message.data.username} joined as ${t(
-              message.data.role
-            )}`,
-            status: 'success',
-            position: 'top-right',
-            duration: 9000,
-            isClosable: true,
-          });
-
           break;
+
         case 'makeMove':
-          setPosition(message.data.role, message.data.position);
-          updateTicketsCount(
-            message.data.role,
-            message.data.type,
-            message.data.secret,
-            message.data.double
-          );
-          setIsDoubleMove(message.data.double);
-          setCurrentTurn(message.data.currentTurn);
-          if (message.data.role === 'culprit') {
-            updateMoves(message.data);
-            toast({
-              description: t('culpritMove', {
-                culprit: t('culprit'),
-                nextTurn: t(message.data.currentTurn),
-              }),
-              status: 'error',
-              position: 'top-right',
-              duration: 6000,
-              isClosable: true,
-            });
-          } else {
-            toast({
-              description: t('playerMove', {
-                player: t(message.data.role),
-                position: message.data.position,
-                nextTurn: t(message.data.currentTurn),
-              }),
-              status: 'success',
-              position: 'top-right',
-              duration: 6000,
-              isClosable: true,
-            });
+          if (message.data.role && message.data.position) {
+            // Find the next player
+            const nextPlayer = players.find(p => p.role === message.data.currentTurn);
+            
+            // If next player is AI, include game state in the move data
+            if (nextPlayer?.isAI) {
+              sendMessage('makeMove', {
+                ...message.data,
+                gameState: useGameStore.getState(),
+                player: nextPlayer,
+                isAI: true
+              });
+            }
+
+            useGameStore.setState((state) => ({
+              ...state,
+              currentTurn: message.data.currentTurn,
+            }));
           }
           break;
+
         case 'updateGameState':
           console.log('Game state updated:', message.data.players);
           break;
+
         case 'impersonate':
           updatePlayer(message.data.role, message.data.username);
           console.log('Impersonating:', message.data.role);
           break;
+
         case 'endGame':
           setStatus('finished');
           toast({
@@ -116,6 +84,7 @@ const useWebSocket = (channel?: string) => {
             isClosable: true,
           });
           break;
+
         default:
           console.warn('Unknown message type:', message.type);
       }
@@ -138,35 +107,11 @@ const useWebSocket = (channel?: string) => {
     }
 
     return () => {
-      if (socket) {
-        socket.onmessage = null;
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current?.close();
       }
     };
-  }, [
-    socket,
-    channel,
-    players,
-    updatePlayer,
-    toast,
-    setPosition,
-    updateTicketsCount,
-    setIsDoubleMove,
-    setCurrentTurn,
-    updateMoves,
-    username,
-    currentRole,
-    sendMessage,
-    t,
-  ]);
+  }, [channel, username, currentRole]);
 
-  // const joinChannel = (newChannel: string, username, currentRole) => {
-  //   setChannel(newChannel);
-  //   if (socket && socket.readyState === WebSocket.OPEN) {
-  //     sendMessage('joinGame', { channel: newChannel, username, currentRole });
-  //   }
-  // };
-
-  return { messages, sendMessage, channel };
-};
-
-export default useWebSocket;
+  return { socket, sendMessage };
+}

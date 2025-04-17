@@ -1,7 +1,10 @@
-import {GameState, initialPlayers, } from "@yard/shared-utils";
+import { GameState, initialPlayers } from "@yard/shared-utils";
 
+export interface CreateGameOptions {
+  aiRoles?: string[];
+}
 
-export function createGameState(): GameState {
+export function createGameState(options: CreateGameOptions = {}): GameState {
   const startingPositions = getStartingPositions();
   const channel = Math.random().toString(36).substring(7);
 
@@ -11,6 +14,7 @@ export function createGameState(): GameState {
       ...player,
       position: startingPositions[player.role],
       previousPosition: startingPositions[player.role],
+      isAI: options.aiRoles?.includes(player.role) || false
     })),
     currentTurn: 'culprit',
     moves: [],
