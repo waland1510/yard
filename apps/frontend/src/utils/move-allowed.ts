@@ -1,5 +1,4 @@
-import { RoleType } from '@yard/shared-utils';
-import { mapData } from '../app/game/board-data/grid_map';
+import { mapData, RoleType } from '@yard/shared-utils';
 import { MapNode } from '../stores/use-nodes-store';
 
 const nodes: MapNode[] = mapData.nodes;

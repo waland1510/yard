@@ -1,4 +1,5 @@
-import { IpInfo, Move } from '@yard/shared-utils';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { GameState, IpInfo, Move } from '@yard/shared-utils';
 import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import {
@@ -25,7 +26,7 @@ export const gamesTable = pgTable('games', {
   players: jsonb('players').notNull(),
   currentTurn: varchar('current_turn', { length: 255 }).notNull(),
   moves: jsonb('moves').notNull(),
-  status: varchar('status', { length: 50 }).default('active'),
+  status: varchar('status', { length: 50 }).notNull(),
   isDoubleMove: boolean('is_double_move').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -45,6 +46,7 @@ export const playersTable = pgTable('players', {
   undergroundTickets: integer('underground_tickets').default(0),
   secretTickets: integer('secret_tickets').default(0),
   doubleTickets: integer('double_tickets').default(0),
+  isAI: boolean('is_ai').default(false),
 });
 
 export const movesTable = pgTable('moves', {
@@ -73,16 +75,108 @@ export const ipInfoTable = pgTable('ip_info', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export async function hasActiveGame(channel: string): Promise<boolean> {
-  const game = await db.select()
-    .from(gamesTable)
-    .where(
-      eq(gamesTable.channel, channel) &&
-      eq(gamesTable.status, 'active')
-    )
-    .execute();
+export async function hasActiveGame(channel: string): Promise<GameState | null> {
+  console.log(`hasActiveGame called with channel: ${channel}`);
 
-  return game.length > 0;
+  try {
+    const [game] = await db
+      .select()
+      .from(gamesTable)
+      .where(
+        eq(gamesTable.channel, channel)
+      )
+    .execute() as GameState[];
+
+    // console.log(`Game fetched:`, game);
+
+    if (!game) {
+      console.log('No active game found for the given channel.');
+      return null;
+    }
+
+    const players = await db
+      .select()
+      .from(playersTable)
+      .where(eq(playersTable.gameId, game.id))
+    .execute() as GameState['players'];
+
+    // console.log(`Players fetched for game ${game.id}:`, players);
+
+    const moves = await db
+      .select()
+      .from(movesTable)
+      .where(eq(movesTable.gameId, game.id))
+      .execute() as GameState['moves'];
+
+    // console.log(`Moves fetched for game ${game.id}:`, moves);
+
+    return { ...game, players, moves };
+  } catch (error) {
+    console.error('Error fetching active game:', error);
+    return null;
+  }
+}
+
+export async function addMove(gameId: number, role: string, type: string, position: number, secret = false, double = false) {
+  // console.log(`Adding move: gameId=${gameId}, role=${role}, type=${type}, position=${position}, secret=${secret}, double=${double}`);
+
+  try {
+    await db.transaction(async (trx) => {
+      // Add the move
+      await trx
+        .insert(movesTable)
+        .values({
+          gameId,
+          role,
+          type,
+          secret,
+          double,
+          position,
+        } as any)
+        .execute();
+
+      // Update player tickets
+      await trx
+        .update(playersTable)
+        .set({
+          taxiTickets: sql`${playersTable.taxiTickets} - ${type === 'taxi' ? 1 : 0}`,
+          busTickets: sql`${playersTable.busTickets} - ${type === 'bus' ? 1 : 0}`,
+          undergroundTickets: sql`${playersTable.undergroundTickets} - ${type === 'underground' ? 1 : 0}`,
+          secretTickets: sql`${playersTable.secretTickets} - ${secret ? 1 : 0}`,
+          doubleTickets: sql`${playersTable.doubleTickets} - ${double ? 1 : 0}`,
+          position,
+          previousPosition: sql`${playersTable.position}`,
+        } as any)
+        .where(
+          sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`
+        )
+        .execute();
+    });
+  } catch (error) {
+    console.error('Failed to add move:', error);
+    throw new Error('Failed to add move');
+  }
+}
+
+export async function updateGame(gameId: number, updates: Partial<GameState>) {
+  if (Object.keys(updates).length === 0) {
+    throw new Error('No fields to update');
+  }
+
+  try {
+    await db.update(gamesTable).set(updates).where(eq(gamesTable.id, gameId));
+
+    const [updatedGame] = await db
+      .select()
+      .from(gamesTable)
+      .where(eq(gamesTable.id, gameId))
+      .execute();
+
+    return updatedGame;
+  } catch (error) {
+    console.error('Failed to update game:', error);
+    throw new Error('Failed to update game');
+  }
 }
 
 export default async function (fastify: FastifyInstance) {
@@ -122,8 +216,7 @@ export default async function (fastify: FastifyInstance) {
 
   // Create New Game
   fastify.post('/api/games', async (request, reply) => {
-    const { channel, players, currentTurn } = createGameState(
-    );
+    const { channel, players, currentTurn } = createGameState();
     try {
       await db.transaction(async (trx) => {
         const [game] = await trx
@@ -134,7 +227,7 @@ export default async function (fastify: FastifyInstance) {
             players: [],
             moves: [],
             status: 'active',
-          } as any)
+          })
           .returning()
           .execute();
 
@@ -182,8 +275,8 @@ export default async function (fastify: FastifyInstance) {
       }
 
       try {
-        await db.update(gamesTable).set(body).where(eq(gamesTable.id, id));
-        reply.code(200).send({ success: true });
+        const updatedGame = await updateGame(id, body);
+        reply.code(200).send({ success: true, updatedGame });
       } catch (error) {
         console.error(error);
         reply
@@ -234,51 +327,16 @@ export default async function (fastify: FastifyInstance) {
     } = request.body;
 
     try {
-      await db.transaction(async (trx) => {
-        await trx
-          .insert(movesTable)
-          .values({
-            gameId,
-            role,
-            type,
-            secret,
-            double,
-            position,
-          } as any)
-          .execute();
+      await addMove(gameId, role, type, position, secret, double);
 
-        await trx
-          .update(playersTable)
-          .set({
-            taxiTickets: sql`${playersTable.taxiTickets} - ${
-              type === 'taxi' ? 1 : 0
-            }`,
-            busTickets: sql`${playersTable.busTickets} - ${
-              type === 'bus' ? 1 : 0
-            }`,
-            undergroundTickets: sql`${playersTable.undergroundTickets} - ${
-              type === 'underground' ? 1 : 0
-            }`,
-            secretTickets: sql`${playersTable.secretTickets} - ${
-              secret ? 1 : 0
-            }`,
-            doubleTickets: sql`${playersTable.doubleTickets} - ${
-              double ? 1 : 0
-            }`,
-          } as any)
-          .where(
-            sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`
-          )
-          .execute();
+      // Get updated game state
+      const [updatedGame] = await db
+        .select()
+        .from(gamesTable)
+        .where(eq(gamesTable.id, gameId))
+        .execute();
 
-        const [updatedGame] = await trx
-          .select()
-          .from(gamesTable)
-          .where(eq(gamesTable.id, gameId))
-          .execute();
-
-        reply.code(201).send({ success: true, updatedGame });
-      });
+      reply.code(201).send({ success: true, updatedGame });
     } catch (error) {
       console.error('Failed to add move:', error);
       reply.code(500).send({ success: false, error: 'Failed to add move' });
@@ -289,7 +347,7 @@ export default async function (fastify: FastifyInstance) {
     const { username, city, region, country, loc, org, postal, timezone } = request.body;
     const records = await db.select().from(ipInfoTable).where(eq(ipInfoTable.postal, postal));
     if (records.length > 0) {
-      return reply.code(409).send({ error: 'Record already exists' });
+      return reply.code(205).send();
     }
     try {
       const [ipInfo] = await db.transaction(async (trx) => {

@@ -1,4 +1,4 @@
-import { showCulpritAtMoves } from '@yard/shared-utils';
+import { mapData, showCulpritAtMoves } from '@yard/shared-utils';
 import { Fragment } from 'react/jsx-runtime';
 import { usePlayerSubscription } from '../../../hooks/use-player-subscription';
 import { usePlayersSubscription } from '../../../hooks/use-players-subscription';
@@ -6,7 +6,6 @@ import { useGameStore } from '../../../stores/use-game-store';
 import { useRunnerStore } from '../../../stores/use-runner-store';
 import { getAvailableType } from '../../../utils/available-type';
 import { isMoveAllowed } from '../../../utils/move-allowed';
-import { mapData } from '../board-data/grid_map';
 import { AnimatedImage } from './animated-image';
 import { useToast } from '@chakra-ui/react';
 

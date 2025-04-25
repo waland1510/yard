@@ -1,4 +1,4 @@
-import { mapData } from "./board-data/grid_map";
+import { mapData } from "@yard/shared-utils";
 
 export interface PlayerPositionProps {
   position: number;

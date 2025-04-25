@@ -34,6 +34,7 @@ export interface Player {
   undergroundTickets: number;
   secretTickets?: number;
   doubleTickets?: number;
+  isAI?: boolean;
 }
 
 export const initialPlayers: Player[] = [
@@ -45,6 +46,7 @@ export const initialPlayers: Player[] = [
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
+    isAI: false,
   },
   {
     id: 2,
@@ -54,6 +56,7 @@ export const initialPlayers: Player[] = [
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
+    isAI: false,
   },
   {
     id: 3,
@@ -63,6 +66,7 @@ export const initialPlayers: Player[] = [
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
+    isAI: false,
   },
   {
     id: 4,
@@ -72,6 +76,7 @@ export const initialPlayers: Player[] = [
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
+    isAI: false,
   },
   {
     id: 5,
@@ -81,6 +86,7 @@ export const initialPlayers: Player[] = [
     taxiTickets: 10,
     busTickets: 8,
     undergroundTickets: 4,
+    isAI: false,
   },
   {
     id: 6,
@@ -92,6 +98,7 @@ export const initialPlayers: Player[] = [
     undergroundTickets: 24,
     secretTickets: 5,
     doubleTickets: 2,
+    isAI: false,
   },
 ];
 
@@ -102,6 +109,7 @@ export interface Move {
   secret?: boolean;
   double?: boolean;
   position: number;
+  isAI?: boolean;
 }
 
 export type MoveType = 'taxi' | 'bus' | 'underground' | 'river';
@@ -117,8 +125,23 @@ export type MessageType =
 export interface Message {
   type: MessageType;
   channel?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any;
+  data: {
+    channel?: string;
+    username?: string;
+    role?: RoleType;
+    ch?: string;
+    type?: MoveType;
+    position?: number;
+    secret?: boolean;
+    double?: boolean;
+    isAI?: boolean;
+    gameState?: GameState;
+    player?: Player;
+    players?: Player[];
+    winner?: string;
+    currentRole?: RoleType;
+    currentTurn?: RoleType;
+  };
 }
 
 export const showCulpritAtMoves = [3, 8, 13, 18, 24];
@@ -160,3 +183,5 @@ export async function runQuery(
     client.release();
   }
 }
+
+export * from './grid-map';

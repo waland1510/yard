@@ -1,5 +1,5 @@
+import { mapData } from '@yard/shared-utils';
 import { create } from 'zustand';
-import { mapData } from '../app/game/board-data/grid_map';
 
 export interface MapNode {
     id: number;

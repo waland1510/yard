@@ -53,6 +53,9 @@
   "culpritMove": "{{culprit}} made his move. Next is {{nextTurn}}",
   "playerMove": "{{player}} moved to {{position}}. Next is {{nextTurn}}",
   "gameRules": "Game Rules",
+  "doYouWantToPlayWithAI": "Do you want to play with AI?",
+  "yes": "Yes",
+  "no": "No",
   "rulesContent": [
     "The game is played with one culprit (Mr. C) and up to five detectives.",
     "The culprit moves secretly, while detectives work together to catch him.",

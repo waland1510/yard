@@ -1,3 +1,13 @@
+export interface Node {
+  id: number;
+  taxi?: number[];
+  bus?: number[];
+  underground?: number[];
+  river?: number[];
+  x: number;
+  y: number;
+}
+
 export const mapData = {
   nodes: [
     {
@@ -60,13 +70,13 @@ export const mapData = {
     },
     {
       id: 10,
-      taxi: [11, 21, 34],
+      taxi: [2, 11, 21, 34],
       x: 450,
       y: 100,
     },
     {
       id: 11,
-      taxi: [10, 22],
+      taxi: [3, 10, 22],
       x: 500,
       y: 100,
     },
@@ -137,7 +147,7 @@ export const mapData = {
     {
       id: 22,
       taxi: [11, 23, 34, 35],
-      bus: [3, 23, 34],
+      bus: [3, 23, 34, 65],
       x: 500,
       y: 150,
     },
@@ -193,13 +203,13 @@ export const mapData = {
     },
     {
       id: 31,
-      taxi: [18, 44],
+      taxi: [18, 43, 44],
       x: 100,
       y: 200,
     },
     {
       id: 32,
-      taxi: [19, 33, 44],
+      taxi: [19, 33, 44, 45],
       x: 200,
       y: 200,
     },
@@ -218,7 +228,7 @@ export const mapData = {
     },
     {
       id: 35,
-      taxi: [22, 36, 47],
+      taxi: [22, 36, 48, 65],
       x: 500,
       y: 200,
     },
@@ -318,7 +328,7 @@ export const mapData = {
     },
     {
       id: 51,
-      taxi: [38, 39, 52, 67],
+      taxi: [38, 39, 52, 67, 68],
       x: 750,
       y: 250,
     },
@@ -362,7 +372,7 @@ export const mapData = {
     },
     {
       id: 58,
-      taxi: [44, 45, 59, 74, 75],
+      taxi: [44, 45, 57, 59, 74, 75],
       bus: [1, 46, 74, 77],
       x: 200,
       y: 300,
@@ -420,7 +430,7 @@ export const mapData = {
     {
       id: 67,
       taxi: [51, 66, 68, 84],
-      bus: [23, 52, 82, 102],
+      bus: [23, 52, 65, 82, 102],
       underground: [13, 79, 89, 111],
       x: 750,
       y: 300,
@@ -464,7 +474,7 @@ export const mapData = {
     },
     {
       id: 74,
-      taxi: [58, 73, 75, 92, 94],
+      taxi: [58, 73, 75, 92],
       bus: [58, 94],
       underground: [46],
       x: 150,
@@ -478,7 +488,7 @@ export const mapData = {
     },
     {
       id: 76,
-      taxi: [59, 60, 77],
+      taxi: [59, 60, 61, 77],
       x: 250,
       y: 350,
     },
@@ -543,7 +553,7 @@ export const mapData = {
     },
     {
       id: 86,
-      taxi: [69, 87, 103, 104],
+      taxi: [69, 103, 104],
       bus: [52, 87, 102, 116],
       x: 850,
       y: 350,
@@ -577,7 +587,7 @@ export const mapData = {
     },
     {
       id: 91,
-      taxi: [72, 90, 105, 107],
+      taxi: [56, 72, 90, 105, 107],
       x: 1150,
       y: 350,
     },
@@ -634,14 +644,14 @@ export const mapData = {
     },
     {
       id: 100,
-      taxi: [80, 81, 112, 113],
+      taxi: [80, 81, 101, 112, 113],
       bus: [63, 82, 111],
       x: 500,
       y: 400,
     },
     {
       id: 101,
-      taxi: [82, 83, 114],
+      taxi: [82, 83, 100, 114],
       x: 650,
       y: 400,
     },
@@ -666,7 +676,7 @@ export const mapData = {
     },
     {
       id: 105,
-      taxi: [88, 89, 90, 106, 118],
+      taxi: [88, 89, 90, 91, 106, 118],
       bus: [72, 87, 89, 118],
       x: 1000,
       y: 400,
@@ -724,7 +734,7 @@ export const mapData = {
     },
     {
       id: 115,
-      taxi: [102, 126, 127],
+      taxi: [102, 114, 126, 127],
       river: [118, 157],
       x: 750,
       y: 450,
@@ -770,7 +780,7 @@ export const mapData = {
     },
     {
       id: 122,
-      taxi: [121, 123, 146],
+      taxi: [95, 121, 123, 146],
       bus: [123, 144],
       x: 150,
       y: 500,
@@ -797,7 +807,7 @@ export const mapData = {
     },
     {
       id: 126,
-      taxi: [114, 115, 133, 134, 140],
+      taxi: [114, 115, 140],
       x: 700,
       y: 500,
     },
@@ -840,7 +850,7 @@ export const mapData = {
     },
     {
       id: 133,
-      taxi: [127, 140],
+      taxi: [127, 140, 141],
       bus: [127, 140, 157],
       x: 750,
       y: 550,
@@ -853,7 +863,7 @@ export const mapData = {
     },
     {
       id: 135,
-      taxi: [129, 136, 143],
+      taxi: [129, 136, 143, 161],
       bus: [118, 159, 161],
       x: 1000,
       y: 550,
@@ -878,7 +888,7 @@ export const mapData = {
     },
     {
       id: 139,
-      taxi: [130, 153, 154],
+      taxi: [130, 140, 153, 154],
       x: 450,
       y: 600,
     },
@@ -1092,7 +1102,7 @@ export const mapData = {
     },
     {
       id: 172,
-      taxi: [159, 187],
+      taxi: [159, 171, 187],
       x: 900,
       y: 700,
     },
@@ -1174,7 +1184,7 @@ export const mapData = {
     {
       id: 185,
       taxi: [170, 184, 186],
-      bus: [157, 184, 199],
+      bus: [157, 184, 187, 199],
       underground: [153, 159],
       x: 750,
       y: 750,
@@ -1264,7 +1274,7 @@ export const mapData = {
     {
       id: 199,
       taxi: [188, 200],
-      bus: [159, 161, 185],
+      bus: [159, 161, 185, 187],
       x: 950,
       y: 800,
     },
@@ -1359,5 +1369,24 @@ export const mapData = {
       x: 975,
       y: 425,
     },
-  ],
+  ] as Node[]
 };
+
+export function areMovesBidirectional(): boolean {
+  const nodeMap = new Map(mapData.nodes.map(node => [node.id, node]));
+
+  for (const node of mapData.nodes) {
+    for (const [transport, connections] of Object.entries(node)) {
+      if (['taxi', 'bus', 'underground', 'river'].includes(transport) && Array.isArray(connections)) {
+        for (const connectedNodeId of connections) {
+          const connectedNode = nodeMap.get(connectedNodeId);
+          if (!connectedNode || !connectedNode[transport]?.includes(node.id)) {
+            return false; // Reverse connection is missing
+          }
+        }
+      }
+    }
+  }
+
+  return true; // All moves are bidirectional
+}

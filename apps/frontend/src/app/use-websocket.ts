@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { getWebSocket } from './websocket-manager';
 import { useGameStore } from '../stores/use-game-store';
 import { useRunnerStore } from '../stores/use-runner-store';
-import { Message, MessageType } from '@yard/shared-utils';
+import { Message, MessageType, Move, RoleType } from '@yard/shared-utils';
 import { useToast } from '@chakra-ui/react';
 import { usePlayersSubscription } from '../hooks/use-players-subscription';
 import { useTranslation } from 'react-i18next';
@@ -64,7 +64,7 @@ const useWebSocket = (channel?: string) => {
 
           break;
         case 'makeMove':
-          setPosition(message.data.role, message.data.position);
+          setPosition(message.data.role as RoleType, message.data.position as number);
           updateTicketsCount(
             message.data.role,
             message.data.type,
@@ -74,11 +74,11 @@ const useWebSocket = (channel?: string) => {
           setIsDoubleMove(message.data.double);
           setCurrentTurn(message.data.currentTurn);
           if (message.data.role === 'culprit') {
-            updateMoves(message.data);
+            updateMoves(message.data as Move);
             toast({
               description: t('culpritMove', {
                 culprit: t('culprit'),
-                nextTurn: t(message.data.currentTurn),
+                nextTurn: t(message.data.currentTurn as string),
               }),
               status: 'error',
               position: 'top-right',
@@ -88,9 +88,9 @@ const useWebSocket = (channel?: string) => {
           } else {
             toast({
               description: t('playerMove', {
-                player: t(message.data.role),
+                player: t(message.data.role as string),
                 position: message.data.position,
-                nextTurn: t(message.data.currentTurn),
+                nextTurn: t(message.data.currentTurn as string),
               }),
               status: 'success',
               position: 'top-right',
@@ -109,7 +109,7 @@ const useWebSocket = (channel?: string) => {
         case 'endGame':
           setStatus('finished');
           toast({
-            description: t('gameOver', {winner: t(message.data.winner)}),
+            description: t('gameOver', { winner: t(message.data.winner || 'unknown') }),
             status: 'success',
             position: 'top-right',
             duration: 9000,
@@ -142,22 +142,7 @@ const useWebSocket = (channel?: string) => {
         socket.onmessage = null;
       }
     };
-  }, [
-    socket,
-    channel,
-    players,
-    updatePlayer,
-    toast,
-    setPosition,
-    updateTicketsCount,
-    setIsDoubleMove,
-    setCurrentTurn,
-    updateMoves,
-    username,
-    currentRole,
-    sendMessage,
-    t,
-  ]);
+  }, [socket, channel, players, updatePlayer, toast, setPosition, updateTicketsCount, setIsDoubleMove, setCurrentTurn, updateMoves, username, currentRole, sendMessage, t, setStatus]);
 
   // const joinChannel = (newChannel: string, username, currentRole) => {
   //   setChannel(newChannel);

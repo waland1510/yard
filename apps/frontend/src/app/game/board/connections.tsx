@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { connectionsData } from '../board-data/connections-data';
-import { mapData } from '../board-data/grid_map';
+import { mapData } from '@yard/shared-utils';
 
 export const Connections = () => {
   return (

@@ -1,5 +1,8 @@
-import {GameState, initialPlayers, } from "@yard/shared-utils";
+import { GameState, initialPlayers } from "@yard/shared-utils";
 
+export interface CreateGameOptions {
+  aiRoles?: string[];
+}
 
 export function createGameState(): GameState {
   const startingPositions = getStartingPositions();
@@ -11,6 +14,7 @@ export function createGameState(): GameState {
       ...player,
       position: startingPositions[player.role],
       previousPosition: startingPositions[player.role],
+      isAI: false
     })),
     currentTurn: 'culprit',
     moves: [],
@@ -31,7 +35,7 @@ interface StartingPositions {
 const getStartingPositions = (): StartingPositions => {
   const possiblePositions = [13, 26, 29, 34, 50, 53, 91, 94, 103, 112, 117, 132, 138, 141, 155, 174, 197, 198];
   const shuffled = [...possiblePositions].sort(() => Math.random() - 0.5);
-  
+
   return {
     culprit: shuffled[0],
     detective1: shuffled[1],

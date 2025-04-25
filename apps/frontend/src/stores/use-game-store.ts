@@ -13,28 +13,32 @@ import {
 export interface ClientGameState extends GameState {
   setId: (id: number) => void;
   setStatus: (status: Status) => void;
-  updateMoves: (move: Move) => void;
-  setCurrentTurn: (currentTurn: RoleType) => void;
+  updateMoves: (move?: Move) => void;
+  setCurrentTurn: (currentTurn?: RoleType) => void;
   setPlayer: (player: Player) => void;
-  updatePlayer: (role: string, username: string) => void;
+  updatePlayer: (role?: RoleType, username?: string) => void;
   setChannel: (channel?: string) => void;
   updateTicketsCount: (
-    playerRole: string,
-    type: MoveType,
-    isSecret: boolean,
-    isDouble: boolean
+    playerRole?: RoleType,
+    type?: MoveType,
+    isSecret?: boolean,
+    isDouble?: boolean
   ) => void;
-  setPosition: (playerRole: string, position: number | string) => void;
-  setIsDoubleMove: (isDoubleMove: boolean) => void;
+  setPosition: (playerRole: RoleType, position: number) => void;
+  setIsDoubleMove: (isDoubleMove?: boolean) => void;
+  getNextPlayer: () => Player | undefined;
 }
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
+  id: undefined,
   setId: (id) => set({ id }),
   moves: [],
   status: 'active',
   setStatus: (status) => set({ status }),
   updateMoves: (move) =>
-    set((state) => ({ moves: [...(state.moves || []), move] })),
+    set((state) => ({
+      moves: move ? [...(state.moves || []), move] : state.moves || [],
+    })),
   currentTurn: Role.culprit,
   setCurrentTurn: (currentTurn) => set({ currentTurn }),
   players: initialPlayers,
@@ -45,11 +49,13 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
         existingPlayer.role = player.role;
         existingPlayer.username = player.username;
         existingPlayer.position = player.position;
+        existingPlayer.previousPosition = player.previousPosition;
         existingPlayer.taxiTickets = player.taxiTickets;
         existingPlayer.busTickets = player.busTickets;
         existingPlayer.undergroundTickets = player.undergroundTickets;
         existingPlayer.secretTickets = player.secretTickets;
         existingPlayer.doubleTickets = player.doubleTickets;
+        existingPlayer.isAI = player.isAI;
       } else {
         state.players.push(player);
       }
@@ -68,14 +74,15 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
     if (channel) set({ channel });
   },
   updateTicketsCount: (
-    playerRole: string,
-    type: MoveType,
-    isSecret: boolean,
-    isDouble: boolean
+    playerRole?: string,
+    type?: MoveType,
+    isSecret?: boolean,
+    isDouble?: boolean
   ) =>
     set((state) => {
       const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
+
       if (isDouble) {
         if (player.doubleTickets !== undefined) {
           player.doubleTickets = player.doubleTickets - 1;
@@ -102,7 +109,7 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
       }
       return { players: state.players };
     }),
-  setPosition: (playerRole: string, position: number | string) =>
+  setPosition: (playerRole: RoleType, position: number | string) =>
     set((state) => {
       const player = state.players.find((p) => p.role === playerRole);
       if (!player) return state;
@@ -112,4 +119,8 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
     }),
   isDoubleMove: false,
   setIsDoubleMove: (isDoubleMove) => set({ isDoubleMove }),
+  getNextPlayer: () => {
+    const state = get();
+    return state.players.find(p => p.role === state.currentTurn);
+  }
 }));

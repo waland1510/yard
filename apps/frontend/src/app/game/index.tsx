@@ -103,16 +103,8 @@ export const Game = () => {
       isSubscribed = false;
       abortController.abort();
     };
-  }, [
-    channel,
-    username,
-    navigate,
-    toast,
-    setChannel,
-    setCurrentRole,
-    sendMessage,
-    t,
-  ]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     isOpen: isLeftOpen,
