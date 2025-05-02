@@ -20,6 +20,7 @@ export interface RunnerState {
   setCurrentRole: (role: RoleType) => void;
   setIsSecret: (isSecret: boolean) => void;
   setIsDouble: (isDouble: boolean) => void;
+  batchUpdate: (updates: Partial<RunnerState>) => void;
 }
 
 export const useRunnerStore = create<RunnerState>((set) => ({
@@ -34,13 +35,28 @@ export const useRunnerStore = create<RunnerState>((set) => ({
   isMagnifyEnabled: false,
   setIsMagnifyEnabled: (isMagnifyEnabled) => set({ isMagnifyEnabled }),
   setMove: (move) => set({ move }),
-  updateSecretTickets: (secretTickets: number) => set({ secretTickets }),
-  updateDoubleTickets: (doubleTickets: number) => set({ doubleTickets }),
-  setCurrentPosition: (currentPosition: number) => set({ currentPosition }),
-  setCurrentType: (currentType: MoveType | undefined) => {
-    set({ currentType });
-  },
+  updateSecretTickets: (secretTickets) => set({ secretTickets }),
+  updateDoubleTickets: (doubleTickets) => set({ doubleTickets }),
+  setCurrentPosition: (currentPosition) => set({ currentPosition }),
+  setCurrentType: (currentType) => set({ currentType }),
   setCurrentRole: (role) => set({ currentRole: role }),
   setIsSecret: (isSecret) => set({ isSecret }),
   setIsDouble: (isDouble) => set({ isDouble }),
+  batchUpdate: ({
+    currentPosition,
+    currentType,
+    currentRole,
+    isSecret,
+    isDouble,
+    move,
+  }: Partial<RunnerState>) =>
+    set((state) => ({
+      ...state,
+      ...(move !== undefined && { move }),
+      ...(currentPosition !== undefined && { currentPosition }),
+      ...(currentType !== undefined && { currentType }),
+      ...(currentRole !== undefined && { currentRole }),
+      ...(isSecret !== undefined && { isSecret }),
+      ...(isDouble !== undefined && { isDouble }),
+    })),
 }));

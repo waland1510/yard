@@ -26,7 +26,6 @@ export interface ClientGameState extends GameState {
   ) => void;
   setPosition: (playerRole: RoleType, position: number) => void;
   setIsDoubleMove: (isDoubleMove?: boolean) => void;
-  getNextPlayer: () => Player | undefined;
 }
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
@@ -37,90 +36,60 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   setStatus: (status) => set({ status }),
   updateMoves: (move) =>
     set((state) => ({
-      moves: move ? [...(state.moves || []), move] : state.moves || [],
+      moves: move ? [...state.moves, move] : state.moves,
     })),
   currentTurn: Role.culprit,
   setCurrentTurn: (currentTurn) => set({ currentTurn }),
   players: initialPlayers,
   setPlayer: (player) =>
     set((state) => {
-      const existingPlayer = state.players.find((p) => p.id === player.id);
-      if (existingPlayer) {
-        existingPlayer.role = player.role;
-        existingPlayer.username = player.username;
-        existingPlayer.position = player.position;
-        existingPlayer.previousPosition = player.previousPosition;
-        existingPlayer.taxiTickets = player.taxiTickets;
-        existingPlayer.busTickets = player.busTickets;
-        existingPlayer.undergroundTickets = player.undergroundTickets;
-        existingPlayer.secretTickets = player.secretTickets;
-        existingPlayer.doubleTickets = player.doubleTickets;
-        existingPlayer.isAI = player.isAI;
-      } else {
-        state.players.push(player);
-      }
-      return { players: state.players };
+      const updatedPlayers = state.players.map((p) =>
+        p.id === player.id ? { ...p, ...player } : p
+      );
+      return { players: updatedPlayers };
     }),
   updatePlayer: (role, username) =>
     set((state) => {
-      const player = state.players.find((p) => p.role === role);
-      if (player) {
-        player.username = username;
-      }
-      return { players: state.players };
+      const updatedPlayers = state.players.map((p) =>
+        p.role === role ? { ...p, username } : p
+      );
+      return { players: updatedPlayers };
     }),
   channel: '',
-  setChannel: (channel?: string) => {
-    if (channel) set({ channel });
-  },
-  updateTicketsCount: (
-    playerRole?: string,
-    type?: MoveType,
-    isSecret?: boolean,
-    isDouble?: boolean
-  ) =>
+  setChannel: (channel) => set({ channel }),
+  updateTicketsCount: (playerRole, type, isSecret, isDouble) =>
     set((state) => {
-      const player = state.players.find((p) => p.role === playerRole);
-      if (!player) return state;
-
-      if (isDouble) {
-        if (player.doubleTickets !== undefined) {
-          player.doubleTickets = player.doubleTickets - 1;
+      const updatedPlayers = state.players.map((p) => {
+        if (p.role !== playerRole) return p;
+        const updatedPlayer = { ...p };
+        if (isDouble) updatedPlayer.doubleTickets = (updatedPlayer.doubleTickets ?? 0) - 1;
+        if (isSecret) updatedPlayer.secretTickets = (updatedPlayer.secretTickets ?? 0) - 1;
+        if (!isSecret) {
+          switch (type) {
+            case 'taxi':
+              updatedPlayer.taxiTickets -= 1;
+              break;
+            case 'bus':
+              updatedPlayer.busTickets -= 1;
+              break;
+            case 'underground':
+              updatedPlayer.undergroundTickets -= 1;
+              break;
+          }
         }
-      }
-      if (isSecret) {
-        if (player.secretTickets !== undefined) {
-          player.secretTickets = player.secretTickets - 1;
-        }
-      } else {
-        switch (type) {
-          case 'taxi':
-            player.taxiTickets = player.taxiTickets - 1;
-            break;
-          case 'bus':
-            player.busTickets = player.busTickets - 1;
-            break;
-          case 'underground':
-            player.undergroundTickets = player.undergroundTickets - 1;
-            break;
-          default:
-            break;
-        }
-      }
-      return { players: state.players };
+        return updatedPlayer;
+      });
+      return { players: updatedPlayers };
     }),
-  setPosition: (playerRole: RoleType, position: number | string) =>
+  setPosition: (playerRole, position) =>
     set((state) => {
-      const player = state.players.find((p) => p.role === playerRole);
-      if (!player) return state;
-      player.previousPosition = player.position;
-      player.position = Number(position);
-      return { players: state.players };
+      const updatedPlayers = state.players.map((p) =>
+        p.role === playerRole
+          ? { ...p, previousPosition: p.position, position: Number(position) }
+          : p
+      );
+      return { players: updatedPlayers };
     }),
   isDoubleMove: false,
   setIsDoubleMove: (isDoubleMove) => set({ isDoubleMove }),
-  getNextPlayer: () => {
-    const state = get();
-    return state.players.find(p => p.role === state.currentTurn);
-  }
 }));

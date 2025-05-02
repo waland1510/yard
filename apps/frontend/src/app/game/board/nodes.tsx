@@ -13,13 +13,10 @@ export const Nodes = () => {
   const players = usePlayersSubscription();
   const currentPosition = usePlayerSubscription().currentPosition;
   const {
-    setCurrentType,
+    batchUpdate,
     currentRole: role,
     isSecret,
-    setIsSecret,
     isDouble,
-    setMove,
-    setCurrentPosition,
   } = useRunnerStore();
   const toast = useToast();
   const runnerData = {
@@ -30,31 +27,33 @@ export const Nodes = () => {
   const playerStorePosition = storePlayers.find(
     (p) => p.role === role
   )?.position;
-  const handleSend =
-    (position: number) => {
-      const availableType =
-        getAvailableType(position, runnerData.position, role) || 'taxi';
+  const handleSend = (position: number) => {
+    const currentType =
+      getAvailableType(position, runnerData.position, role) || 'taxi';
 
-      if (availableType === 'river') {
-        setIsSecret(true);
-        toast({
-          title: 'This move requires a secret ticket',
-          description: 'The secret ticket was selected for you',
-          status: 'info',
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-      setCurrentType(availableType);
-      setMove({
+    if (currentType === 'river') {
+      toast({
+        title: 'This move requires a secret ticket',
+        description: 'The secret ticket was selected for you',
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+
+    batchUpdate({
+      currentType,
+      move: {
         role,
-        type: availableType,
+        type: currentType,
         position,
         secret: isSecret,
         double: isDouble,
-      });
-      setCurrentPosition(position);
-    };
+      },
+      currentPosition: position,
+      isSecret: currentType === 'river',
+    });
+  };
 
   return (
     <>

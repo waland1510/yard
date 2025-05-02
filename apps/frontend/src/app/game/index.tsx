@@ -32,7 +32,7 @@ export const Game = () => {
   const toast = useToast();
   const username = localStorage.getItem('username');
   const { players, setChannel, currentTurn, status } = useGameStore();
-  const { currentRole, setCurrentRole, setCurrentPosition } = useRunnerStore();
+  const { currentRole, setCurrentRole, batchUpdate } = useRunnerStore();
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
 
@@ -103,7 +103,7 @@ export const Game = () => {
       isSubscribed = false;
       abortController.abort();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const {
@@ -119,10 +119,12 @@ export const Game = () => {
 
   const onRoleChange = (role: RoleType) => {
     if (role === 'culprit' || currentRole === 'culprit') return;
-    setCurrentRole(role);
     const currentPlayer = players.find((p) => p.role === role);
+    batchUpdate({
+      currentRole: role,
+      currentPosition: currentPlayer?.position,
+    });
     if (currentPlayer) {
-      setCurrentPosition(currentPlayer.position);
       updatePlayer(currentPlayer.id, { username: username as string });
     }
     sendMessage('updateGameState', role);
@@ -135,7 +137,6 @@ export const Game = () => {
     <Flex height="100vh" bg="#1a202c" color="white">
       <LeftDrawer
         isLeftOpen={isLeftOpen}
-        channel={channel}
         onLeftClose={onLeftClose}
         onRoleChange={onRoleChange}
       />
@@ -163,7 +164,11 @@ export const Game = () => {
           {t('moves')}
         </Button>
         <Heading size="md" color="gray.900">
-          {status === 'finished' ? t('winner') : currentRole === currentTurn ? t('yourTurn') : t('nextTurn')}
+          {status === 'finished'
+            ? t('winner')
+            : currentRole === currentTurn
+            ? t('yourTurn')
+            : t('nextTurn')}
         </Heading>
         <Box
           display="flex"
