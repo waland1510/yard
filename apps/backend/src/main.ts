@@ -1,16 +1,19 @@
 import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
 import { getNextRole, Message, Player, RoleType } from '@yard/shared-utils';
-import Fastify from 'fastify';
+import { fastify } from 'fastify';
 import { setTimeout } from 'timers/promises';
 import { app } from './app/app';
 import { AIPlayerService } from './app/helpers/ai-player';
-import { addMove, hasActiveGame, updateGame } from './app/routes/games';
+import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
 
 const host = process.env.HOST ?? '0.0.0.0';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-const server = Fastify();
+const server = fastify({
+  logger: true, // Enable logging
+  ignoreTrailingSlash: true, // Handle routes with or without trailing slashes
+});
 const aiService = new AIPlayerService();
 
 server.register(cors, {
@@ -24,7 +27,7 @@ const channels: Record<string, Set<WebSocket>> = {};
 server.register(app);
 server.register(ws);
 
-async function handleAIMove(currentTurn, currentChannel, connection) {
+async function handleAIMove(currentTurn, currentChannel) {
   const game = await hasActiveGame(currentChannel);
   try {
     const nextPlayer = game.players.find(p => p.role === currentTurn);
@@ -59,17 +62,11 @@ async function handleAIMove(currentTurn, currentChannel, connection) {
       const nextTurn = getNextRole(aiMove.role, aiMove.double || false);
       const nextAIPlayer = game.players.find(p => p.role === nextTurn);
       if (nextAIPlayer?.isAI) {
-        await handleAIMove(nextTurn, currentChannel, connection);
+        await handleAIMove(nextTurn, currentChannel);
       }
     }
   } catch (error) {
     console.error('AI move calculation failed:', error);
-    connection.send(
-      JSON.stringify({
-        type: 'error',
-        data: 'AI move calculation failed',
-      })
-    );
   }
 }
 
@@ -120,7 +117,7 @@ server.register(async function (fastify) {
             try {
               const nextPlayer = game.players.find(p => p.role === 'culprit');
               if (nextPlayer?.isAI) {
-                await handleAIMove('culprit', currentChannel, connection);
+                await handleAIMove('culprit', currentChannel);
               }
             } catch (error) {
               console.error('AI move calculation failed:', error);
@@ -166,7 +163,7 @@ server.register(async function (fastify) {
                 },
               });
 
-              await handleAIMove(currentTurn, currentChannel, connection);
+              await handleAIMove(currentTurn, currentChannel);
             }
             break;
 
@@ -210,7 +207,7 @@ const broadcast = (channel: string, message: Message) => {
 
 server.listen({ port, host }, (err, address) => {
   if (err) {
-    console.error(err);
+    server.log.error(err);
     process.exit(1);
   }
   console.log(`Server listening at ${address}`);

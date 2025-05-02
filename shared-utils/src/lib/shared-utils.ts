@@ -184,4 +184,10 @@ export async function runQuery(
   }
 }
 
+export interface PredictedCulpritMove {
+  type: MoveType;
+  position: number;
+  probability: number;
+}
+
 export * from './grid-map';

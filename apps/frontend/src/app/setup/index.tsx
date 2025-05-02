@@ -1,24 +1,18 @@
-import { Card, Spinner, useToast } from '@chakra-ui/react';
+import { useDisclosure } from '@chakra-ui/hooks';
+import {
+  Box, Card, Drawer,
+  DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader,
+  DrawerOverlay, Spinner, useToast
+} from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getGameByChannel } from '../../api';
+import { createIpInfo, getGameByChannel } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
-import { useTranslation } from 'react-i18next';
-import { createIpInfo } from '../../api';
-import {
-  Drawer,
-  DrawerBody,
-  DrawerHeader,
-  DrawerOverlay,
-  DrawerContent,
-  DrawerCloseButton,
-  Button,
-} from '@chakra-ui/react';
-import { useDisclosure } from '@chakra-ui/hooks';
 
 const setupWorkflow = [
   'startGame',
@@ -131,12 +125,21 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   return (
     <div className="flex relative w-full h-full">
       <div className="flex flex-col absolute w-full h-[100vh] z-10 p-10 items-start justify-start text-black">
-        <Button
-          className="absolute top-0 right-0 ml-auto bg-[#ACD8AF]"
+        <Box
+          as='button'
+          bg="#ACD8AF"
+          color="black"
+          borderRadius="lg"
+          px={4}
+          py={2}
+          boxShadow="md"
+          _hover={{ bg: '#8CC690' }}
+          transition="background-color 0.3s"
+          className='absolute top-0 right-0 ml-auto mr-10 mt-10'
           onClick={onOpen}
         >
           {t('gameRules')}
-        </Button>
+        </Box>
         <img
           className="w-96 rounded"
           src="/images/catch.png"
