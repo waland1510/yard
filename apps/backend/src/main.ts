@@ -6,9 +6,10 @@ import { setTimeout } from 'timers/promises';
 import { app } from './app/app';
 import { AIPlayerService } from './app/helpers/ai-player';
 import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
+import { ENV } from './app/helpers/env';
 
-const host = process.env.HOST ?? '0.0.0.0';
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+const host = ENV.HOST;
+const port = ENV.PORT;
 
 const server = fastify({
   logger: true, // Enable logging
@@ -17,7 +18,7 @@ const server = fastify({
 const aiService = new AIPlayerService();
 
 server.register(cors, {
-  origin: [process.env.FRONTEND_URL],
+  origin: [ENV.FRONTEND_URL],
   methods: ['GET', 'POST', 'PUT', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });

@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { Move, Player } from '@yard/shared-utils';
+import { ENV } from './env';
 
 export async function getOpenRouterAIDecision(prompt: string, player: Player): Promise<Move | null> {
   console.log('[AI Decision] Attempting OpenRouter API call.');
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = ENV.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.warn('[AI Decision] OpenRouter API key is not set. Skipping OpenRouter API call.');
     throw new Error('OpenRouter API key not set');

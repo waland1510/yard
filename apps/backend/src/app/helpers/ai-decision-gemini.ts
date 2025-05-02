@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { Move, Player } from '@yard/shared-utils';
+import { ENV } from './env';
 
 export async function getGeminiAIDecision(prompt: string, player: Player): Promise<Move | null> {
   console.log('[AI Decision] Attempting Gemini API call.');
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = ENV.GEMINI_API_KEY;
   if (!geminiApiKey) {
     console.warn('[AI Decision] Gemini API key is not set. Skipping Gemini API call.');
     throw new Error('Gemini API key not set');

@@ -2,8 +2,9 @@ import { IpInfo, Move } from '@yard/shared-utils';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { gamesTable, ipInfoTable, movesTable, playersTable } from '../helpers/pg-tables';
+import { ENV } from './env';
 
-const db = drizzle(process.env.DATABASE_URL, {
+const db = drizzle(ENV.DATABASE_URL, {
   casing: 'snake_case',
 });
 
