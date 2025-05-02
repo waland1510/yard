@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 const useWebSocket = (channel?: string) => {
   const socket = getWebSocket();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
   const username = localStorage.getItem('username');
   const toast = useToast();
   const { currentRole } = useRunnerStore();
@@ -26,18 +27,79 @@ const useWebSocket = (channel?: string) => {
   const { t } = useTranslation();
 
   const sendMessage = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (type: MessageType, data: any) => {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        const message = JSON.stringify({ type, channel, data }); // Include the channel in every message
+        const message = JSON.stringify({ type, channel, data });
         socket.send(message);
       } else {
-        console.log({ type, channel, data });
         console.warn('WebSocket is not connected');
+        toast({
+          description: t('websocketDisconnected'),
+          status: 'error',
+          position: 'top-right',
+          duration: 5000,
+          isClosable: true,
+        });
       }
     },
-    [socket, channel]
+    [socket, channel, toast, t]
   );
+
+  useEffect(() => {
+    const handleOpen = () => {
+      setIsConnected(true);
+      toast({
+        description: t('websocketConnected'),
+        status: 'success',
+        position: 'top-right',
+        duration: 3000,
+        isClosable: true,
+      });
+    };
+
+    const handleClose = () => {
+      setIsConnected(false);
+      toast({
+        description: t('websocketDisconnected'),
+        status: 'error',
+        position: 'top-right',
+        duration: 5000,
+        isClosable: true,
+      });
+
+      // Attempt reconnection
+      setTimeout(() => {
+        if (socket && socket.readyState !== WebSocket.OPEN) {
+          socket.onopen = handleOpen;
+        }
+      }, 5000);
+    };
+
+    const handleError = (error: Event) => {
+      console.error('WebSocket error:', error);
+      toast({
+        description: t('websocketError'),
+        status: 'error',
+        position: 'top-right',
+        duration: 5000,
+        isClosable: true,
+      });
+    };
+
+    if (socket) {
+      socket.onopen = handleOpen;
+      socket.onclose = handleClose;
+      socket.onerror = handleError;
+    }
+
+    return () => {
+      if (socket) {
+        socket.onopen = null;
+        socket.onclose = null;
+        socket.onerror = null;
+      }
+    };
+  }, [socket, toast, t]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -144,14 +206,7 @@ const useWebSocket = (channel?: string) => {
     };
   }, [socket, channel, players, updatePlayer, toast, setPosition, updateTicketsCount, setIsDoubleMove, setCurrentTurn, updateMoves, username, currentRole, sendMessage, t, setStatus]);
 
-  // const joinChannel = (newChannel: string, username, currentRole) => {
-  //   setChannel(newChannel);
-  //   if (socket && socket.readyState === WebSocket.OPEN) {
-  //     sendMessage('joinGame', { channel: newChannel, username, currentRole });
-  //   }
-  // };
-
-  return { messages, sendMessage, channel };
+  return { messages, sendMessage, channel, isConnected };
 };
 
 export default useWebSocket;
