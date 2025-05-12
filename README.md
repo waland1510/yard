@@ -1,5 +1,8 @@
 # Scotland Yard Online
 
+DeepWiki Documentation
+https://deepwiki.com/waland1510/yard
+
 A real-time multiplayer web implementation of the classic deduction board game, built with Nx workspace. One player takes on the role of a fugitive (Mr. X) moving secretly through London while up to 5 detective players work together to track them down.
 
 ## Game Features
