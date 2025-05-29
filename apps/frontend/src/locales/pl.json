@@ -53,6 +53,12 @@
   "shareLink": "Udostępnij ten link znajomym, aby rozpocząć grę",
   "confirm": "Potwierdź {{position}}",
   "gameRules": "Zasady gry",
+  "doYouWantToPlayWithAI": "Czy chcesz grać z AI?",
+  "yes": "Tak",
+  "no": "Nie",
+  "chooseAIOption": "Wybierz opcję AI",
+  "AIplaysDetectives": "AI gra detektywami",
+  "AIplaysCulprit": "AI gra przestępcą",
   "rulesContent": [
     "Gra toczy się między jednym przestępcą (Pan C) a maksymalnie pięcioma detektywami.",
     "Przestępca porusza się w ukryciu, a detektywi współpracują, aby go schwytać.",

@@ -166,16 +166,17 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
           <p className="text-lg text-gray-700">{t('chooseAIOption')}</p>
           <div className="flex gap-4">
             <button
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="px-4 py-2 bg-gray-400 text-gray-200 rounded cursor-not-allowed disabled:bg-gray-400 disabled:text-gray-200"
               onClick={() => handlePlayWithAI('culprit')}
+              disabled
             >
-              {t('playWithAIAsCulprit')}
+              {t('AIplaysCulprit')}
             </button>
             <button
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               onClick={() => handlePlayWithAI('detectives')}
             >
-              {t('playWithAIAsDetectives')}
+              {t('AIplaysDetectives')}
             </button>
           </div>
         </div>

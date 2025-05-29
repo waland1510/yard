@@ -53,6 +53,12 @@
   "culpritMove": "{{culprit}} a fait son mouvement. Le prochain est {{nextTurn}}",
   "playerMove": "{{player}} s'est déplacé vers {{position}}. Le prochain est {{nextTurn}}",
   "gameRules": "Règles du jeu",
+  "doYouWantToPlayWithAI": "Voulez-vous jouer avec l'IA ?",
+  "yes": "Oui",
+  "no": "Non",
+  "chooseAIOption": "Choisir l'option IA",
+  "AIplaysDetectives": "L'IA joue les détectives",
+  "AIplaysCulprit": "L'IA joue le coupable",
   "rulesContent": [
     "Le jeu se joue avec un coupable (M. C) et jusqu'à cinq détectives.",
     "Le coupable se déplace en secret, tandis que les détectives travaillent ensemble pour l'attraper.",

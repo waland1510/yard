@@ -56,6 +56,9 @@
   "doYouWantToPlayWithAI": "Do you want to play with AI?",
   "yes": "Yes",
   "no": "No",
+  "chooseAIOption": "Choose AI Option",
+  "AIplaysDetectives": "AI plays Detectives",
+  "AIplaysCulprit": "AI plays Culprit",
   "rulesContent": [
     "The game is played with one culprit (Mr. C) and up to five detectives.",
     "The culprit moves secretly, while detectives work together to catch him.",

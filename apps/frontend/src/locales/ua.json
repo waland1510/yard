@@ -53,6 +53,12 @@
   "culpritMove": "{{culprit}} зробив свій хід. Наступний — {{nextTurn}}",
   "playerMove": "{{player}} перемістився до {{position}}. Наступний — {{nextTurn}}",
   "gameRules": "Правила гри",
+  "doYouWantToPlayWithAI": "Чи хочете ви грати з ШІ?",
+  "yes": "Так",
+  "no": "Ні",
+  "chooseAIOption": "Виберіть опцію ШІ",
+  "AIplaysDetectives": "ШІ грає детективами",
+  "AIplaysCulprit": "ШІ грає злочинцем",
   "rulesContent": [
     "У грі є один злочинець (Містер С) і до п’яти детективів.",
     "Злочинець рухається таємно, а детективи співпрацюють, щоб його зловити.",

@@ -53,6 +53,12 @@
   "shareLink": "このリンクを友達と共有してプレイを開始しましょう",
   "confirm": "{{position}} を確認",
   "gameRules": "ゲームのルール",
+  "doYouWantToPlayWithAI": "AIと一緒にプレイしますか？",
+  "yes": "はい",
+  "no": "いいえ",
+  "chooseAIOption": "AIオプションを選択",
+  "AIplaysDetectives": "AIが探偵を担当",
+  "AIplaysCulprit": "AIが犯人を担当",
   "rulesContent": [
     "ゲームは1人の犯人（ミスターC）と最大5人の探偵で行われます。",
     "犯人は秘密裏に移動し、探偵たちは協力して犯人を捕まえます。",

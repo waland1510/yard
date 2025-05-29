@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Move, Player } from '@yard/shared-utils';
 import { ENV } from './env';
+import { makeApiCall, sanitizeApiResponse, parseJsonResponse } from './ai-decision-utils';
 
 export async function getOpenRouterAIDecision(prompt: string, player: Player): Promise<Move | null> {
   console.log('[AI Decision] Attempting OpenRouter API call.');
@@ -10,8 +11,9 @@ export async function getOpenRouterAIDecision(prompt: string, player: Player): P
     throw new Error('OpenRouter API key not set');
   }
 
-  const response = await axios.post(
+  const response = await makeApiCall(
     'https://openrouter.ai/api/v1/chat/completions',
+    apiKey,
     {
       model: 'deepseek/deepseek-chat:free',
       messages: [{
@@ -22,31 +24,18 @@ export async function getOpenRouterAIDecision(prompt: string, player: Player): P
       max_tokens: 500
     },
     {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
     }
   );
 
-  console.log('[AI Decision] OpenRouter API response received:', response.data);
-  const choices = response.data.choices;
-  if (!choices || choices.length === 0) {
-    console.warn('[AI Decision] No choices found in OpenRouter API response.');
-    throw new Error('No choices in OpenRouter response');
-  }
+  console.log('[AI Decision] OpenRouter API response received:', response);
 
-  const moveDecision = choices[0]?.message?.content;
-  if (!moveDecision) {
-    console.warn('[AI Decision] No move decision found in OpenRouter API response.');
-    throw new Error('No move decision in OpenRouter response');
-  }
-
-  const sanitizedMoveDecision = moveDecision.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
+  const sanitizedMoveDecision = sanitizeApiResponse(response.choices?.[0]?.message?.content || '');
   console.log('[AI Decision] Sanitized OpenRouter move decision:', sanitizedMoveDecision);
 
   try {
-    const parsedMove = JSON.parse(sanitizedMoveDecision);
+    const parsedMove = parseJsonResponse(sanitizedMoveDecision);
     console.log('[AI Decision] Parsed OpenRouter move decision:', parsedMove);
 
     return {

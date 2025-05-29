@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Move, Player } from '@yard/shared-utils';
 import { ENV } from './env';
+import { makeApiCall, sanitizeApiResponse, parseJsonResponse } from './ai-decision-utils';
 
 export async function getGeminiAIDecision(prompt: string, player: Player): Promise<Move | null> {
   console.log('[AI Decision] Attempting Gemini API call.');
@@ -10,39 +11,23 @@ export async function getGeminiAIDecision(prompt: string, player: Player): Promi
     throw new Error('Gemini API key not set');
   }
 
-  const geminiResponse = await axios.post(
+  const geminiResponse = await makeApiCall(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+    geminiApiKey,
     {
       contents: [{
         parts: [{ text: prompt }]
       }]
     },
-    {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }
+    { 'Content-Type': 'application/json' }
   );
 
-  console.log('[AI Decision] Gemini API response received:', geminiResponse.data);
-  const geminiMoveDecision = geminiResponse.data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!geminiMoveDecision) {
-    console.warn('[AI Decision] No move decision found in Gemini API response.');
-    throw new Error('No move decision from Gemini API');
-  }
-
-  const sanitizedGeminiMoveDecision = geminiMoveDecision.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
+  console.log('[AI Decision] Gemini API response received:', geminiResponse);
+  const sanitizedGeminiMoveDecision = sanitizeApiResponse(geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '');
   console.log('[AI Decision] Sanitized Gemini move decision:', sanitizedGeminiMoveDecision);
 
-  // Extract JSON part from the response
-  const jsonMatch = sanitizedGeminiMoveDecision.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    console.warn('[AI Decision] No valid JSON found in Gemini AI response.');
-    throw new Error('Invalid JSON in Gemini response');
-  }
-
   try {
-    const parsedGeminiMove = JSON.parse(jsonMatch[0]);
+    const parsedGeminiMove = parseJsonResponse(sanitizedGeminiMoveDecision);
     console.log('[AI Decision] Parsed Gemini move decision:', parsedGeminiMove);
 
     return {
