@@ -57,9 +57,83 @@ export const Nodes = () => {
 
   return (
     <>
+      {/* Render all nodes and static elements first */}
       {mapData.nodes.map((node) => {
         const hasBus = node.bus && node.bus.length > 0;
         const hasUnderground = node.underground && node.underground.length > 0;
+        if (node.id < 1) return null;
+
+        const player = players.find(p => p.position === node.id);
+        const shouldHideText = player?.role === 'culprit' &&
+          (role === 'culprit' || showCulpritAtMoves.includes(moves.length));
+
+        return (
+          <g key={`static-${node.id}`}>
+            {hasBus && (
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r="18"
+                fill="none"
+                stroke="#080"
+                strokeWidth="4"
+              />
+            )}
+            {hasUnderground && (
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r="22"
+                fill="none"
+                stroke="#d00"
+                strokeWidth="4"
+              />
+            )}
+            <circle
+              cx={node.x}
+              cy={node.y}
+              r="14"
+              fill={
+                isMoveAllowed(
+                  node.id,
+                  playerStorePosition ?? runnerData.position,
+                  role
+                ) ?? 'white'
+              }
+              stroke="black"
+              strokeWidth="4"
+              onClick={() => handleSend(node.id)}
+              strokeDasharray={node.river ? '5 5' : 'none'}
+            />
+            <text
+              x={node.x}
+              y={node.y + 5}
+              textAnchor="middle"
+              fontWeight="normal"
+              fontSize={currentPosition === node.id ? '16' : '14'}
+              fill={
+                shouldHideText
+                  ? 'transparent'
+                  : currentPosition === node.id
+                  ? 'purple'
+                  : isMoveAllowed(
+                      node.id,
+                      playerStorePosition ?? runnerData.position,
+                      role
+                    )
+                  ? 'white'
+                  : 'black'
+              }
+              onClick={() => handleSend(node.id)}
+            >
+              {node.id}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Render all animated images on top */}
+      {mapData.nodes.map((node) => {
         if (node.id < 1) return null;
         const player = players.find((p) => p.position === node.id);
         const playerRole = player?.role;
@@ -72,96 +146,20 @@ export const Nodes = () => {
             role === 'culprit' ||
             (playerRole === 'culprit' &&
               showCulpritAtMoves.includes(moves.length)));
+
+        if (!showImage) return null;
+
         return (
-          <Fragment key={node.id}>
-            <g>
-              {hasBus && (
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r="18"
-                  fill="none"
-                  stroke="#080"
-                  strokeWidth="4"
-                />
-              )}
-              {hasUnderground && (
-                <circle
-                  cx={node.x}
-                  cy={node.y}
-                  r="22"
-                  fill="none"
-                  stroke="#d00"
-                  strokeWidth="4"
-                />
-              )}
-              <circle
-                cx={node.x}
-                cy={node.y}
-                r="14"
-                fill={
-                  isMoveAllowed(
-                    node.id,
-                    playerStorePosition ?? runnerData.position,
-                    role
-                  ) ?? 'white'
-                }
-                stroke="black"
-                strokeWidth="4"
-                onClick={() => handleSend(node.id)}
-                strokeDasharray={node.river ? '5 5' : 'none'}
-              />
-              <defs>
-                <clipPath id={`clip-circle-${node.id}`}>
-                  <circle cx={node.x} cy={node.y} r="14" />
-                </clipPath>
-              </defs>
-              {showImage && playerRole === "culprit" && (
-                <AnimatedImage
-                  href={`/images/${playerRole}.png`}
-                  previousX={playersNode?.x || node.x}
-                  previousY={playersNode?.y || node.y}
-                  targetX={node.x}
-                  targetY={node.y}
-                  isCurrentPlayer={playerRole === role}
-                  nodeId={node.id}
-                />
-              )}
-              <text
-                x={node.x}
-                y={node.y + 5}
-                textAnchor="middle"
-                fontWeight={showImage ? 'bold' : 'normal'}
-                fontSize={currentPosition === node.id ? '16' : '14'}
-                fill={
-                  showImage
-                    ? 'transparent'
-                    : currentPosition === node.id
-                    ? 'purple'
-                    : isMoveAllowed(
-                        node.id,
-                        playerStorePosition ?? runnerData.position,
-                        role
-                      )
-                    ? 'white'
-                    : 'black'
-                }
-                onClick={() => handleSend(node.id)}
-              >
-                {node.id}
-              </text>
-            </g>
-            {showImage && playerRole !== "culprit" &&(
-                <AnimatedImage
-                  href={`/images/${playerRole}.png`}
-                  previousX={playersNode?.x || node.x}
-                  previousY={playersNode?.y || node.y}
-                  targetX={node.x}
-                  targetY={node.y}
-                  isCurrentPlayer={playerRole === role}
-                  nodeId={node.id}
-                />
-              )}
+          <Fragment key={`player-${node.id}`}>
+            <AnimatedImage
+              href={`/images/${playerRole}.png`}
+              previousX={playersNode?.x || node.x}
+              previousY={playersNode?.y || node.y}
+              targetX={node.x}
+              targetY={node.y}
+              isCurrentPlayer={playerRole === role}
+              nodeId={node.id}
+            />
           </Fragment>
         );
       })}

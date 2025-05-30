@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useSpring, animated, to } from 'react-spring';
 
 const OFFSET = 14;
 const ANIMATION_CONFIG = {
   movement: { tension: 60, friction: 14 },
-  scale: { duration: 1000 },
-  reset: { duration: 500 }
+  scale: { duration: 200 },
+  reset: { duration: 200 }
 } as const;
 
 interface AnimatedImageProps {
@@ -27,61 +27,36 @@ export const AnimatedImage: React.FC<AnimatedImageProps> = ({
   isCurrentPlayer,
   nodeId
 }) => {
+  const hasJustMoved = previousX !== targetX || previousY !== targetY;
 
-  const position = useMemo(() => ({
+  const springXY = useSpring({
     from: { x: previousX - OFFSET, y: previousY - OFFSET },
-    to: { x: targetX - OFFSET, y: targetY - OFFSET }
-  }), [previousX, previousY, targetX, targetY]);
-
-  const springProps = useSpring({
-    ...position,
-    config: ANIMATION_CONFIG.movement
+    to: { x: targetX - OFFSET, y: targetY - OFFSET },
+    config: ANIMATION_CONFIG.movement,
+    immediate: !hasJustMoved
   });
 
-  const combinedSpring = useSpring({
-    from: { x: targetX - OFFSET, y: targetY - OFFSET, scale: 1 },
+  const springScale = useSpring({
+    from: { scale: 1 },
     to: async (next) => {
-      await next({
-        x: targetX - OFFSET,
-        y: targetY - OFFSET,
-        scale: 1.5,
-        config: ANIMATION_CONFIG.scale,
-      });
-      await next({
-        scale: 1,
-        config: ANIMATION_CONFIG.reset
-      });
+      if (hasJustMoved && isCurrentPlayer) {
+        await next({ scale: 1.5 });
+        await next({ scale: 1 });
+      }
     },
-    reset: true,
+    config: ANIMATION_CONFIG.scale,
+    immediate: !hasJustMoved || !isCurrentPlayer
   });
 
-  const transform = useMemo(() =>
-    to(
-      [combinedSpring.x, combinedSpring.y, combinedSpring.scale],
-      (x, y, scale) => `translate(${x}, ${y}) scale(${scale})`
-    ),
-    [combinedSpring.x, combinedSpring.y, combinedSpring.scale]
-  );
-
-  if (isCurrentPlayer) {
-    return (
-      <animated.image
-        href={href}
-        transform={transform}
-        width="28"
-        height="28"
-      />
-    );
-  }
+  const { x, y } = springXY;
+  const { scale } = springScale;
 
   return (
     <animated.image
       href={href}
-      x={springProps.x}
-      y={springProps.y}
+      transform={to([x, y, scale], (x, y, s) => `translate(${x}, ${y}) scale(${s})`)}
       width="28"
       height="28"
-      clipPath={`url(#clip-circle-${nodeId})`}
     />
   );
 };
