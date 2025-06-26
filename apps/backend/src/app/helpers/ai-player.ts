@@ -105,8 +105,8 @@ interface AIMoveEvaluation {
 export class AIPlayerService {
 
   private async getAIDecision(gameState: GameState, player: Player): Promise<Move | null> {
-    console.log(`[AI Decision] Using local AI logic for ${player.role}`);
-    return this.calculateLocalAIMove(gameState, player);
+    console.log(`[AI Decision] Using enhanced AI logic for ${player.role}`);
+    return this.calculateEnhancedAIMove(gameState, player);
   }
 
   private createGameStatePrompt(gameState: GameState, player: Player): string {
@@ -274,6 +274,14 @@ Choose the move that best ${player.role === 'culprit'
     gameState: GameState,
     map: Map<number, NodeConnections>
   ): PredictedCulpritMove[] {
+    // Use enhanced tracking for better predictions
+    return this.getAdvancedCulpritPositions(gameState, map);
+  }
+
+  private getAdvancedCulpritPositions(
+    gameState: GameState,
+    map: Map<number, NodeConnections>
+  ): PredictedCulpritMove[] {
     const culpritMoves = gameState.moves.filter(move => move.role === 'culprit');
     const currentMoveNumber = culpritMoves.length;
     const lastRevealedMoveIndex = culpritMoves
@@ -288,6 +296,11 @@ Choose the move that best ${player.role === 'culprit'
 
     const culprit = gameState.players.find(p => p.role === 'culprit');
     if (!culprit) return [];
+
+    // Enhanced tracking with human behavior analysis
+    const humanBehaviorProfile = this.analyzeHumanBehaviorProfile(culpritMoves, gameState);
+    const movementPattern = this.detectMovementPattern(culpritMoves);
+    const riskAssessment = this.assessCurrentRisk(gameState);
 
     // Initialize with the last known position
     let positionProbs: Map<number, { prob: number; type: MoveType | null }> = new Map([
@@ -329,7 +342,14 @@ Choose the move that best ${player.role === 'culprit'
 
         for (const { type, connections, weight } of transports) {
           for (const next of connections) {
-            const positionWeight = this.calculatePositionWeight(next, gameState, map);
+            const positionWeight = this.calculateEnhancedPositionWeight(
+              next,
+              gameState,
+              map,
+              humanBehaviorProfile,
+              movementPattern,
+              riskAssessment
+            );
             const transportWeight = weight;
             const moveProb = (prob * connections.length * transportWeight / totalWeightedConnections) * positionWeight;
 
@@ -657,6 +677,96 @@ ${Array.from(allPossibleMoves.entries())
       }
     }
     return false;
+  }
+
+  private calculateEnhancedAIMove(gameState: GameState, player: Player): Move {
+    try {
+      if (player.role === 'culprit') {
+        return this.calculateLocalAIMove(gameState, player);
+      } else {
+        return this.calculateEnhancedDetectiveMove(gameState, player);
+      }
+    } catch (error) {
+      console.error(`[Enhanced AI] Error for ${player.role}:`, error);
+      return this.calculateLocalAIMove(gameState, player);
+    }
+  }
+
+  private calculateEnhancedDetectiveMove(gameState: GameState, player: Player): Move {
+    try {
+      const currentNode = mapData.nodes.find(node => node.id === player.position);
+      if (!currentNode) {
+        throw new Error(`Current node not found for position ${player.position}`);
+      }
+
+      const detectives = gameState.players.filter(p => p.role !== 'culprit');
+      const otherDetectives = detectives.filter(d => d.role !== player.role);
+      const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
+      const moveNumber = culpritMoves.length;
+
+      // Assess human player skill and adjust difficulty
+      const skillAssessment = this.assessHumanPlayerSkill(gameState);
+      const difficultyLevel = this.calculateAdaptiveDifficulty(skillAssessment, gameState);
+
+      // Get enhanced possible culprit positions with human behavior patterns
+      const possibleCulpritPositions = this.getEnhancedCulpritPositions(gameState);
+
+      // Analyze game phase and adjust strategy
+      const gamePhase = this.determineGamePhase(gameState);
+
+      // Get all possible moves with enhanced scoring
+      const possibleMovesWithDetails = this.getEnhancedPossibleMoves(
+        currentNode,
+        player,
+        gameState,
+        possibleCulpritPositions,
+        gamePhase
+      );
+
+      if (possibleMovesWithDetails.length === 0) {
+        throw new Error('No possible moves available');
+      }
+
+      // Apply advanced coordination and strategic filtering with difficulty adjustment
+      const coordinatedMoves = this.applyAdvancedCoordination(
+        possibleMovesWithDetails,
+        player,
+        otherDetectives,
+        possibleCulpritPositions,
+        gamePhase
+      );
+
+      // Apply difficulty scaling to moves
+      const difficultyAdjustedMoves = this.applyDifficultyScaling(
+        coordinatedMoves,
+        difficultyLevel,
+        skillAssessment
+      );
+
+      // Select best move with enhanced decision making
+      const selectedMove = this.selectOptimalDetectiveMove(
+        difficultyAdjustedMoves,
+        player,
+        gameState,
+        gamePhase
+      );
+
+      // Create the move object with enhanced special ticket logic
+      const move: Move = {
+        type: selectedMove.type,
+        position: selectedMove.targetPosition,
+        secret: false, // Detectives don't use secret tickets
+        double: this.shouldDetectiveUseDoubleTicket(selectedMove, player, gameState, gamePhase),
+        role: player.role
+      };
+
+      console.log(`[Enhanced Detective AI] ${player.role} selected move: ${move.type} to position ${move.position} (score: ${selectedMove.score}, phase: ${gamePhase})`);
+      return move;
+
+    } catch (error) {
+      console.error(`[Enhanced Detective AI] Error for ${player.role}:`, error);
+      return this.calculateLocalAIMove(gameState, player);
+    }
   }
 
   private calculateLocalAIMove(gameState: GameState, player: Player): Move {
@@ -1911,6 +2021,501 @@ ${Array.from(allPossibleMoves.entries())
     return score;
   }
 
+  private getEnhancedCulpritPositions(gameState: GameState): PredictedCulpritMove[] {
+    const map = new Map<number, NodeConnections>();
+    mapData.nodes.forEach(node => {
+      map.set(node.id, {
+        taxi: node.taxi || [],
+        bus: node.bus || [],
+        underground: node.underground || []
+      });
+    });
+    const basePredictions = this.getPossibleCulpritPositions(gameState, map);
+
+    if (basePredictions.length === 0) {
+      return [];
+    }
+
+    // Enhance predictions with human behavior patterns
+    const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+
+    return basePredictions.map(prediction => {
+      let adjustedProbability = prediction.probability;
+
+      // Human players tend to avoid positions very close to detectives
+      const minDetectiveDistance = Math.min(
+        ...detectives.map(d => this.calculateDistance(prediction.position, d.position))
+      );
+
+      if (minDetectiveDistance <= 1) {
+        adjustedProbability *= 0.3; // Much less likely for humans to stay very close
+      } else if (minDetectiveDistance <= 2) {
+        adjustedProbability *= 0.6; // Somewhat less likely
+      } else if (minDetectiveDistance >= 5) {
+        adjustedProbability *= 1.2; // Humans prefer safer distances
+      }
+
+      // Human players often prefer positions with multiple escape routes
+      const exitCount = this.getExitCount(map, prediction.position);
+      if (exitCount >= 4) {
+        adjustedProbability *= 1.15;
+      } else if (exitCount <= 2) {
+        adjustedProbability *= 0.85;
+      }
+
+      // Humans tend to vary their transport types
+      const recentMoves = culpritMoves.slice(-3);
+      const recentTypes = new Set(recentMoves.filter(m => !m.secret).map(m => m.type));
+      if (recentTypes.size >= 2 && prediction.type !== 'underground') {
+        adjustedProbability *= 1.1; // Slight preference for continuing variation
+      }
+
+      return {
+        ...prediction,
+        probability: Math.max(0.01, Math.min(1.0, adjustedProbability))
+      };
+    });
+  }
+
+  private determineGamePhase(gameState: GameState): 'early' | 'mid' | 'late' | 'endgame' {
+    const culpritMoves = gameState.moves.filter(m => m.role === 'culprit').length;
+
+    if (culpritMoves <= 3) return 'early';
+    if (culpritMoves <= 8) return 'mid';
+    if (culpritMoves <= 18) return 'late';
+    return 'endgame';
+  }
+
+  private getEnhancedPossibleMoves(
+    currentNode: Node | undefined,
+    player: Player,
+    gameState: GameState,
+    possibleCulpritPositions: PredictedCulpritMove[],
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame'
+  ): Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }> {
+    const baseMoves = this.getPossibleMovesWithDetails(currentNode, player, gameState);
+
+    return baseMoves.map(move => {
+      let enhancedScore = move.score;
+
+      // Phase-specific scoring adjustments
+      switch (gamePhase) {
+        case 'early':
+          enhancedScore += this.calculateEarlyGameScore(move, player, gameState);
+          break;
+        case 'mid':
+          enhancedScore += this.calculateMidGameScore(move, player, possibleCulpritPositions);
+          break;
+        case 'late':
+          enhancedScore += this.calculateLateGameScore(move, player, possibleCulpritPositions);
+          break;
+        case 'endgame':
+          enhancedScore += this.calculateEndGameScore(move, player, possibleCulpritPositions);
+          break;
+      }
+
+      // Add human behavior prediction bonus
+      enhancedScore += this.calculateHumanBehaviorScore(move, gameState, possibleCulpritPositions);
+
+      return {
+        ...move,
+        score: enhancedScore
+      };
+    });
+  }
+
+  private calculateEarlyGameScore(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    gameState: GameState
+  ): number {
+    let score = 0;
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+    const otherDetectives = detectives.filter(d => d.role !== player.role);
+
+    // Early game: focus on spreading out and positioning
+    const minDistanceToOthers = Math.min(
+      ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+    );
+
+    // Strong bonus for maintaining good spacing
+    if (minDistanceToOthers >= 3 && minDistanceToOthers <= 5) {
+      score += 20;
+    } else if (minDistanceToOthers < 2) {
+      score -= 30; // Heavy penalty for clustering
+    }
+
+    // Bonus for reaching strategic positions (underground stations, transport hubs)
+    const map = new Map<number, NodeConnections>();
+    mapData.nodes.forEach(node => {
+      map.set(node.id, {
+        taxi: node.taxi || [],
+        bus: node.bus || [],
+        underground: node.underground || []
+      });
+    });
+
+    const targetNode = map.get(move.targetPosition);
+    if (targetNode?.underground && targetNode.underground.length > 0) {
+      score += 15; // Underground stations are valuable in early game
+    }
+
+    const totalConnections = (targetNode?.taxi?.length || 0) +
+                           (targetNode?.bus?.length || 0) +
+                           (targetNode?.underground?.length || 0);
+    if (totalConnections >= 4) {
+      score += 10; // Transport hubs are good for mobility
+    }
+
+    return score;
+  }
+
+  private calculateMidGameScore(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Mid game: balance between pursuit and positioning
+    if (possibleCulpritPositions.length > 0) {
+      const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
+        const distance = this.calculateDistance(move.targetPosition, pos.position);
+        return sum + (distance * pos.probability);
+      }, 0);
+
+      // Optimal distance for mid-game positioning (2-4 moves away)
+      if (avgDistanceToCulprit >= 2 && avgDistanceToCulprit <= 4) {
+        score += 25;
+      } else if (avgDistanceToCulprit > 6) {
+        score -= 15; // Too far away
+      }
+
+      // Bonus for cutting off high-probability escape routes
+      const highProbPositions = possibleCulpritPositions.filter(p => p.probability > 0.3);
+      const blockedRoutes = highProbPositions.filter(pos =>
+        this.calculateDistance(move.targetPosition, pos.position) <= 2
+      ).length;
+
+      score += blockedRoutes * 8;
+    }
+
+    return score;
+  }
+
+  private calculateLateGameScore(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Late game: aggressive pursuit and area denial
+    if (possibleCulpritPositions.length > 0) {
+      const closestCulpritDistance = Math.min(
+        ...possibleCulpritPositions.map(pos => this.calculateDistance(move.targetPosition, pos.position))
+      );
+
+      // Strong bonus for being close to culprit
+      score += (8 - Math.min(closestCulpritDistance, 8)) * 6;
+
+      // Bonus for positions that can reach multiple culprit positions
+      const reachablePositions = possibleCulpritPositions.filter(pos =>
+        this.calculateDistance(move.targetPosition, pos.position) <= 2
+      ).length;
+
+      score += reachablePositions * 12;
+
+      // Penalty for ticket conservation issues
+      const totalTickets = player.taxiTickets + player.busTickets + player.undergroundTickets;
+      if (totalTickets <= 3) {
+        // Prefer cheaper moves when low on tickets
+        if (move.type === 'taxi') score += 5;
+        if (move.type === 'underground') score -= 8;
+      }
+    }
+
+    return score;
+  }
+
+  private calculateEndGameScore(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Endgame: all-out pursuit, ignore everything else
+    if (possibleCulpritPositions.length > 0) {
+      const weightedDistance = possibleCulpritPositions.reduce((sum, pos) => {
+        const distance = this.calculateDistance(move.targetPosition, pos.position);
+        return sum + (distance * pos.probability);
+      }, 0);
+
+      // Massive bonus for being very close
+      score += (10 - Math.min(weightedDistance, 10)) * 15;
+
+      // Huge bonus for positions that can directly catch culprit
+      const canCatchPositions = possibleCulpritPositions.filter(pos =>
+        this.calculateDistance(move.targetPosition, pos.position) <= 1
+      );
+
+      score += canCatchPositions.length * 50;
+
+      // Don't worry about tickets in endgame - go for the win
+      if (move.type === 'underground' && canCatchPositions.length > 0) {
+        score += 20; // Use underground if it helps catch culprit
+      }
+    }
+
+    return score;
+  }
+
+  private calculateHumanBehaviorScore(
+    move: { type: MoveType; targetPosition: number },
+    gameState: GameState,
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Predict human culprit behavior patterns
+    const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
+
+    if (culpritMoves.length >= 3) {
+      // Analyze recent movement patterns
+      const recentMoves = culpritMoves.slice(-3);
+      const recentPositions = recentMoves.map(m => m.position);
+
+      // Check if culprit is moving in a pattern (linear, circular, etc.)
+      const isLinearMovement = this.detectLinearMovement(recentPositions);
+      const isCircularMovement = this.detectCircularMovement(recentPositions);
+
+      if (isLinearMovement) {
+        // Predict continuation of linear movement and intercept
+        const predictedNextPosition = this.predictLinearNextPosition(recentPositions);
+        if (predictedNextPosition && this.calculateDistance(move.targetPosition, predictedNextPosition) <= 2) {
+          score += 25;
+        }
+      }
+
+      if (isCircularMovement) {
+        // Position to cut off circular movement
+        const centerPosition = this.calculateMovementCenter(recentPositions);
+        if (centerPosition && this.calculateDistance(move.targetPosition, centerPosition) <= 3) {
+          score += 20;
+        }
+      }
+
+      // Human players often avoid recently visited areas
+      const recentDetectivePositions = new Set(
+        gameState.moves
+          .filter(m => m.role !== 'culprit')
+          .slice(-4)
+          .map(m => m.position)
+      );
+
+      // Bonus for moving to areas culprit might think are "safe"
+      if (!recentDetectivePositions.has(move.targetPosition)) {
+        score += 8;
+      }
+    }
+
+    return score;
+  }
+
+  private detectLinearMovement(positions: number[]): boolean {
+    if (positions.length < 3) return false;
+
+    // Check if positions form a roughly linear pattern
+    const vectors = [];
+    for (let i = 1; i < positions.length; i++) {
+      const prev = positions[i - 1];
+      const curr = positions[i];
+      vectors.push({
+        dx: (curr % 100) - (prev % 100),
+        dy: Math.floor(curr / 100) - Math.floor(prev / 100)
+      });
+    }
+
+    // Check if vectors are roughly in the same direction
+    if (vectors.length < 2) return false;
+
+    const firstVector = vectors[0];
+    const firstMagnitude = Math.sqrt(firstVector.dx * firstVector.dx + firstVector.dy * firstVector.dy);
+    if (firstMagnitude === 0) return false;
+
+    for (let i = 1; i < vectors.length; i++) {
+      const vector = vectors[i];
+      const magnitude = Math.sqrt(vector.dx * vector.dx + vector.dy * vector.dy);
+      if (magnitude === 0) continue;
+
+      // Calculate dot product to check direction similarity
+      const dotProduct = (firstVector.dx * vector.dx + firstVector.dy * vector.dy) / (firstMagnitude * magnitude);
+      if (dotProduct < 0.5) return false; // Not similar enough direction
+    }
+
+    return true;
+  }
+
+  private detectCircularMovement(positions: number[]): boolean {
+    if (positions.length < 3) return false;
+
+    // Check if positions form a circular or back-and-forth pattern
+    const distances = [];
+    const center = this.calculateMovementCenter(positions);
+    if (!center) return false;
+
+    for (const pos of positions) {
+      const distance = this.calculateDistance(pos, center);
+      distances.push(distance);
+    }
+
+    // Check if distances from center are roughly similar (circular pattern)
+    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgDistance, 2), 0) / distances.length;
+
+    return variance < 2; // Low variance indicates circular movement
+  }
+
+  private predictLinearNextPosition(positions: number[]): number | null {
+    if (positions.length < 2) return null;
+
+    const last = positions[positions.length - 1];
+    const secondLast = positions[positions.length - 2];
+
+    const dx = (last % 100) - (secondLast % 100);
+    const dy = Math.floor(last / 100) - Math.floor(secondLast / 100);
+
+    const predictedX = (last % 100) + dx;
+    const predictedY = Math.floor(last / 100) + dy;
+
+    // Ensure predicted position is within map bounds
+    if (predictedX < 0 || predictedX >= 100 || predictedY < 0 || predictedY >= 100) {
+      return null;
+    }
+
+    return predictedY * 100 + predictedX;
+  }
+
+  private calculateMovementCenter(positions: number[]): number | null {
+    if (positions.length === 0) return null;
+
+    const avgX = positions.reduce((sum, pos) => sum + (pos % 100), 0) / positions.length;
+    const avgY = positions.reduce((sum, pos) => sum + Math.floor(pos / 100), 0) / positions.length;
+
+    return Math.floor(avgY) * 100 + Math.floor(avgX);
+  }
+
+  private applyAdvancedCoordination(
+    moves: Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }>,
+    player: Player,
+    otherDetectives: Player[],
+    possibleCulpritPositions: PredictedCulpritMove[],
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame'
+  ): Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }> {
+
+    return moves.map(move => {
+      let coordinationScore = 0;
+
+      // Enhanced role-based coordination
+      const map = new Map<number, NodeConnections>();
+      mapData.nodes.forEach(node => {
+        map.set(node.id, {
+          taxi: node.taxi || [],
+          bus: node.bus || [],
+          underground: node.underground || []
+        });
+      });
+      const detectiveRole = this.calculateDynamicRole(player, otherDetectives, possibleCulpritPositions, map);
+
+      switch (detectiveRole) {
+        case 'primary-hunter':
+          coordinationScore += this.calculatePrimaryHunterCoordination(move, player, otherDetectives, possibleCulpritPositions);
+          break;
+        case 'interceptor':
+          coordinationScore += this.calculateInterceptorCoordination(move, player, otherDetectives, possibleCulpritPositions);
+          break;
+        case 'flanker':
+          coordinationScore += this.calculateFlankerCoordination(move, player, otherDetectives, possibleCulpritPositions);
+          break;
+      }
+
+      // Phase-specific coordination adjustments
+      coordinationScore += this.calculatePhaseCoordination(move, gamePhase, otherDetectives);
+
+      // Anti-clustering with dynamic spacing based on game phase
+      coordinationScore += this.calculateDynamicSpacing(move, player, otherDetectives, gamePhase);
+
+      return {
+        ...move,
+        score: move.score + coordinationScore
+      };
+    });
+  }
+
+  private selectOptimalDetectiveMove(
+    moves: Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }>,
+    player: Player,
+    gameState: GameState,
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame'
+  ): { type: MoveType; targetPosition: number; score: number; blockedBy: string[] } {
+
+    // Filter out blocked moves unless it's endgame
+    let availableMoves = moves;
+    if (gamePhase !== 'endgame') {
+      const unblockedMoves = moves.filter(move => move.blockedBy.length === 0);
+      if (unblockedMoves.length > 0) {
+        availableMoves = unblockedMoves;
+      }
+    }
+
+    // Sort by score and apply some randomization to avoid predictability
+    availableMoves.sort((a, b) => b.score - a.score);
+
+    // In early/mid game, add some randomization among top moves
+    if (gamePhase === 'early' || gamePhase === 'mid') {
+      const topMoves = availableMoves.slice(0, Math.min(3, availableMoves.length));
+      const scoreThreshold = topMoves[0].score - 10; // Within 10 points of best
+      const competitiveMoves = topMoves.filter(move => move.score >= scoreThreshold);
+
+      if (competitiveMoves.length > 1) {
+        return competitiveMoves[Math.floor(Math.random() * competitiveMoves.length)];
+      }
+    }
+
+    return availableMoves[0];
+  }
+
+  private shouldDetectiveUseDoubleTicket(
+    move: { type: MoveType; targetPosition: number; score: number },
+    player: Player,
+    gameState: GameState,
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame'
+  ): boolean {
+
+    if (!player.doubleTickets || player.doubleTickets <= 0) {
+      return false;
+    }
+
+    // Only use double tickets in late game or endgame when close to culprit
+    if (gamePhase === 'early' || gamePhase === 'mid') {
+      return false;
+    }
+
+    const possibleCulpritPositions = this.getEnhancedCulpritPositions(gameState);
+    if (possibleCulpritPositions.length === 0) {
+      return false;
+    }
+
+    const minDistanceToCulprit = Math.min(
+      ...possibleCulpritPositions.map(pos => this.calculateDistance(move.targetPosition, pos.position))
+    );
+
+    // Use double ticket if very close to culprit (within 2 moves)
+    return minDistanceToCulprit <= 2;
+  }
+
   private calculateCulpritCentroid(
     positions: (number | PredictedCulpritMove)[]
   ): { x: number; y: number } {
@@ -1934,5 +2539,905 @@ ${Array.from(allPossibleMoves.entries())
       x: weightedX / (totalWeight || 1),
       y: weightedY / (totalWeight || 1)
     };
+  }
+
+  private calculatePrimaryHunterCoordination(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    otherDetectives: Player[],
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Primary hunter should be closest to culprit
+    if (possibleCulpritPositions.length > 0) {
+      const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
+        return sum + (this.calculateDistance(move.targetPosition, pos.position) * pos.probability);
+      }, 0);
+
+      // Strong bonus for being close to culprit
+      score += (10 - Math.min(avgDistanceToCulprit, 10)) * 8;
+
+      // Ensure other detectives aren't too close to avoid clustering
+      const minDistanceToOthers = Math.min(
+        ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+      );
+
+      if (minDistanceToOthers < 2) {
+        score -= 25; // Penalty for clustering
+      }
+    }
+
+    return score;
+  }
+
+  private calculateInterceptorCoordination(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    otherDetectives: Player[],
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Interceptor should control key transport hubs and cut off escape routes
+    const map = new Map<number, NodeConnections>();
+    mapData.nodes.forEach(node => {
+      map.set(node.id, {
+        taxi: node.taxi || [],
+        bus: node.bus || [],
+        underground: node.underground || []
+      });
+    });
+
+    const targetNode = map.get(move.targetPosition);
+    if (targetNode) {
+      // Bonus for positions with many connections (transport hubs)
+      const totalConnections = (targetNode.taxi?.length || 0) +
+                             (targetNode.bus?.length || 0) +
+                             (targetNode.underground?.length || 0);
+      score += totalConnections * 3;
+
+      // Special bonus for underground stations
+      if (targetNode.underground && targetNode.underground.length > 0) {
+        score += 15;
+      }
+    }
+
+    // Position to intercept culprit escape routes
+    if (possibleCulpritPositions.length > 0) {
+      const interceptValue = possibleCulpritPositions.reduce((sum, pos) => {
+        const distance = this.calculateDistance(move.targetPosition, pos.position);
+        // Optimal intercept distance is 2-4 moves
+        if (distance >= 2 && distance <= 4) {
+          return sum + (pos.probability * 10);
+        }
+        return sum;
+      }, 0);
+
+      score += interceptValue;
+    }
+
+    return score;
+  }
+
+  private calculateFlankerCoordination(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    otherDetectives: Player[],
+    possibleCulpritPositions: PredictedCulpritMove[]
+  ): number {
+    let score = 0;
+
+    // Flanker should approach from unexpected angles and maintain distance from other detectives
+    const minDistanceToOthers = Math.min(
+      ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+    );
+
+    // Strong bonus for maintaining good spacing
+    if (minDistanceToOthers >= 4 && minDistanceToOthers <= 6) {
+      score += 20;
+    } else if (minDistanceToOthers < 3) {
+      score -= 30; // Heavy penalty for being too close
+    }
+
+    // Position to approach culprit from different angle than primary hunter
+    if (possibleCulpritPositions.length > 0 && otherDetectives.length > 0) {
+      const primaryHunter = otherDetectives.find(d =>
+        this.getDetectiveRole(d, otherDetectives.filter(od => od !== d)) === 'primary-hunter'
+      );
+
+      if (primaryHunter) {
+        const culpritCentroid = this.calculateCulpritCentroid(possibleCulpritPositions);
+
+        // Calculate angle difference between flanker and primary hunter relative to culprit
+        const hunterAngle = Math.atan2(
+          Math.floor(primaryHunter.position / 100) - culpritCentroid.y,
+          (primaryHunter.position % 100) - culpritCentroid.x
+        );
+
+        const flankerAngle = Math.atan2(
+          Math.floor(move.targetPosition / 100) - culpritCentroid.y,
+          (move.targetPosition % 100) - culpritCentroid.x
+        );
+
+        const angleDiff = Math.abs(hunterAngle - flankerAngle);
+        const normalizedAngleDiff = Math.min(angleDiff, 2 * Math.PI - angleDiff);
+
+        // Bonus for approaching from different angle (90-180 degrees apart)
+        if (normalizedAngleDiff >= Math.PI / 2) {
+          score += 15;
+        }
+      }
+    }
+
+    return score;
+  }
+
+  private calculatePhaseCoordination(
+    move: { type: MoveType; targetPosition: number },
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame',
+    otherDetectives: Player[]
+  ): number {
+    let score = 0;
+
+    switch (gamePhase) {
+      case 'early':
+        // Early game: focus on spreading out
+        const earlySpacing = Math.min(
+          ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+        );
+        if (earlySpacing >= 4) score += 15;
+        break;
+
+      case 'mid':
+        // Mid game: balance between spacing and positioning
+        const midSpacing = Math.min(
+          ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+        );
+        if (midSpacing >= 2 && midSpacing <= 4) score += 10;
+        break;
+
+      case 'late':
+        // Late game: tighten formation but avoid clustering
+        const lateSpacing = Math.min(
+          ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
+        );
+        if (lateSpacing >= 2 && lateSpacing <= 3) score += 12;
+        break;
+
+      case 'endgame':
+        // Endgame: coordination less important than catching culprit
+        score += 0; // No coordination bonus, focus on pursuit
+        break;
+    }
+
+    return score;
+  }
+
+  private calculateDynamicSpacing(
+    move: { type: MoveType; targetPosition: number },
+    player: Player,
+    otherDetectives: Player[],
+    gamePhase: 'early' | 'mid' | 'late' | 'endgame'
+  ): number {
+    if (otherDetectives.length === 0) return 0;
+
+    let score = 0;
+    const distances = otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position));
+    const minDistance = Math.min(...distances);
+    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+
+    // Dynamic spacing based on game phase
+    let optimalMinDistance: number;
+    let optimalAvgDistance: number;
+
+    switch (gamePhase) {
+      case 'early':
+        optimalMinDistance = 4;
+        optimalAvgDistance = 6;
+        break;
+      case 'mid':
+        optimalMinDistance = 3;
+        optimalAvgDistance = 5;
+        break;
+      case 'late':
+        optimalMinDistance = 2;
+        optimalAvgDistance = 4;
+        break;
+      case 'endgame':
+        optimalMinDistance = 1;
+        optimalAvgDistance = 3;
+        break;
+    }
+
+    // Score based on how close to optimal spacing
+    const minDistanceScore = 10 - Math.abs(minDistance - optimalMinDistance) * 3;
+    const avgDistanceScore = 5 - Math.abs(avgDistance - optimalAvgDistance) * 2;
+
+    score += Math.max(0, minDistanceScore) + Math.max(0, avgDistanceScore);
+
+    // Heavy penalty for clustering (being too close to multiple detectives)
+    const nearbyDetectives = distances.filter(d => d <= 2).length;
+    if (nearbyDetectives >= 2) {
+      score -= 40; // Severe clustering penalty
+    }
+
+    return score;
+  }
+
+  private analyzeHumanBehaviorProfile(culpritMoves: Move[], gameState: GameState): {
+    riskTolerance: 'low' | 'medium' | 'high';
+    transportPreference: { taxi: number; bus: number; underground: number };
+    patternConsistency: number;
+    adaptability: number;
+  } {
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+
+    // Analyze risk tolerance based on distance to detectives
+    let totalRisk = 0;
+    let riskSamples = 0;
+
+    culpritMoves.forEach((move, index) => {
+      if (index > 0) { // Skip first move
+        const detectiveDistances = detectives.map(d => {
+          // Get detective position at that time (approximate)
+          const detectiveMoves = gameState.moves.filter(m => m.role === d.role && gameState.moves.indexOf(m) <= gameState.moves.indexOf(move));
+          const lastDetectiveMove = detectiveMoves[detectiveMoves.length - 1];
+          return lastDetectiveMove ? this.calculateDistance(move.position, lastDetectiveMove.position) : 10;
+        });
+        const minDistance = Math.min(...detectiveDistances);
+        totalRisk += minDistance;
+        riskSamples++;
+      }
+    });
+
+    const avgRisk = riskSamples > 0 ? totalRisk / riskSamples : 5;
+    const riskTolerance = avgRisk < 3 ? 'high' : avgRisk < 5 ? 'medium' : 'low';
+
+    // Analyze transport preferences
+    const transportCounts = { taxi: 0, bus: 0, underground: 0 };
+    culpritMoves.filter(m => !m.secret).forEach(move => {
+      if (move.type && transportCounts.hasOwnProperty(move.type)) {
+        transportCounts[move.type]++;
+      }
+    });
+
+    const totalTransport = Object.values(transportCounts).reduce((sum, count) => sum + count, 0);
+    const transportPreference = {
+      taxi: totalTransport > 0 ? transportCounts.taxi / totalTransport : 0.33,
+      bus: totalTransport > 0 ? transportCounts.bus / totalTransport : 0.33,
+      underground: totalTransport > 0 ? transportCounts.underground / totalTransport : 0.33
+    };
+
+    // Analyze pattern consistency (how predictable the player is)
+    const patternConsistency = this.calculatePatternConsistency(culpritMoves);
+
+    // Analyze adaptability (how much the player changes strategy)
+    const adaptability = this.calculateAdaptability(culpritMoves, gameState);
+
+    return {
+      riskTolerance,
+      transportPreference,
+      patternConsistency,
+      adaptability
+    };
+  }
+
+  private detectMovementPattern(culpritMoves: Move[]): {
+    type: 'linear' | 'circular' | 'random' | 'hub-based' | 'evasive';
+    confidence: number;
+    predictedNextPositions: number[];
+  } {
+    if (culpritMoves.length < 3) {
+      return { type: 'random', confidence: 0, predictedNextPositions: [] };
+    }
+
+    const positions = culpritMoves.map(m => m.position);
+
+    // Check for linear movement
+    const linearConfidence = this.calculateLinearConfidence(positions);
+
+    // Check for circular movement
+    const circularConfidence = this.calculateCircularConfidence(positions);
+
+    // Check for hub-based movement (returning to central locations)
+    const hubConfidence = this.calculateHubBasedConfidence(positions);
+
+    // Check for evasive movement (avoiding detectives)
+    const evasiveConfidence = this.calculateEvasiveConfidence(culpritMoves);
+
+    const patterns = [
+      { type: 'linear' as const, confidence: linearConfidence },
+      { type: 'circular' as const, confidence: circularConfidence },
+      { type: 'hub-based' as const, confidence: hubConfidence },
+      { type: 'evasive' as const, confidence: evasiveConfidence }
+    ];
+
+    const bestPattern = patterns.reduce((best, current) =>
+      current.confidence > best.confidence ? current : best
+    );
+
+    // Generate predicted next positions based on pattern
+    const predictedNextPositions = this.generatePredictedPositions(bestPattern.type, positions);
+
+    return {
+      type: bestPattern.confidence > 0.3 ? bestPattern.type : 'random',
+      confidence: bestPattern.confidence,
+      predictedNextPositions
+    };
+  }
+
+  private assessCurrentRisk(gameState: GameState): {
+    level: 'low' | 'medium' | 'high' | 'critical';
+    factors: string[];
+    escapeRoutes: number;
+  } {
+    const culprit = gameState.players.find(p => p.role === 'culprit');
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+
+    if (!culprit) {
+      return { level: 'low', factors: [], escapeRoutes: 0 };
+    }
+
+    const factors: string[] = [];
+    let riskScore = 0;
+
+    // Distance to closest detective
+    const detectiveDistances = detectives.map(d => this.calculateDistance(culprit.position, d.position));
+    const minDistance = Math.min(...detectiveDistances);
+
+    if (minDistance <= 1) {
+      riskScore += 40;
+      factors.push('Detective within 1 move');
+    } else if (minDistance <= 2) {
+      riskScore += 25;
+      factors.push('Detective within 2 moves');
+    } else if (minDistance <= 3) {
+      riskScore += 10;
+      factors.push('Detective within 3 moves');
+    }
+
+    // Number of detectives nearby
+    const nearbyDetectives = detectiveDistances.filter(d => d <= 3).length;
+    if (nearbyDetectives >= 3) {
+      riskScore += 20;
+      factors.push('Multiple detectives nearby');
+    }
+
+    // Ticket situation
+    const totalTickets = culprit.taxiTickets + culprit.busTickets + culprit.undergroundTickets;
+    if (totalTickets <= 5) {
+      riskScore += 15;
+      factors.push('Low on tickets');
+    }
+
+    // Escape routes
+    const map = new Map<number, NodeConnections>();
+    mapData.nodes.forEach(node => {
+      map.set(node.id, {
+        taxi: node.taxi || [],
+        bus: node.bus || [],
+        underground: node.underground || []
+      });
+    });
+
+    const escapeRoutes = this.getExitCount(map, culprit.position);
+    if (escapeRoutes <= 2) {
+      riskScore += 15;
+      factors.push('Limited escape routes');
+    }
+
+    // Determine risk level
+    let level: 'low' | 'medium' | 'high' | 'critical';
+    if (riskScore >= 50) level = 'critical';
+    else if (riskScore >= 30) level = 'high';
+    else if (riskScore >= 15) level = 'medium';
+    else level = 'low';
+
+    return { level, factors, escapeRoutes };
+  }
+
+  private calculateEnhancedPositionWeight(
+    position: number,
+    gameState: GameState,
+    map: Map<number, NodeConnections>,
+    humanBehaviorProfile: any,
+    movementPattern: any,
+    riskAssessment: any
+  ): number {
+    const baseWeight = this.calculatePositionWeight(position, gameState, map);
+
+    // Adjust based on human behavior profile
+    let behaviorMultiplier = 1.0;
+
+    // Risk tolerance adjustment
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+    const minDetectiveDistance = Math.min(
+      ...detectives.map(d => this.calculateDistance(position, d.position))
+    );
+
+    switch (humanBehaviorProfile.riskTolerance) {
+      case 'low':
+        if (minDetectiveDistance >= 4) behaviorMultiplier *= 1.3;
+        else if (minDetectiveDistance <= 2) behaviorMultiplier *= 0.5;
+        break;
+      case 'high':
+        if (minDetectiveDistance <= 2) behaviorMultiplier *= 1.2;
+        else if (minDetectiveDistance >= 5) behaviorMultiplier *= 0.8;
+        break;
+    }
+
+    // Pattern-based adjustment
+    if (movementPattern.type !== 'random' && movementPattern.predictedNextPositions.includes(position)) {
+      behaviorMultiplier *= (1 + movementPattern.confidence);
+    }
+
+    // Risk assessment adjustment
+    if (riskAssessment.level === 'critical' || riskAssessment.level === 'high') {
+      // In high risk, prefer positions with more escape routes
+      const exitCount = this.getExitCount(map, position);
+      if (exitCount >= 4) behaviorMultiplier *= 1.4;
+    }
+
+    return baseWeight * behaviorMultiplier;
+  }
+
+  private calculatePatternConsistency(culpritMoves: Move[]): number {
+    if (culpritMoves.length < 4) return 0;
+
+    // Analyze consistency in transport choices
+    const transportSequence = culpritMoves.filter(m => !m.secret).map(m => m.type);
+    let consistencyScore = 0;
+
+    // Check for repeated patterns
+    for (let patternLength = 2; patternLength <= Math.min(4, transportSequence.length / 2); patternLength++) {
+      const pattern = transportSequence.slice(0, patternLength);
+      let matches = 0;
+
+      for (let i = patternLength; i <= transportSequence.length - patternLength; i += patternLength) {
+        const segment = transportSequence.slice(i, i + patternLength);
+        if (JSON.stringify(pattern) === JSON.stringify(segment)) {
+          matches++;
+        }
+      }
+
+      if (matches > 0) {
+        consistencyScore += matches / (transportSequence.length / patternLength);
+      }
+    }
+
+    return Math.min(1, consistencyScore);
+  }
+
+  private calculateAdaptability(culpritMoves: Move[], gameState: GameState): number {
+    if (culpritMoves.length < 5) return 0.5; // Default medium adaptability
+
+    // Analyze how much the strategy changes over time
+    const earlyMoves = culpritMoves.slice(0, Math.floor(culpritMoves.length / 2));
+    const lateMoves = culpritMoves.slice(Math.floor(culpritMoves.length / 2));
+
+    // Compare transport usage patterns
+    const earlyTransports = this.getTransportDistribution(earlyMoves);
+    const lateTransports = this.getTransportDistribution(lateMoves);
+
+    let adaptabilityScore = 0;
+
+    // Calculate difference in transport usage
+    Object.keys(earlyTransports).forEach(transport => {
+      adaptabilityScore += Math.abs(earlyTransports[transport] - lateTransports[transport]);
+    });
+
+    // Analyze position preferences (staying in same areas vs exploring)
+    const earlyPositions = new Set(earlyMoves.map(m => Math.floor(m.position / 10))); // Group by area
+    const latePositions = new Set(lateMoves.map(m => Math.floor(m.position / 10)));
+
+    const positionOverlap = new Set([...earlyPositions].filter(x => latePositions.has(x))).size;
+    const totalAreas = new Set([...earlyPositions, ...latePositions]).size;
+
+    const explorationChange = 1 - (positionOverlap / totalAreas);
+    adaptabilityScore += explorationChange;
+
+    return Math.min(1, adaptabilityScore / 2);
+  }
+
+  private getTransportDistribution(moves: Move[]): { [key: string]: number } {
+    const distribution = { taxi: 0, bus: 0, underground: 0 };
+    const validMoves = moves.filter(m => !m.secret && m.type);
+
+    validMoves.forEach(move => {
+      if (move.type && distribution.hasOwnProperty(move.type)) {
+        distribution[move.type]++;
+      }
+    });
+
+    const total = Object.values(distribution).reduce((sum, count) => sum + count, 0);
+    if (total === 0) return { taxi: 0.33, bus: 0.33, underground: 0.33 };
+
+    Object.keys(distribution).forEach(key => {
+      distribution[key] = distribution[key] / total;
+    });
+
+    return distribution;
+  }
+
+  private calculateLinearConfidence(positions: number[]): number {
+    if (positions.length < 3) return 0;
+
+    const vectors = [];
+    for (let i = 1; i < positions.length; i++) {
+      const prev = positions[i - 1];
+      const curr = positions[i];
+      vectors.push({
+        dx: (curr % 100) - (prev % 100),
+        dy: Math.floor(curr / 100) - Math.floor(prev / 100)
+      });
+    }
+
+    if (vectors.length < 2) return 0;
+
+    let consistentDirections = 0;
+    const firstVector = vectors[0];
+    const firstMagnitude = Math.sqrt(firstVector.dx * firstVector.dx + firstVector.dy * firstVector.dy);
+
+    if (firstMagnitude === 0) return 0;
+
+    for (let i = 1; i < vectors.length; i++) {
+      const vector = vectors[i];
+      const magnitude = Math.sqrt(vector.dx * vector.dx + vector.dy * vector.dy);
+
+      if (magnitude === 0) continue;
+
+      const dotProduct = (firstVector.dx * vector.dx + firstVector.dy * vector.dy) / (firstMagnitude * magnitude);
+      if (dotProduct > 0.7) { // Similar direction
+        consistentDirections++;
+      }
+    }
+
+    return consistentDirections / (vectors.length - 1);
+  }
+
+  private calculateCircularConfidence(positions: number[]): number {
+    if (positions.length < 4) return 0;
+
+    const center = this.calculateMovementCenter(positions);
+    if (!center) return 0;
+
+    const distances = positions.map(pos => this.calculateDistance(pos, center));
+    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+    const variance = distances.reduce((sum, d) => sum + Math.pow(d - avgDistance, 2), 0) / distances.length;
+
+    // Low variance indicates circular movement
+    const circularScore = Math.max(0, 1 - variance / 4);
+
+    // Check for returning to similar positions
+    const positionRevisits = new Set();
+    const revisitScore = positions.reduce((score, pos, index) => {
+      const nearbyPositions = positions.slice(0, index).filter(p => this.calculateDistance(pos, p) <= 2);
+      if (nearbyPositions.length > 0) {
+        positionRevisits.add(pos);
+        return score + 1;
+      }
+      return score;
+    }, 0) / positions.length;
+
+    return (circularScore + revisitScore) / 2;
+  }
+
+  private calculateHubBasedConfidence(positions: number[]): number {
+    if (positions.length < 4) return 0;
+
+    // Find positions that are visited multiple times
+    const positionCounts = new Map<number, number>();
+    positions.forEach(pos => {
+      positionCounts.set(pos, (positionCounts.get(pos) || 0) + 1);
+    });
+
+    const hubs = Array.from(positionCounts.entries())
+      .filter(([_, count]) => count >= 2)
+      .map(([pos, _]) => pos);
+
+    if (hubs.length === 0) return 0;
+
+    // Calculate how often the player returns to hub areas
+    let hubReturns = 0;
+    for (let i = 1; i < positions.length; i++) {
+      const currentPos = positions[i];
+      const isNearHub = hubs.some(hub => this.calculateDistance(currentPos, hub) <= 2);
+      if (isNearHub) hubReturns++;
+    }
+
+    return hubReturns / (positions.length - 1);
+  }
+
+  private calculateEvasiveConfidence(culpritMoves: Move[]): number {
+    // This would require detective position history, which is complex
+    // For now, return a simple heuristic based on transport variety
+    const transportTypes = new Set(culpritMoves.filter(m => !m.secret).map(m => m.type));
+    return Math.min(1, transportTypes.size / 3); // More transport variety = more evasive
+  }
+
+  private generatePredictedPositions(patternType: string, positions: number[]): number[] {
+    switch (patternType) {
+      case 'linear':
+        const predicted = this.predictLinearNextPosition(positions);
+        return predicted ? [predicted] : [];
+
+      case 'circular':
+        const center = this.calculateMovementCenter(positions);
+        if (!center) return [];
+        // Predict positions around the center
+        return positions.filter(pos => this.calculateDistance(pos, center) <= 3);
+
+      case 'hub-based':
+        // Return hub positions
+        const positionCounts = new Map<number, number>();
+        positions.forEach(pos => {
+          positionCounts.set(pos, (positionCounts.get(pos) || 0) + 1);
+        });
+        return Array.from(positionCounts.entries())
+          .filter(([_, count]) => count >= 2)
+          .map(([pos, _]) => pos);
+
+      default:
+        return [];
+    }
+  }
+
+  private assessHumanPlayerSkill(gameState: GameState): {
+    skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    metrics: {
+      averageDistanceFromDetectives: number;
+      transportVariety: number;
+      escapeEfficiency: number;
+      riskManagement: number;
+      patternUnpredictability: number;
+    };
+  } {
+    const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+
+    if (culpritMoves.length < 3) {
+      return {
+        skillLevel: 'intermediate',
+        metrics: {
+          averageDistanceFromDetectives: 5,
+          transportVariety: 0.5,
+          escapeEfficiency: 0.5,
+          riskManagement: 0.5,
+          patternUnpredictability: 0.5
+        }
+      };
+    }
+
+    // Calculate average distance from detectives
+    let totalDistance = 0;
+    let distanceSamples = 0;
+
+    culpritMoves.forEach((move, index) => {
+      if (index > 0) {
+        const detectiveDistances = detectives.map(d => {
+          const detectiveMoves = gameState.moves.filter(m => m.role === d.role);
+          const relevantMove = detectiveMoves[Math.min(index - 1, detectiveMoves.length - 1)];
+          return relevantMove ? this.calculateDistance(move.position, relevantMove.position) : 10;
+        });
+        const minDistance = Math.min(...detectiveDistances);
+        totalDistance += minDistance;
+        distanceSamples++;
+      }
+    });
+
+    const averageDistanceFromDetectives = distanceSamples > 0 ? totalDistance / distanceSamples : 5;
+
+    // Calculate transport variety
+    const transportTypes = new Set(culpritMoves.filter(m => !m.secret).map(m => m.type));
+    const transportVariety = transportTypes.size / 3; // Max 3 transport types
+
+    // Calculate escape efficiency (how well they use available moves)
+    const escapeEfficiency = this.calculateEscapeEfficiency(culpritMoves, gameState);
+
+    // Calculate risk management (avoiding dangerous situations)
+    const riskManagement = this.calculateRiskManagement(culpritMoves, gameState);
+
+    // Calculate pattern unpredictability
+    const patternUnpredictability = 1 - this.calculatePatternConsistency(culpritMoves);
+
+    const metrics = {
+      averageDistanceFromDetectives: Math.min(10, averageDistanceFromDetectives) / 10,
+      transportVariety,
+      escapeEfficiency,
+      riskManagement,
+      patternUnpredictability
+    };
+
+    // Calculate overall skill level
+    const overallScore = (
+      metrics.averageDistanceFromDetectives * 0.25 +
+      metrics.transportVariety * 0.15 +
+      metrics.escapeEfficiency * 0.25 +
+      metrics.riskManagement * 0.2 +
+      metrics.patternUnpredictability * 0.15
+    );
+
+    let skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    if (overallScore >= 0.8) skillLevel = 'expert';
+    else if (overallScore >= 0.65) skillLevel = 'advanced';
+    else if (overallScore >= 0.4) skillLevel = 'intermediate';
+    else skillLevel = 'beginner';
+
+    return { skillLevel, metrics };
+  }
+
+  private calculateAdaptiveDifficulty(
+    skillAssessment: any,
+    gameState: GameState
+  ): {
+    level: 'easy' | 'normal' | 'hard' | 'expert';
+    aggressiveness: number; // 0-1
+    coordination: number; // 0-1
+    prediction: number; // 0-1
+    mistakes: number; // 0-1 (higher = more mistakes)
+  } {
+    const culpritMoves = gameState.moves.filter(m => m.role === 'culprit').length;
+    const gameProgress = Math.min(1, culpritMoves / 20); // Normalize to 0-1
+
+    // Base difficulty on skill assessment
+    let baseDifficulty: number;
+    switch (skillAssessment.skillLevel) {
+      case 'beginner': baseDifficulty = 0.3; break;
+      case 'intermediate': baseDifficulty = 0.5; break;
+      case 'advanced': baseDifficulty = 0.7; break;
+      case 'expert': baseDifficulty = 0.9; break;
+    }
+
+    // Adjust difficulty based on game progress (ramp up over time)
+    const progressAdjustment = gameProgress * 0.2;
+    const adjustedDifficulty = Math.min(1, baseDifficulty + progressAdjustment);
+
+    // Determine difficulty level
+    let level: 'easy' | 'normal' | 'hard' | 'expert';
+    if (adjustedDifficulty >= 0.8) level = 'expert';
+    else if (adjustedDifficulty >= 0.65) level = 'hard';
+    else if (adjustedDifficulty >= 0.4) level = 'normal';
+    else level = 'easy';
+
+    // Calculate specific parameters
+    const aggressiveness = Math.min(1, adjustedDifficulty + 0.1);
+    const coordination = Math.min(1, adjustedDifficulty);
+    const prediction = Math.min(1, adjustedDifficulty + 0.05);
+    const mistakes = Math.max(0, 0.3 - adjustedDifficulty * 0.3); // More mistakes at lower difficulty
+
+    return { level, aggressiveness, coordination, prediction, mistakes };
+  }
+
+  private calculateEscapeEfficiency(culpritMoves: Move[], gameState: GameState): number {
+    if (culpritMoves.length < 3) return 0.5;
+
+    let efficiencyScore = 0;
+    let samples = 0;
+
+    const map = new Map<number, NodeConnections>();
+    mapData.nodes.forEach(node => {
+      map.set(node.id, {
+        taxi: node.taxi || [],
+        bus: node.bus || [],
+        underground: node.underground || []
+      });
+    });
+
+    culpritMoves.forEach((move, index) => {
+      if (index > 0) {
+        const prevPosition = culpritMoves[index - 1].position;
+        const currentPosition = move.position;
+
+        // Check if this was an optimal escape move
+        const prevNode = map.get(prevPosition);
+        if (prevNode) {
+          const allPossibleMoves = [
+            ...(prevNode.taxi || []),
+            ...(prevNode.bus || []),
+            ...(prevNode.underground || [])
+          ];
+
+          const detectives = gameState.players.filter(p => p.role !== 'culprit');
+          const detectiveDistances = allPossibleMoves.map(pos => {
+            return Math.min(...detectives.map(d => this.calculateDistance(pos, d.position)));
+          });
+
+          const maxDistance = Math.max(...detectiveDistances);
+          const actualDistance = Math.min(...detectives.map(d => this.calculateDistance(currentPosition, d.position)));
+
+          if (maxDistance > 0) {
+            efficiencyScore += actualDistance / maxDistance;
+            samples++;
+          }
+        }
+      }
+    });
+
+    return samples > 0 ? efficiencyScore / samples : 0.5;
+  }
+
+  private calculateRiskManagement(culpritMoves: Move[], gameState: GameState): number {
+    if (culpritMoves.length < 3) return 0.5;
+
+    let riskScore = 0;
+    let samples = 0;
+
+    const detectives = gameState.players.filter(p => p.role !== 'culprit');
+
+    culpritMoves.forEach((move, index) => {
+      if (index > 0) {
+        // Calculate risk level at this position
+        const detectiveDistances = detectives.map(d => {
+          const detectiveMoves = gameState.moves.filter(m => m.role === d.role);
+          const relevantMove = detectiveMoves[Math.min(index - 1, detectiveMoves.length - 1)];
+          return relevantMove ? this.calculateDistance(move.position, relevantMove.position) : 10;
+        });
+
+        const minDistance = Math.min(...detectiveDistances);
+        const nearbyDetectives = detectiveDistances.filter(d => d <= 3).length;
+
+        // Good risk management = maintaining distance and avoiding clusters
+        let moveRiskScore = 1;
+        if (minDistance <= 1) moveRiskScore = 0.1; // Very risky
+        else if (minDistance <= 2) moveRiskScore = 0.3; // Risky
+        else if (minDistance <= 3) moveRiskScore = 0.6; // Moderate
+        else moveRiskScore = 1; // Safe
+
+        // Penalty for being surrounded
+        if (nearbyDetectives >= 3) moveRiskScore *= 0.5;
+
+        riskScore += moveRiskScore;
+        samples++;
+      }
+    });
+
+    return samples > 0 ? riskScore / samples : 0.5;
+  }
+
+  private applyDifficultyScaling(
+    moves: Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }>,
+    difficultyLevel: any,
+    skillAssessment: any
+  ): Array<{ type: MoveType; targetPosition: number; score: number; blockedBy: string[] }> {
+
+    return moves.map(move => {
+      let adjustedScore = move.score;
+
+      // Apply aggressiveness scaling
+      if (move.score > 0) {
+        adjustedScore *= difficultyLevel.aggressiveness;
+      }
+
+      // Apply coordination scaling (affects coordination bonuses)
+      const coordinationBonus = Math.max(0, move.score - 50); // Assume coordination adds 50+ points
+      adjustedScore = (adjustedScore - coordinationBonus) + (coordinationBonus * difficultyLevel.coordination);
+
+      // Apply prediction scaling (affects culprit tracking bonuses)
+      const predictionBonus = Math.max(0, move.score - 30); // Assume prediction adds 30+ points
+      adjustedScore = (adjustedScore - predictionBonus) + (predictionBonus * difficultyLevel.prediction);
+
+      // Add mistakes (random score reduction)
+      if (difficultyLevel.mistakes > 0 && Math.random() < difficultyLevel.mistakes) {
+        adjustedScore *= (0.7 + Math.random() * 0.3); // Reduce score by 0-30%
+      }
+
+      // Skill-based adjustments
+      switch (skillAssessment.skillLevel) {
+        case 'beginner':
+          // Make more obvious moves, less optimal play
+          if (move.score < 20) adjustedScore *= 1.2; // Boost simple moves
+          break;
+        case 'expert':
+          // More sophisticated play, better prediction
+          if (move.score > 40) adjustedScore *= 1.1; // Boost complex moves
+          break;
+      }
+
+      return {
+        ...move,
+        score: adjustedScore
+      };
+    });
   }
 }
