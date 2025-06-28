@@ -2,14 +2,45 @@ import { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import { securityHeaders, rateLimitConfig } from '../helpers/validation-schemas';
+import { rateLimitConfig } from '../helpers/validation-schemas';
 
 /**
  * Security plugin that adds rate limiting, security headers, and other security measures
  */
 export default fp(async function (fastify: FastifyInstance) {
   // Register helmet for security headers
-  await fastify.register(helmet, securityHeaders);
+  await fastify.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "ws:", "wss:"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    dnsPrefetchControl: { allow: false },
+    frameguard: { action: 'deny' },
+    hidePoweredBy: true,
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    },
+    ieNoOpen: true,
+    noSniff: true,
+    originAgentCluster: true,
+    permittedCrossDomainPolicies: false,
+    referrerPolicy: { policy: "no-referrer" },
+    xssFilter: true,
+  });
 
   // Register rate limiting
   await fastify.register(rateLimit, {
@@ -28,10 +59,6 @@ export default fp(async function (fastify: FastifyInstance) {
       'x-ratelimit-limit': true,
       'x-ratelimit-remaining': true,
       'x-ratelimit-reset': true
-    },
-    // Skip rate limiting for health checks
-    skip: function (request) {
-      return request.url === '/health' || request.url === '/';
     }
   });
 
@@ -39,7 +66,12 @@ export default fp(async function (fastify: FastifyInstance) {
   fastify.addHook('onRequest', async (request, reply) => {
     // Add request ID for tracing
     request.id = request.id || generateRequestId();
-    
+
+    // Skip rate limiting for health checks
+    if (request.url === '/health' || request.url === '/') {
+      return;
+    }
+
     // Log security-relevant requests
     if (request.method !== 'GET' || request.url.includes('/api/')) {
       fastify.log.info({
@@ -123,7 +155,7 @@ export default fp(async function (fastify: FastifyInstance) {
       reply.code(429).send({
         error: 'Too Many Requests',
         message: 'Rate limit exceeded. Please try again later.',
-        retryAfter: error.retryAfter || 60
+        retryAfter: 60
       });
     } else if (error.validation) {
       // Validation error
