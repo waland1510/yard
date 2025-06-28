@@ -58,11 +58,11 @@ server.register(cors, {
     ];
 
     // Allow Vercel preview URLs (common patterns)
-    const isVercelPreview = origin.includes('.vercel.app') ||
-                           origin.includes('yard-') ||
-                           origin.includes('waland1510-') ||
-                           origin.match(/https:\/\/.*-waland1510\.vercel\.app/) ||
-                           origin.match(/https:\/\/yard-.*\.vercel\.app/);
+    const isVercelPreview = origin.includes('.vercel.app') && (
+                           origin.includes('yard') ||
+                           origin.includes('waland1510') ||
+                           origin.includes('scotland-yard')
+                         );
 
     // Allow localhost with any port for development
     const isLocalhost = (origin.includes('localhost') ||

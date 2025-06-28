@@ -1,13 +1,55 @@
 import { GameState, IpInfo, Move, Player } from '@yard/shared-utils';
 import axios from 'axios';
+import { API_URL, ENABLE_DEBUG } from '../config/environment';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-
+  baseURL: API_URL,
+  timeout: 10000, // 10 second timeout
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Include credentials for CORS
 });
+
+// Request interceptor for debugging
+if (ENABLE_DEBUG) {
+  api.interceptors.request.use(
+    (config) => {
+      console.log('🚀 API Request:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        baseURL: config.baseURL,
+        fullURL: `${config.baseURL}${config.url}`,
+      });
+      return config;
+    },
+    (error) => {
+      console.error('❌ API Request Error:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  api.interceptors.response.use(
+    (response) => {
+      console.log('✅ API Response:', {
+        status: response.status,
+        url: response.config.url,
+        data: response.data,
+      });
+      return response;
+    },
+    (error) => {
+      console.error('❌ API Response Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        url: error.config?.url,
+        message: error.message,
+        data: error.response?.data,
+      });
+      return Promise.reject(error);
+    }
+  );
+}
 
 const handleApiError = (error: unknown, context: string) => {
   console.error(`${context}:`, error);

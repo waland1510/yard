@@ -1,3 +1,5 @@
+import { WS_URL, ENABLE_DEBUG } from '../config/environment';
+
 interface WebSocketConfig {
   url: string;
   reconnectInterval: number;
@@ -24,13 +26,21 @@ class WebSocketManager {
 
   constructor(config: Partial<WebSocketConfig> = {}) {
     this.config = {
-      url: import.meta.env.VITE_WS_URL || 'ws://localhost:3000/wss',
+      url: WS_URL,
       reconnectInterval: 3000,
       maxReconnectAttempts: 5,
       heartbeatInterval: 30000,
       connectionTimeout: 10000,
       ...config
     };
+
+    if (ENABLE_DEBUG) {
+      console.log('🔌 WebSocket Manager initialized:', {
+        url: this.config.url,
+        reconnectInterval: this.config.reconnectInterval,
+        maxReconnectAttempts: this.config.maxReconnectAttempts,
+      });
+    }
 
     this.state = {
       socket: null,

@@ -13,6 +13,7 @@ import {
   Badge,
   Divider,
 } from '@chakra-ui/react';
+import { API_URL, WS_URL, testConnectivity } from '../config/environment';
 
 interface CORSTestResult {
   success: boolean;
@@ -26,8 +27,9 @@ interface CORSTestResult {
 export const CORSTest: React.FC = () => {
   const [results, setResults] = useState<CORSTestResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectivityTest, setConnectivityTest] = useState<any>(null);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const apiUrl = API_URL;
 
   const testEndpoints = [
     { name: 'Root', path: '/' },
@@ -79,11 +81,26 @@ export const CORSTest: React.FC = () => {
       const result = await testCORS(endpoint);
       testResults.push({ ...result, name: endpoint.name } as any);
       setResults([...testResults]);
-      
+
       // Small delay between requests
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
+    setIsLoading(false);
+  };
+
+  const runConnectivityTest = async () => {
+    setIsLoading(true);
+    try {
+      const result = await testConnectivity();
+      setConnectivityTest(result);
+    } catch (error) {
+      setConnectivityTest({
+        api: false,
+        websocket: false,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+      });
+    }
     setIsLoading(false);
   };
 
@@ -118,17 +135,29 @@ export const CORSTest: React.FC = () => {
           </Text>
         </Box>
 
-        <HStack>
+        <HStack wrap="wrap" spacing={3}>
           <Button
             onClick={runAllTests}
             isLoading={isLoading}
             loadingText="Testing..."
             colorScheme="blue"
           >
-            Run Tests
+            Run Endpoint Tests
           </Button>
           <Button
-            onClick={() => setResults([])}
+            onClick={runConnectivityTest}
+            isLoading={isLoading}
+            loadingText="Testing..."
+            colorScheme="green"
+            variant="outline"
+          >
+            Quick Connectivity Test
+          </Button>
+          <Button
+            onClick={() => {
+              setResults([]);
+              setConnectivityTest(null);
+            }}
             variant="outline"
             disabled={isLoading}
           >
@@ -137,6 +166,39 @@ export const CORSTest: React.FC = () => {
         </HStack>
 
         <Divider />
+
+        {/* Quick Connectivity Test Results */}
+        {connectivityTest && (
+          <Alert
+            status={connectivityTest.api && connectivityTest.websocket ? 'success' : 'warning'}
+            variant="left-accent"
+          >
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle>Quick Connectivity Test Results</AlertTitle>
+              <AlertDescription>
+                <VStack align="start" spacing={2}>
+                  <HStack>
+                    <Badge colorScheme={connectivityTest.api ? 'green' : 'red'}>
+                      API: {connectivityTest.api ? 'Connected' : 'Failed'}
+                    </Badge>
+                    <Badge colorScheme={connectivityTest.websocket ? 'green' : 'red'}>
+                      WebSocket: {connectivityTest.websocket ? 'Connected' : 'Failed'}
+                    </Badge>
+                  </HStack>
+                  {connectivityTest.errors.length > 0 && (
+                    <Box>
+                      <Text fontSize="sm" fontWeight="bold" color="red.500">Errors:</Text>
+                      {connectivityTest.errors.map((error: string, index: number) => (
+                        <Text key={index} fontSize="sm" color="red.500">• {error}</Text>
+                      ))}
+                    </Box>
+                  )}
+                </VStack>
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
 
         <VStack spacing={4} align="stretch">
           {results.map((result, index) => (
@@ -241,10 +303,19 @@ export const CORSTest: React.FC = () => {
               <strong>Frontend URL:</strong> {window.location.origin}
             </Text>
             <Text fontSize="sm">
-              <strong>Backend URL:</strong> {apiUrl}
+              <strong>Backend API URL:</strong> {apiUrl}
             </Text>
             <Text fontSize="sm">
-              <strong>User Agent:</strong> {navigator.userAgent.substring(0, 100)}...
+              <strong>WebSocket URL:</strong> {WS_URL}
+            </Text>
+            <Text fontSize="sm">
+              <strong>Environment:</strong> {import.meta.env.DEV ? 'Development' : 'Production'}
+            </Text>
+            <Text fontSize="sm">
+              <strong>Hostname:</strong> {window.location.hostname}
+            </Text>
+            <Text fontSize="sm">
+              <strong>Protocol:</strong> {window.location.protocol}
             </Text>
           </VStack>
         </Box>
