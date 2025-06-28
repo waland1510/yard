@@ -41,12 +41,50 @@ const server = fastify({
 
 const aiService = new AIPlayerService();
 
-// Register CORS
+// Register CORS with dynamic origin handling
 server.register(cors, {
-  origin: [ENV.FRONTEND_URL],
-  methods: ['GET', 'POST', 'PUT', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    // List of allowed origins from environment
+    const allowedOrigins = [
+      ENV.FRONTEND_URL,
+      ...ENV.ALLOWED_ORIGINS,
+      'http://localhost:4200',
+      'http://localhost:3000',
+      'http://127.0.0.1:4200',
+      'http://127.0.0.1:3000',
+    ];
+
+    // Allow Vercel preview URLs (common patterns)
+    const isVercelPreview = origin.includes('.vercel.app') ||
+                           origin.includes('yard-') ||
+                           origin.includes('waland1510-') ||
+                           origin.match(/https:\/\/.*-waland1510\.vercel\.app/) ||
+                           origin.match(/https:\/\/yard-.*\.vercel\.app/);
+
+    // Allow localhost with any port for development
+    const isLocalhost = (origin.includes('localhost') ||
+                        origin.includes('127.0.0.1')) &&
+                       ENV.NODE_ENV === 'development';
+
+    // Check if origin is allowed
+    if (allowedOrigins.includes(origin) || isVercelPreview || isLocalhost) {
+      server.log.debug(`CORS: Allowed origin: ${origin}`);
+      return callback(null, true);
+    }
+
+    // Log rejected origins for debugging
+    server.log.warn(`CORS: Rejected origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   credentials: true,
+  optionsSuccessStatus: 200, // For legacy browser support
+  preflightContinue: false,
+  preflight: true,
 });
 
 const channels: Record<string, Set<WebSocket>> = {};

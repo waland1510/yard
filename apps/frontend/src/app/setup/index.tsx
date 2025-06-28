@@ -2,7 +2,7 @@ import { useDisclosure } from '@chakra-ui/hooks';
 import {
   Box, Card, Drawer,
   DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader,
-  DrawerOverlay, Spinner, useToast
+  DrawerOverlay, Spinner, useToast, Button, HStack
 } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { Start } from './start';
 import { VideoBackground } from './video-background';
+import { CORSTest } from '../../components/cors-test';
 
 const setupWorkflow = [
   'startGame',
@@ -37,6 +38,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
   const existingChannel = localStorage.getItem('channel');
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const [showCORSTest, setShowCORSTest] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -164,8 +166,35 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
             </div>
           )}
         </Card>
+
+        {/* CORS Test Button - only show in development or if there are connection issues */}
+        {(process.env.NODE_ENV === 'development' || window.location.hostname.includes('vercel')) && (
+          <Box position="fixed" bottom={4} right={4} zIndex={1000}>
+            <Button
+              size="sm"
+              colorScheme="blue"
+              variant="outline"
+              onClick={() => setShowCORSTest(true)}
+            >
+              Test API Connection
+            </Button>
+          </Box>
+        )}
       </div>
       <VideoBackground />
+
+      {/* CORS Test Modal */}
+      <Drawer isOpen={showCORSTest} placement="right" onClose={() => setShowCORSTest(false)} size="lg">
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>API Connection Test</DrawerHeader>
+          <DrawerBody>
+            <CORSTest />
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+
       <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
         <DrawerOverlay />
         <DrawerContent>
