@@ -106,14 +106,11 @@ describe('Games Routes', () => {
       expect(body.createdGame.isDoubleMove).toBe(false);
     });
 
-    it('should create a game with AI players', async () => {
+    it('should create a game without any payload', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/api/games',
-        payload: {
-          aiRoles: ['detective1', 'detective2'],
-          difficulty: 'hard',
-        },
+        payload: {},
       });
 
       expect(response.statusCode).toBe(201);
@@ -122,33 +119,7 @@ describe('Games Routes', () => {
       expect(body.createdGame).toBeDefined();
     });
 
-    it('should validate AI roles array', async () => {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/games',
-        payload: {
-          aiRoles: ['invalid-role'],
-        },
-      });
 
-      expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(false);
-    });
-
-    it('should validate difficulty level', async () => {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/games',
-        payload: {
-          difficulty: 'invalid-difficulty',
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(false);
-    });
 
     it('should handle database errors during game creation', async () => {
       // Mock database error
@@ -332,7 +303,7 @@ describe('Games Routes', () => {
 
       const responses = await Promise.all(requests);
       const rateLimitedResponses = responses.filter(r => r.statusCode === 429);
-      
+
       expect(rateLimitedResponses.length).toBeGreaterThan(0);
     });
   });

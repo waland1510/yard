@@ -85,18 +85,6 @@ export default async function (fastify: FastifyInstance) {
     schema: {
       body: {
         type: 'object',
-        properties: {
-          aiRoles: {
-            type: 'array',
-            items: { type: 'string' },
-            maxItems: 6
-          },
-          difficulty: {
-            type: 'string',
-            enum: ['easy', 'medium', 'hard'],
-            default: 'medium'
-          }
-        },
         additionalProperties: false
       },
       response: {

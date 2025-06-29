@@ -113,7 +113,7 @@ export default fp(async function (fastify: FastifyInstance) {
           url: request.url,
           pattern: pattern.toString()
         }, 'Suspicious request detected');
-        
+
         reply.code(400).send({
           error: 'Bad Request',
           message: 'Invalid request format'
@@ -127,11 +127,11 @@ export default fp(async function (fastify: FastifyInstance) {
   fastify.addHook('onSend', async (request, reply, payload) => {
     // Remove server information
     reply.removeHeader('x-powered-by');
-    
+
     // Add custom security headers
     reply.header('X-Request-ID', request.id);
     reply.header('X-API-Version', '1.0');
-    
+
     return payload;
   });
 
@@ -149,7 +149,7 @@ export default fp(async function (fastify: FastifyInstance) {
 
     // Don't expose internal error details in production
     const isDevelopment = process.env.NODE_ENV === 'development';
-    
+
     if (error.statusCode === 429) {
       // Rate limit error
       reply.code(429).send({
@@ -181,14 +181,14 @@ export default fp(async function (fastify: FastifyInstance) {
   });
 
   // Health check endpoint (bypasses rate limiting)
-  fastify.get('/health', async () => {
-    return {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: process.env.npm_package_version || '1.0.0'
-    };
-  });
+  // fastify.get('/health', async () => {
+  //   return {
+  //     status: 'healthy',
+  //     timestamp: new Date().toISOString(),
+  //     uptime: process.uptime(),
+  //     version: process.env.npm_package_version || '1.0.0'
+  //   };
+  // });
 });
 
 function generateRequestId(): string {

@@ -67,7 +67,7 @@ const handleApiError = (error: unknown, context: string) => {
 
 export const createGame = async () => {
   try {
-    const response = await api.post('/api/games');
+    const response = await api.post('/api/games', {});
     return response.data;
   } catch (error) {
     handleApiError(error, 'Error creating game');
