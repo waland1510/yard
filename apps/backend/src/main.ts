@@ -7,26 +7,94 @@ import { app } from './app/app';
 import { AIPlayerService } from './app/helpers/ai-player';
 import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
 import { ENV } from './app/helpers/env';
+import { setupGracefulShutdown } from './app/helpers/error-handler';
+import {
+  incrementWebSocketConnection,
+  decrementWebSocketConnection,
+  incrementWebSocketMessage
+} from './app/plugins/monitoring';
 
 const host = ENV.HOST;
 const port = ENV.PORT;
 
 const server = fastify({
-  logger: true, // Enable logging
-  ignoreTrailingSlash: true, // Handle routes with or without trailing slashes
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    serializers: {
+      req: (req) => ({
+        method: req.method,
+        url: req.url,
+        hostname: req.hostname,
+        remoteAddress: req.ip,
+        remotePort: req.socket?.remotePort,
+      }),
+      res: (res) => ({
+        statusCode: res.statusCode,
+      }),
+    },
+  },
+  ignoreTrailingSlash: true,
+  trustProxy: true, // Important for getting real IP addresses
+  requestIdHeader: 'x-request-id',
+  requestIdLogLabel: 'requestId',
 });
+
 const aiService = new AIPlayerService();
 
+// Register CORS with dynamic origin handling
 server.register(cors, {
-  origin: [ENV.FRONTEND_URL],
-  methods: ['GET', 'POST', 'PUT', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    // List of allowed origins from environment
+    const allowedOrigins = [
+      ENV.FRONTEND_URL,
+      ...ENV.ALLOWED_ORIGINS,
+      'http://localhost:4200',
+      'http://localhost:3000',
+      'http://127.0.0.1:4200',
+      'http://127.0.0.1:3000',
+    ];
+
+    // Allow Vercel preview URLs (common patterns)
+    const isVercelPreview = origin.includes('.vercel.app') && (
+                           origin.includes('yard') ||
+                           origin.includes('waland1510') ||
+                           origin.includes('scotland-yard')
+                         );
+
+    // Allow localhost with any port for development
+    const isLocalhost = (origin.includes('localhost') ||
+                        origin.includes('127.0.0.1')) &&
+                       ENV.NODE_ENV === 'development';
+
+    // Check if origin is allowed
+    if (allowedOrigins.includes(origin) || isVercelPreview || isLocalhost) {
+      server.log.debug(`CORS: Allowed origin: ${origin}`);
+      return callback(null, true);
+    }
+
+    // Log rejected origins for debugging
+    server.log.warn(`CORS: Rejected origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  credentials: true,
+  optionsSuccessStatus: 200, // For legacy browser support
+  preflightContinue: false,
+  preflight: true,
 });
 
 const channels: Record<string, Set<WebSocket>> = {};
 
+// Register plugins and routes
 server.register(app);
 server.register(ws);
+
+// Setup graceful shutdown
+setupGracefulShutdown(server, server.log);
 
 async function handleAIMove(currentTurn, currentChannel) {
   const game = await hasActiveGame(currentChannel);
@@ -80,12 +148,15 @@ server.register(async function (fastify) {
 
       connection.on('message', async (message) => {
         const parsedMessage: Message = JSON.parse(message.toString());
+        incrementWebSocketMessage('received');
+
         switch (parsedMessage.type) {
           case 'startGame':
             currentChannel = parsedMessage.data.ch;
             channels[currentChannel] = new Set();
             channels[currentChannel].add(connection as unknown as WebSocket);
-            console.log(`Client joined channel: ${currentChannel}`);
+            incrementWebSocketConnection();
+            server.log.info(`Client joined channel: ${currentChannel}`);
             break;
 
           case 'joinGame': {
@@ -186,8 +257,10 @@ server.register(async function (fastify) {
       connection.on('close', () => {
         if (currentChannel) {
           channels[currentChannel].delete(connection as unknown as WebSocket);
+          decrementWebSocketConnection();
           if (channels[currentChannel].size === 0) {
             delete channels[currentChannel];
+            server.log.info(`Channel ${currentChannel} closed - no more clients`);
           }
         }
       });
@@ -198,11 +271,15 @@ server.register(async function (fastify) {
 const broadcast = (channel: string, message: Message) => {
   const clients = channels[channel];
   if (clients) {
+    let sentCount = 0;
     for (const client of clients) {
       if (client.readyState === client.OPEN) {
         client.send(JSON.stringify(message));
+        incrementWebSocketMessage('sent');
+        sentCount++;
       }
     }
+    server.log.debug(`Broadcasted message to ${sentCount} clients in channel ${channel}`);
   }
 };
 
