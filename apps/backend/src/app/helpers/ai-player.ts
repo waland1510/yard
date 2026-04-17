@@ -371,13 +371,26 @@ Choose the move that best ${player.role === 'culprit'
       .reverse()
       .find(index => showCulpritAtMoves.includes(index));
 
-    if (lastRevealedMoveIndex === undefined) return [];
+    const culprit = gameState.players.find(p => p.role === 'culprit');
+    if (!culprit) return [];
+
+    // If no reveal yet, use culprit's actual starting position for AI planning
+    // (This is internal AI knowledge, not revealed to human players)
+    if (lastRevealedMoveIndex === undefined) {
+      // Before first reveal, return the actual position with high probability
+      // This allows AI detectives to practice pursuit
+      if (culprit.position) {
+        return [{
+          type: 'taxi',
+          position: culprit.position,
+          probability: 0.8
+        }];
+      }
+      return [];
+    }
 
     const lastRevealedPosition = culpritMoves[lastRevealedMoveIndex - 1]?.position;
     if (!lastRevealedPosition) return [];
-
-    const culprit = gameState.players.find(p => p.role === 'culprit');
-    if (!culprit) return [];
 
     // Enhanced tracking with human behavior analysis
     const humanBehaviorProfile = this.analyzeHumanBehaviorProfile(culpritMoves, gameState);
@@ -2309,27 +2322,31 @@ ${Array.from(allPossibleMoves.entries())
   ): number {
     let score = 0;
 
-    // Mid game: balance between pursuit and positioning
+    // Mid game: ACTIVE PURSUIT - detectives should aggressively close in
     if (possibleCulpritPositions.length > 0) {
-      const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
+      const weightedDistance = possibleCulpritPositions.reduce((sum, pos) => {
         const distance = this.calculateDistance(move.targetPosition, pos.position);
         return sum + (distance * pos.probability);
       }, 0);
 
-      // Optimal distance for mid-game positioning (2-4 moves away)
-      if (avgDistanceToCulprit >= 2 && avgDistanceToCulprit <= 4) {
-        score += 25;
-      } else if (avgDistanceToCulprit > 6) {
-        score -= 15; // Too far away
+      // Strong pursuit bonus - higher score for being closer
+      score += (15 - Math.min(weightedDistance, 15)) * 8;
+
+      // Extra bonus for being very close to high-probability positions
+      const highProbPositions = possibleCulpritPositions.filter(p => p.probability > 0.2);
+      for (const pos of highProbPositions) {
+        const distance = this.calculateDistance(move.targetPosition, pos.position);
+        if (distance <= 2) {
+          score += 40 * pos.probability; // Strong bonus for being close
+        } else if (distance <= 4) {
+          score += 20 * pos.probability; // Moderate bonus for medium distance
+        }
       }
 
-      // Bonus for cutting off high-probability escape routes
-      const highProbPositions = possibleCulpritPositions.filter(p => p.probability > 0.3);
-      const blockedRoutes = highProbPositions.filter(pos =>
-        this.calculateDistance(move.targetPosition, pos.position) <= 2
-      ).length;
-
-      score += blockedRoutes * 8;
+      // Penalty for being too far
+      if (weightedDistance > 8) {
+        score -= 30;
+      }
     }
 
     return score;
