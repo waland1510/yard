@@ -73,15 +73,82 @@ function findShortestPath(
   return null;
 }
 
+/**
+ * BFS hop-count distance between two positions on the game graph.
+ * Ignores ticket costs — counts pure graph hops. Returns 999 if unreachable.
+ * This replaces the broken pixel-coordinate Manhattan distance.
+ */
+function bfsHopDistance(
+  map: Map<number, NodeConnections>,
+  from: number,
+  to: number
+): number {
+  if (from === to) return 0;
+  const visited = new Set<number>();
+  const queue: { node: number; hops: number }[] = [{ node: from, hops: 0 }];
+
+  while (queue.length > 0) {
+    const { node: current, hops } = queue.shift();
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    const connections = map.get(current);
+    if (!connections) continue;
+
+    const neighbors = [
+      ...(connections.taxi || []),
+      ...(connections.bus || []),
+      ...(connections.underground || []),
+    ];
+
+    for (const next of neighbors) {
+      if (next === to) return hops + 1;
+      if (!visited.has(next)) {
+        queue.push({ node: next, hops: hops + 1 });
+      }
+    }
+  }
+
+  return 999;
+}
+
+// Build a shared map reference for the graph (created once)
+const _sharedMap = new Map<number, NodeConnections>(
+  mapData.nodes.map(node => [node.id, { taxi: node.taxi, bus: node.bus, underground: node.underground }])
+);
+
+// Build a lookup from node ID to x,y pixel coordinates (real map geometry)
+const _nodeXY = new Map<number, { x: number; y: number }>(
+  mapData.nodes.map(node => [node.id, { x: node.x, y: node.y }])
+);
+
+/**
+ * Get real x,y coordinates for a node ID.
+ * Replaces the broken `position % 100` / `Math.floor(position / 100)` pattern.
+ */
+function getNodeXY(nodeId: number): { x: number; y: number } {
+  return _nodeXY.get(nodeId) ?? { x: 0, y: 0 };
+}
+
 function getNextDetectiveMove(
   map: Map<number, NodeConnections>,
   detective: Player,
   mrXPositions: number[] | PredictedCulpritMove[],
   otherDetectives: Player[]
 ): number | null {
-  const paths = mrXPositions
+  // Fix Bug 3: extract numeric positions from PredictedCulpritMove objects
+  const targets: number[] = mrXPositions.map(p =>
+    typeof p === 'number' ? p : (p as PredictedCulpritMove).position
+  );
+
+  // Sort targets by distance so we pursue the closest first
+  const sortedTargets = [...new Set(targets)].sort(
+    (a, b) => bfsHopDistance(map, detective.position, a) - bfsHopDistance(map, detective.position, b)
+  );
+
+  const paths = sortedTargets
     .map(position => findShortestPath(map, detective, [position]))
-    .filter(path => path !== null) as number[][];
+    .filter(path => path !== null && path.length > 1) as number[][];
 
   if (paths.length === 0) return null;
 
@@ -91,6 +158,21 @@ function getNextDetectiveMove(
     const nextPosition = path[1];
     if (!occupiedPositions.has(nextPosition)) {
       return nextPosition;
+    }
+  }
+
+  // All ideal next positions are blocked — pick the closest unoccupied neighbour
+  const currentNode = map.get(detective.position);
+  if (currentNode) {
+    const neighbors = [
+      ...(currentNode.taxi || []),
+      ...(currentNode.bus || []),
+      ...(currentNode.underground || []),
+    ];
+    for (const neighbor of neighbors) {
+      if (!occupiedPositions.has(neighbor)) {
+        return neighbor;
+      }
     }
   }
 
@@ -648,13 +730,10 @@ ${Array.from(allPossibleMoves.entries())
   }
 
   private calculateDistance(pos1: number, pos2: number): number {
-    const node1 = mapData.nodes.find(node => node.id === pos1);
-    const node2 = mapData.nodes.find(node => node.id === pos2);
-
-    if (!node1 || !node2) return 999;
-
-    // Calculate Manhattan distance using x,y coordinates
-    return Math.abs(node1.x - node2.x) + Math.abs(node1.y - node2.y);
+    // Fix Bug 2: use BFS hop-count on the actual game graph instead of
+    // Manhattan distance on pixel coordinates (which returned values 50-2000+
+    // making all threshold comparisons meaningless).
+    return bfsHopDistance(_sharedMap, pos1, pos2);
   }
 
   private shouldUseDoubleTicket(move: Move, player: Player, gameState: GameState): boolean {
@@ -857,8 +936,8 @@ ${Array.from(allPossibleMoves.entries())
 
     // Calculate position relative to culprit centroid
     const culpritCentroid = this.calculateCulpritCentroid(possibleCulpritPositions);
-    const playerX = player.position % 100;
-    const playerY = Math.floor(player.position / 100);
+    // Fix Bug 4: use real x,y from mapData
+    const { x: playerX, y: playerY } = getNodeXY(player.position);
     const distanceToCentroid = Math.sqrt(
       Math.pow(playerX - culpritCentroid.x, 2) +
       Math.pow(playerY - culpritCentroid.y, 2)
@@ -877,8 +956,7 @@ ${Array.from(allPossibleMoves.entries())
 
     // Calculate angles to other detectives relative to culprit
     const detectiveAngles = otherDetectives.map(detective => {
-      const detX = detective.position % 100;
-      const detY = Math.floor(detective.position / 100);
+      const { x: detX, y: detY } = getNodeXY(detective.position);
       return Math.atan2(detY - culpritCentroid.y, detX - culpritCentroid.x);
     });
 
@@ -1092,6 +1170,7 @@ ${Array.from(allPossibleMoves.entries())
 
     if (player.role !== 'culprit') {
       const currentMoveNumber = gameState.moves.filter(move => move.role === 'culprit').length;
+      const otherDetectives = detectives.filter(d => d.role !== player.role);
 
       // Early game positioning strategy (first 3 moves)
       if (currentMoveNumber <= 3) {
@@ -1107,7 +1186,7 @@ ${Array.from(allPossibleMoves.entries())
               .filter(([pos, node]) => {
                 if (node.underground?.length) {
                   const distance = this.calculateDistance(pos, targetPosition);
-                  return distance === 1; // One move away from underground
+                  return distance === 1; // One hop away from underground
                 }
                 return false;
               });
@@ -1152,36 +1231,101 @@ ${Array.from(allPossibleMoves.entries())
             if (hasUnderground) {
               // Calculate how well this underground station is positioned relative to likely culprit locations
               const possibleCulpritPositions = this.getPossibleCulpritPositions(gameState, map);
-              const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
-                const distance = this.calculateDistance(targetPosition, typeof pos === 'number' ? pos : pos.position);
-                const weight = typeof pos === 'number' ? 1 : pos.probability;
-                return sum + (distance * weight);
-              }, 0) / possibleCulpritPositions.length;
+              if (possibleCulpritPositions.length > 0) {
+                const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
+                  const distance = this.calculateDistance(targetPosition, pos.position);
+                  const weight = pos.probability;
+                  return sum + (distance * weight);
+                }, 0) / possibleCulpritPositions.length;
 
-              // Prefer underground stations that are well-positioned for pursuit
-              score += (15 - avgDistanceToCulprit) * 5;
+                // Prefer underground stations that are well-positioned for pursuit
+                score += Math.max(0, (8 - avgDistanceToCulprit)) * 5;
+              }
             }
             break;
           }
         }
 
-        // Global early-game coordination
-        const otherDetectives = detectives.filter(d => d.role !== player.role);
-        const detectiveSpacing = Math.min(...otherDetectives.map(d =>
-          this.calculateDistance(targetPosition, d.position)
-        ));
+        // Global early-game coordination — maintain spacing
+        if (otherDetectives.length > 0) {
+          const detectiveSpacing = Math.min(...otherDetectives.map(d =>
+            this.calculateDistance(targetPosition, d.position)
+          ));
 
-        // Maintain spacing in early game
-        if (detectiveSpacing < 2) {
-          score -= 35; // Strong penalty for clustering in early game
-        } else if (detectiveSpacing >= 2 && detectiveSpacing <= 4) {
-          score += 15; // Bonus for good spacing
+          if (detectiveSpacing < 2) {
+            score -= 35; // Strong penalty for clustering in early game
+          } else if (detectiveSpacing >= 2 && detectiveSpacing <= 4) {
+            score += 15; // Bonus for good spacing
+          }
         }
       }
 
-      // Continue with normal scoring for later turns
-      // Culprit scoring logic
-    } else {
+      // ---------------------------------------------------------------
+      // Fix Bug 1: Mid/late-game pursuit scoring (was completely missing).
+      // This is the CRITICAL fix — without it, detective scores were all 0
+      // after move 3, causing purely random movement.
+      // ---------------------------------------------------------------
+      if (currentMoveNumber > 3) {
+        const culprit = gameState.players.find(p => p.role === 'culprit');
+        const possibleCulpritPositions = this.getPossibleCulpritPositions(gameState, map);
+
+        // Determine the set of likely culprit positions (weighted by probability)
+        const culpritTargets: { position: number; weight: number }[] = [];
+
+        if (possibleCulpritPositions.length > 0) {
+          possibleCulpritPositions.forEach(p => {
+            culpritTargets.push({ position: p.position, weight: p.probability });
+          });
+        } else if (culprit) {
+          // No predictions available — use current known position
+          culpritTargets.push({ position: culprit.position, weight: 1.0 });
+        }
+
+        if (culpritTargets.length > 0) {
+          // Weighted average hop distance to predicted culprit positions
+          const totalWeight = culpritTargets.reduce((s, t) => s + t.weight, 0);
+          const weightedDistance = culpritTargets.reduce((sum, t) => {
+            return sum + this.calculateDistance(targetPosition, t.position) * t.weight;
+          }, 0) / totalWeight;
+
+          // Core pursuit score: strongly prefer moves that close the gap
+          // Max score 60 when adjacent, 0 when 6+ hops away
+          score += Math.max(0, (6 - weightedDistance)) * 10;
+
+          // Bonus for being able to reach a high-probability culprit position in one hop
+          const adjacentCulpritPositions = culpritTargets.filter(t =>
+            this.calculateDistance(targetPosition, t.position) <= 1
+          );
+          score += adjacentCulpritPositions.reduce((s, t) => s + t.weight * 50, 0);
+
+          // Block escape routes: bonus for being adjacent to multiple culprit exits
+          for (const t of culpritTargets) {
+            const culpritNode = map.get(t.position);
+            if (!culpritNode) continue;
+            const escapeRoutes = [
+              ...(culpritNode.taxi || []),
+              ...(culpritNode.bus || []),
+              ...(culpritNode.underground || []),
+            ];
+            if (escapeRoutes.includes(targetPosition)) {
+              score += t.weight * 20; // Blocking an escape route
+            }
+          }
+        }
+
+        // Anti-clustering: small penalty for being too close to other detectives
+        if (otherDetectives.length > 0) {
+          const minDetectiveDistance = Math.min(
+            ...otherDetectives.map(d => this.calculateDistance(targetPosition, d.position))
+          );
+          if (minDetectiveDistance < 2) {
+            score -= 20;
+          }
+        }
+      }
+      // ---------------------------------------------------------------
+
+    } else {  // Culprit scoring logic
       // Culprit strategy: maximize distance from detectives, prefer escape routes
       const detectiveDistances = detectives.map(d => this.calculateDistance(targetPosition, d.position));
       const minDetectiveDistance = Math.min(...detectiveDistances);
@@ -1685,12 +1829,9 @@ ${Array.from(allPossibleMoves.entries())
       }
 
       case 'interceptor': {
-        const otherPositions = otherDetectives.map(d => ({
-          x: d.position % 100,
-          y: Math.floor(d.position / 100)
-        }));
+        // Fix Bug 4: use real x,y from mapData
+        const otherPositions = otherDetectives.map(d => getNodeXY(d.position));
 
-        // Calculate average detective position
         const avgDetX = otherPositions.reduce((sum, pos) => sum + pos.x, 0) / otherPositions.length;
         const avgDetY = otherPositions.reduce((sum, pos) => sum + pos.y, 0) / otherPositions.length;
 
@@ -1706,14 +1847,13 @@ ${Array.from(allPossibleMoves.entries())
         };
 
         const nearbyNodes = Array.from(map.entries())
-          .filter(([pos, _]) => {
-            const nodeX = pos % 100;
-            const nodeY = Math.floor(pos / 100);
+          .filter(([pos]) => {
+            const { x: nodeX, y: nodeY } = getNodeXY(pos);
             const dx = nodeX - projectedPos.x;
             const dy = nodeY - projectedPos.y;
-            return Math.sqrt(dx * dx + dy * dy) <= 3;
+            return Math.sqrt(dx * dx + dy * dy) <= 300; // 300px ~ 3 hops
           })
-          .map(([_, node]) => node);
+          .map(([, node]) => node);
 
         const transportHubCount = nearbyNodes.reduce((count, node) =>
           count + (node.underground?.length || 0) + (node.bus?.length || 0), 0);
@@ -1740,8 +1880,10 @@ ${Array.from(allPossibleMoves.entries())
         );
 
         if (primaryHunter) {
-          const pursuitVectorX = culpritCentroid.x - (primaryHunter.position % 100);
-          const pursuitVectorY = culpritCentroid.y - Math.floor(primaryHunter.position / 100);
+          // Fix Bug 4: use real x,y from mapData
+          const { x: hunterX, y: hunterY } = getNodeXY(primaryHunter.position);
+          const pursuitVectorX = culpritCentroid.x - hunterX;
+          const pursuitVectorY = culpritCentroid.y - hunterY;
           const vectorLength = Math.sqrt(pursuitVectorX * pursuitVectorX + pursuitVectorY * pursuitVectorY);
 
           // Calculate perpendicular vector and normalize
@@ -1762,12 +1904,13 @@ ${Array.from(allPossibleMoves.entries())
           // Score each flank based on transport availability
           const scoreFlank = (pos: { x: number; y: number }) => {
             const nearby = Array.from(map.entries())
-              .filter(([nodePos, _]) => {
-                const dx = (nodePos % 100) - pos.x;
-                const dy = Math.floor(nodePos / 100) - pos.y;
-                return Math.sqrt(dx * dx + dy * dy) <= 2;
+              .filter(([nodePos]) => {
+                const { x: nx, y: ny } = getNodeXY(nodePos);
+                const dx = nx - pos.x;
+                const dy = ny - pos.y;
+                return Math.sqrt(dx * dx + dy * dy) <= 200; // 200px ~ 2 hops
               })
-              .map(([_, node]) => node);
+              .map(([, node]) => node);
 
             return nearby.reduce((score, node) =>
               score + (node.underground?.length || 0) * 2 + (node.bus?.length || 0), 0);
@@ -1798,29 +1941,27 @@ ${Array.from(allPossibleMoves.entries())
     targetPosition: number,
     priorityZone: { center: { x: number; y: number }; radius: number }
   ): number {
-    const targetX = targetPosition % 100;
-    const targetY = Math.floor(targetPosition / 100);
+    // Fix Bug 4: use real x,y from mapData instead of position % 100
+    const { x: targetX, y: targetY } = getNodeXY(targetPosition);
 
-    // Calculate distance from target to priority zone center
+    // Normalise radius from pixel space to hop-equivalent units:
+    // average node-to-node pixel distance is roughly 100px, so divide by 100.
+    const pixelRadius = priorityZone.radius * 100;
+
     const distanceToCenter = Math.sqrt(
       Math.pow(targetX - priorityZone.center.x, 2) +
       Math.pow(targetY - priorityZone.center.y, 2)
     );
 
-    // Score based on distance to priority zone center
-    if (distanceToCenter <= priorityZone.radius) {
-      // Inside priority zone - maximum score scaling down to edge
-      const normalizedDistance = distanceToCenter / priorityZone.radius;
+    if (distanceToCenter <= pixelRadius) {
+      const normalizedDistance = distanceToCenter / pixelRadius;
       const baseScore = 20 * (1 - normalizedDistance);
-
-      // Bonus for being very close to center for primary hunter
       if (normalizedDistance < 0.3) {
         return baseScore + 10;
       }
       return baseScore;
     } else {
-      // Outside priority zone - penalty increasing with distance
-      const distanceOutside = distanceToCenter - priorityZone.radius;
+      const distanceOutside = (distanceToCenter - pixelRadius) / 100; // back to hop-scale
       return Math.max(-20, -5 * Math.pow(distanceOutside, 1.5));
     }
   }
@@ -1894,37 +2035,31 @@ ${Array.from(allPossibleMoves.entries())
   ): number {
     let score = 0;
 
-    // Calculate center of mass for detective positions
-    const otherPositions = otherDetectives.map(d => ({
-      x: d.position % 100,
-      y: Math.floor(d.position / 100)
-    }));
+    // Fix Bug 4: use real x,y from mapData
+    const otherPositions = otherDetectives.map(d => getNodeXY(d.position));
+    if (otherPositions.length === 0) return 0;
 
     const centerX = otherPositions.reduce((sum, pos) => sum + pos.x, 0) / otherPositions.length;
     const centerY = otherPositions.reduce((sum, pos) => sum + pos.y, 0) / otherPositions.length;
 
-    // For each possible culprit position, check if this position helps cover gaps
     possibleCulpritPositions.forEach(pos => {
       const culpritPos = typeof pos === 'number' ? pos : pos.position;
       const weight = typeof pos === 'number' ? 1 : pos.probability;
-      const culpritX = culpritPos % 100;
-      const culpritY = Math.floor(culpritPos / 100);
+      const { x: culpritX, y: culpritY } = getNodeXY(culpritPos);
+      const { x: targetX, y: targetY } = getNodeXY(targetPosition);
 
-      // Vector from detective center to culprit
       const vectorX = culpritX - centerX;
       const vectorY = culpritY - centerY;
+      const vectorLen = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+      if (vectorLen === 0) return;
 
-      // Position relative to this vector
-      const targetX = targetPosition % 100;
-      const targetY = Math.floor(targetPosition / 100);
-
-      // Calculate perpendicular distance to escape vector
       const perpDistance = Math.abs(
         vectorX * (centerY - targetY) - (centerX - targetX) * vectorY
-      ) / Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+      ) / vectorLen;
 
       // Score higher for positions that help form a containment net
-      if (perpDistance >= 2 && perpDistance <= 4) {
+      // perpDistance here is in pixel units; 100-400px spans 1-4 map-hops approx
+      if (perpDistance >= 100 && perpDistance <= 400) {
         score += 10 * weight;
       }
     });
@@ -1943,30 +2078,26 @@ ${Array.from(allPossibleMoves.entries())
       const culpritPos = typeof pos === 'number' ? pos : pos.position;
       const weight = typeof pos === 'number' ? 1 : pos.probability;
 
-      // Vector from target to culprit
-      const targetX = targetPosition % 100;
-      const targetY = Math.floor(targetPosition / 100);
-      const culpritX = culpritPos % 100;
-      const culpritY = Math.floor(culpritPos / 100);
+      // Fix Bug 4: use real x,y from mapData
+      const { x: targetX, y: targetY } = getNodeXY(targetPosition);
+      const { x: culpritX, y: culpritY } = getNodeXY(culpritPos);
 
-      // Calculate convergence angle with other detectives
       otherDetectives.forEach(detective => {
-        const detX = detective.position % 100;
-        const detY = Math.floor(detective.position / 100);
+        const { x: detX, y: detY } = getNodeXY(detective.position);
 
-        // Vectors to culprit
         const v1x = culpritX - targetX;
         const v1y = culpritY - targetY;
         const v2x = culpritX - detX;
         const v2y = culpritY - detY;
 
-        // Calculate angle between vectors
         const dotProduct = v1x * v2x + v1y * v2y;
         const mag1 = Math.sqrt(v1x * v1x + v1y * v1y);
         const mag2 = Math.sqrt(v2x * v2x + v2y * v2y);
-        const angle = Math.acos(dotProduct / (mag1 * mag2));
+        if (mag1 === 0 || mag2 === 0) return;
 
-        // Best convergence at angles between 60-120 degrees
+        const cosAngle = Math.max(-1, Math.min(1, dotProduct / (mag1 * mag2)));
+        const angle = Math.acos(cosAngle);
+
         if (angle >= Math.PI / 3 && angle <= 2 * Math.PI / 3) {
           score += 12 * weight;
         }
@@ -2527,8 +2658,8 @@ ${Array.from(allPossibleMoves.entries())
       const position = typeof pos === 'number' ? pos : pos.position;
       const weight = typeof pos === 'number' ? 1 : pos.probability;
 
-      const x = position % 100;
-      const y = Math.floor(position / 100);
+      // Fix Bug 4: use real map x,y coordinates instead of position % 100
+      const { x, y } = getNodeXY(position);
 
       weightedX += x * weight;
       weightedY += y * weight;
@@ -2649,15 +2780,18 @@ ${Array.from(allPossibleMoves.entries())
       if (primaryHunter) {
         const culpritCentroid = this.calculateCulpritCentroid(possibleCulpritPositions);
 
-        // Calculate angle difference between flanker and primary hunter relative to culprit
+        // Fix Bug 4: use real x,y from mapData
+        const { x: hunterX, y: hunterY } = getNodeXY(primaryHunter.position);
+        const { x: flankerX, y: flankerY } = getNodeXY(move.targetPosition);
+
         const hunterAngle = Math.atan2(
-          Math.floor(primaryHunter.position / 100) - culpritCentroid.y,
-          (primaryHunter.position % 100) - culpritCentroid.x
+          hunterY - culpritCentroid.y,
+          hunterX - culpritCentroid.x
         );
 
         const flankerAngle = Math.atan2(
-          Math.floor(move.targetPosition / 100) - culpritCentroid.y,
-          (move.targetPosition % 100) - culpritCentroid.x
+          flankerY - culpritCentroid.y,
+          flankerX - culpritCentroid.x
         );
 
         const angleDiff = Math.abs(hunterAngle - flankerAngle);
