@@ -3,42 +3,124 @@ import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import { hasActiveGame, updateGame } from '../helpers/db-operations';
 import { addMove, createGame, saveIpInfo, updatePlayer } from '../helpers/db-transactions';
+import {
+  gameChannelSchema,
+  updateGameSchema,
+  playerIdSchema,
+  updatePlayerSchema,
+  moveSchema,
+  ipInfoSchema,
+  validateSchema
+} from '../helpers/validation-schemas';
+import {
+  asyncHandler,
+  NotFoundError,
+  ValidationError,
+  DatabaseError,
+  wrapDatabaseOperation
+} from '../helpers/error-handler';
 
 export default async function (fastify: FastifyInstance) {
+  // Get game by channel
   fastify.get<{ Params: { channel: string } }>(
     '/games/:channel',
-    async (request, reply) => {
-      try {
-        const game = await hasActiveGame(request.params.channel);
-        if (!game)
-          return reply
-            .code(404)
-            .send({ success: false, error: 'Game not found' });
-
-        reply.send(game);
-      } catch (error) {
-        console.error(error);
-        reply
-          .code(500)
-          .send({ success: false, error: 'Failed to fetch game data' });
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            channel: { type: 'string', minLength: 1, maxLength: 50 }
+          },
+          required: ['channel']
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              id: { type: 'number' },
+              channel: { type: 'string' },
+              players: { type: 'array' },
+              currentTurn: { type: 'string' },
+              moves: { type: 'array' },
+              status: { type: 'string' },
+              isDoubleMove: { type: 'boolean' }
+            }
+          },
+          404: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                  requestId: { type: 'string' },
+                  timestamp: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
       }
-    }
+    },
+    asyncHandler(async (request, reply) => {
+      const { channel } = validateSchema(gameChannelSchema, request.params);
+
+      const game = await wrapDatabaseOperation(
+        () => hasActiveGame(channel),
+        `fetch game with channel: ${channel}`
+      );
+
+      if (!game) {
+        throw new NotFoundError('Game', channel);
+      }
+
+      reply.send(game);
+    })
   );
 
   // Create New Game
-  fastify.post('/games', async (request, reply) => {
-    const { channel, players, currentTurn } = createGameState();
-    try {
-      const createdGame = await createGame(channel, players, currentTurn);
-      reply.code(201).send({
-        success: true,
-        createdGame,
-      });
-    } catch (error) {
-      console.error(error);
-      reply.code(500).send({ success: false, error: 'Failed to save game' });
+  fastify.post('/games', {
+    schema: {
+      body: {
+        type: 'object',
+        additionalProperties: false
+      },
+      response: {
+        201: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            createdGame: {
+              type: 'object',
+              properties: {
+                id: { type: 'number' },
+                channel: { type: 'string' },
+                players: { type: 'array' },
+                currentTurn: { type: 'string' },
+                moves: { type: 'array' },
+                status: { type: 'string' },
+                isDoubleMove: { type: 'boolean' }
+              }
+            }
+          }
+        }
+      }
     }
-  });
+  }, asyncHandler(async (request, reply) => {
+    const { channel, players, currentTurn } = createGameState();
+
+    const createdGame = await wrapDatabaseOperation(
+      () => createGame(channel, players, currentTurn),
+      'create new game'
+    );
+
+    reply.code(201).send({
+      success: true,
+      createdGame,
+    });
+  }));
 
   // Update a game
   fastify.patch<{ Params: { id: string } }>(

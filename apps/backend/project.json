@@ -18,6 +18,7 @@
         "tsConfig": "apps/backend/tsconfig.app.json",
         "assets": ["apps/backend/src/assets"],
         "generatePackageJson": true,
+        "generateLockfile": false,
         "esbuildOptions": {
           "sourcemap": true,
           "outExtension": {
