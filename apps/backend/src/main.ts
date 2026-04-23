@@ -12,8 +12,8 @@ const host = ENV.HOST;
 const port = ENV.PORT;
 
 const server = fastify({
-  logger: true, // Enable logging
-  ignoreTrailingSlash: true, // Handle routes with or without trailing slashes
+  logger: true,
+  ignoreTrailingSlash: true,
 });
 const aiService = new AIPlayerService();
 
@@ -28,8 +28,9 @@ const channels: Record<string, Set<WebSocket>> = {};
 server.register(app);
 server.register(ws);
 
-async function handleAIMove(currentTurn, currentChannel) {
+async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
   let game = await hasActiveGame(currentChannel);
+  if (!game) return;
   try {
     const nextPlayer = game.players.find(p => p.role === currentTurn);
     if (nextPlayer?.isAI) {
@@ -39,22 +40,20 @@ async function handleAIMove(currentTurn, currentChannel) {
         nextPlayer as Player
       );
 
-      // Add a 2-second timeout before checking the next turn
       await setTimeout(2000);
 
-      // Update the game state with the AI move
+      if (!aiMove.role || aiMove.position === undefined || !game.id) return;
+
       await addMove(game.id, aiMove.role, aiMove.type, aiMove.position, aiMove.secret, aiMove.double);
 
-      // Fetch the updated game state AFTER the move
       game = await hasActiveGame(currentChannel);
+      if (!game?.id) return;
 
-      // CHECK IF CULPRIT IS CAUGHT (detective landed on culprit's position)
       const culprit = game.players.find(p => p.role === 'culprit');
       const detectives = game.players.filter(p => p.role !== 'culprit');
       const caughtDetective = detectives.find(d => d.position === culprit?.position);
 
       if (caughtDetective && culprit) {
-        // Game over - detectives win!
         broadcast(currentChannel, {
           type: 'endGame',
           data: {
@@ -66,22 +65,20 @@ async function handleAIMove(currentTurn, currentChannel) {
         return;
       }
 
-      // Broadcast AI move
+      const nextTurn = getNextRole(aiMove.role as RoleType, aiMove.double || false);
+
       broadcast(currentChannel, {
         type: 'makeMove',
         data: {
           ...aiMove,
-          currentTurn: getNextRole(aiMove.role, aiMove.double || false),
+          currentTurn: nextTurn,
         },
       });
 
-      // Update the game state with the new turn
       await updateGame(game.id, {
-        currentTurn: getNextRole(aiMove.role, aiMove.double || false),
+        currentTurn: nextTurn,
       });
 
-      // Check if the next turn is also an AI and recursively call handleAIMove
-      const nextTurn = getNextRole(aiMove.role, aiMove.double || false);
       const nextAIPlayer = game.players.find(p => p.role === nextTurn);
       if (nextAIPlayer?.isAI) {
         await handleAIMove(nextTurn, currentChannel);
@@ -102,19 +99,23 @@ server.register(async function (fastify) {
       connection.on('message', async (message) => {
         const parsedMessage: Message = JSON.parse(message.toString());
         switch (parsedMessage.type) {
-          case 'startGame':
-            currentChannel = parsedMessage.data.ch;
+          case 'startGame': {
+            const ch = parsedMessage.data.ch;
+            if (!ch) break;
+            currentChannel = ch;
             channels[currentChannel] = new Set();
             channels[currentChannel].add(connection as unknown as WebSocket);
             console.log(`Client joined channel: ${currentChannel}`);
             break;
+          }
 
           case 'joinGame': {
-            currentChannel = parsedMessage.channel;
+            currentChannel = parsedMessage.channel ?? null;
+            if (!currentChannel) break;
 
             const game = await hasActiveGame(currentChannel);
             if (!channels[currentChannel]) {
-              if (game.status === 'active') {
+              if (game?.status === 'active') {
                 channels[currentChannel] = new Set();
               } else {
                 connection.send(
@@ -135,31 +136,27 @@ server.register(async function (fastify) {
                 role: parsedMessage.data.role,
               },
             });
-            if (!game.moves.length) {
-            try {
-              const nextPlayer = game.players.find(p => p.role === 'culprit');
-              if (nextPlayer?.isAI) {
-                await handleAIMove('culprit', currentChannel);
+
+            if (game && !game.moves.length) {
+              try {
+                const nextPlayer = game.players.find(p => p.role === 'culprit');
+                if (nextPlayer?.isAI) {
+                  await handleAIMove('culprit', currentChannel);
+                }
+              } catch (error) {
+                console.error('AI move calculation failed:', error);
+                connection.send(
+                  JSON.stringify({
+                    type: 'error',
+                    data: 'AI move calculation failed',
+                  })
+                );
               }
-            } catch (error) {
-              console.error('AI move calculation failed:', error);
-              connection.send(
-                JSON.stringify({
-                  type: 'error',
-                  data: 'AI move calculation failed',
-                })
-              );
-            }}
+            }
             break;
           }
 
           case 'updateGameState':
-            if (currentChannel) {
-              // broadcast(currentChannel, {
-              //   type: 'updateGameState',
-              //   data: parsedMessage.data,
-              // });
-            }
             break;
 
           case 'impersonate':
@@ -174,21 +171,21 @@ server.register(async function (fastify) {
           case 'makeMove':
             if (currentChannel) {
               const { role, double, position } = parsedMessage.data;
+              const moveType = parsedMessage.data.type;
+              if (!role || !moveType || position === undefined) break;
 
-              // Update the game state with the human move
               const game = await hasActiveGame(currentChannel);
-              await addMove(game.id, role, parsedMessage.data.type, position, parsedMessage.data.secret, double);
+              if (!game?.id) break;
+              await addMove(game.id, role, moveType, position, parsedMessage.data.secret, double);
 
-              // Fetch updated game state
               const updatedGame = await hasActiveGame(currentChannel);
+              if (!updatedGame?.id) break;
 
-              // CHECK IF CULPRIT IS CAUGHT after human move
               const culprit = updatedGame.players.find(p => p.role === 'culprit');
               const detectives = updatedGame.players.filter(p => p.role !== 'culprit');
               const caughtDetective = detectives.find(d => d.position === culprit?.position);
 
               if (caughtDetective && culprit) {
-                // Game over - detectives win!
                 broadcast(currentChannel, {
                   type: 'endGame',
                   data: {
@@ -202,7 +199,6 @@ server.register(async function (fastify) {
 
               const currentTurn = getNextRole(role as RoleType, double || false);
 
-              // Broadcast the current move
               broadcast(currentChannel, {
                 type: 'makeMove',
                 data: {
@@ -231,7 +227,7 @@ server.register(async function (fastify) {
       });
 
       connection.on('close', () => {
-        if (currentChannel) {
+        if (currentChannel && channels[currentChannel]) {
           channels[currentChannel].delete(connection as unknown as WebSocket);
           if (channels[currentChannel].size === 0) {
             delete channels[currentChannel];

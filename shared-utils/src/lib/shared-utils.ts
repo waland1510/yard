@@ -141,6 +141,7 @@ export interface Message {
     player?: Player;
     players?: Player[];
     winner?: string;
+    reason?: string;
     currentRole?: RoleType;
     currentTurn?: RoleType;
   };
