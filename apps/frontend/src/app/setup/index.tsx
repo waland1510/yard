@@ -12,6 +12,7 @@ import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
 import ChooseRole from './choose-role';
 import { Start } from './start';
+import { ThemeSelector } from './theme-selector';
 import { VideoBackground } from './video-background';
 
 const setupWorkflow = [
@@ -145,6 +146,7 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
           src="/images/catch.png"
           alt="Game Logo"
         />
+        <ThemeSelector />
         <Card
           style={{ backgroundColor: 'inherit' }}
           className="w-full h-[300px] px-6 justify-center"

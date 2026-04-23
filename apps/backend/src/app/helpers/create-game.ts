@@ -1,25 +1,36 @@
-import { GameState, initialPlayers } from "@yard/shared-utils";
+import { GameState, initialPlayers } from '@yard/shared-utils';
+import { themes } from '../../../../frontend/src/app/themes';
 
 export interface CreateGameOptions {
   aiRoles?: string[];
 }
 
-export function createGameState(): GameState {
+export function createGameState(themeName = 'classic'): GameState {
   const startingPositions = getStartingPositions();
   const channel = Math.random().toString(36).substring(7);
+  const theme = themes[themeName];
 
   return {
     channel,
-    players: initialPlayers.map((player) => ({
-      ...player,
-      position: startingPositions[player.role],
-      previousPosition: startingPositions[player.role],
-      isAI: false
-    })),
+    players: initialPlayers.map((player, index) => {
+      const isCulprit = player.role === 'culprit';
+      const character = isCulprit
+        ? theme.characters.culprit
+        : theme.characters.detectives[index];
+
+      return {
+        ...player,
+        position: startingPositions[player.role],
+        previousPosition: startingPositions[player.role],
+        isAI: false,
+        characterName: character.name,
+        characterImage: character.image,
+      };
+    }),
     currentTurn: 'culprit',
     moves: [],
     isDoubleMove: false,
-    status: 'active'
+    status: 'active',
   };
 }
 
@@ -33,7 +44,10 @@ interface StartingPositions {
 }
 
 const getStartingPositions = (): StartingPositions => {
-  const possiblePositions = [13, 26, 29, 34, 50, 53, 91, 94, 103, 112, 117, 132, 138, 141, 155, 174, 197, 198];
+  const possiblePositions = [
+    13, 26, 29, 34, 50, 53, 91, 94, 103, 112, 117, 132, 138, 141, 155, 174,
+    197, 198,
+  ];
   const shuffled = [...possiblePositions].sort(() => Math.random() - 0.5);
 
   return {
@@ -42,7 +56,7 @@ const getStartingPositions = (): StartingPositions => {
     detective2: shuffled[2],
     detective3: shuffled[3],
     detective4: shuffled[4],
-    detective5: shuffled[5]
+    detective5: shuffled[5],
   };
 };
 

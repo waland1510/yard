@@ -27,7 +27,8 @@ export default async function (fastify: FastifyInstance) {
 
   // Create New Game
   fastify.post('/games', async (request, reply) => {
-    const { channel, players, currentTurn } = createGameState();
+    const { theme } = request.body as { theme: string };
+    const { channel, players, currentTurn } = createGameState(theme);
     try {
       const createdGame = await createGame(channel, players, currentTurn);
       reply.code(201).send({

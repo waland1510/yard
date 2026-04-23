@@ -1,11 +1,16 @@
 import { Box, DrawerBody, Text, VStack } from '@chakra-ui/react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { useGameStore } from '../../stores/use-game-store';
-import { useTranslation } from "react-i18next";
+import { themes } from '../themes';
+import { useTranslation } from 'react-i18next';
 
 export const Moves = () => {
-  const moves = useGameStore((state) => state.moves).filter((m) => m.role === 'culprit');
+  const { moves, theme } = useGameStore((state) => ({
+    moves: state.moves.filter((m) => m.role === 'culprit'),
+    theme: state.theme,
+  }));
   const { t } = useTranslation();
+  const selectedTheme = themes[theme];
 
   return (
     <DrawerBody bg="#8CC690" color="white" overflowY="auto" maxH="100%">
@@ -24,10 +29,16 @@ export const Moves = () => {
             borderLeft={isSpecialMove ? "4px solid red" : "none"}
           >
             <Text fontSize="md" fontWeight="medium">
-              {index + 1}. {move ? (move.secret ? '🔒' : t(move.type).toUpperCase()) : '...'} -{' '}
+              {index + 1}.{" "}
+              {move
+                ? move.secret
+                  ? '🔒'
+                  : t(selectedTheme.transportation[move.type]).toUpperCase()
+                : '...'}{' '}
+              -{" "}
               {move && showCulpritAtMoves.includes(index + 1)
                 ? move.position
-                : '??'}
+                : "??"}
             </Text>
           </Box>
         );

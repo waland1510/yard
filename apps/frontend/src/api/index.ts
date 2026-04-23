@@ -23,9 +23,9 @@ const handleApiError = (error: unknown, context: string) => {
   throw new Error(userMessage);
 };
 
-export const createGame = async () => {
+export const createGame = async (data: { theme: string }) => {
   try {
-    const response = await api.post('/api/games');
+    const response = await api.post('/api/games', data);
     return response.data;
   } catch (error) {
     handleApiError(error, 'Error creating game');

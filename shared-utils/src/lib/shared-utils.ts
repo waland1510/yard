@@ -1,4 +1,4 @@
-import { PostgresDb } from '@fastify/postgres';
+import type { PostgresDb } from '@fastify/postgres';
 
 export const Role = {
   culprit: 'culprit',
@@ -35,6 +35,8 @@ export interface Player {
   secretTickets?: number;
   doubleTickets?: number;
   isAI?: boolean;
+  characterName?: string;
+  characterImage?: string;
 }
 
 export const initialPlayers: Player[] = [

@@ -5,7 +5,7 @@ import { RoleType } from '@yard/shared-utils';
 import useWebSocket from '../use-websocket';
 import { useGameStore } from '../../stores/use-game-store';
 import { updatePlayer } from '../../api';
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 
 interface ChooseRoleProps {
@@ -15,14 +15,18 @@ interface ChooseRoleProps {
 const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
   const location = useLocation();
   const players = usePlayersSubscription();
-  const channel = useGameStore((state) => state.channel);
+  console.log('Players:', players);
+
+  const { channel } = useGameStore();
   const { sendMessage } = useWebSocket(channel);
   const username = localStorage.getItem('username');
   const currentRole = useRunnerStore((state) => state.currentRole);
   const setPlayer = useGameStore((state) => state.setPlayer);
   const { t } = useTranslation();
   const [showAIOptions, setShowAIOptions] = React.useState(false);
-  const [showOptions, setShowOptions] = React.useState(location.pathname.includes('join'));
+  const [showOptions, setShowOptions] = React.useState(
+    location.pathname.includes('join')
+  );
 
   useEffect(() => {
     if (username) {
@@ -49,7 +53,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
       });
     }
 
-    player.username = isAI ? `AI_${t(role)}` : username as string;
+    player.username = isAI ? `AI_${t(role)}` : (username as string);
     player.isAI = isAI;
     setPlayer(player);
 
@@ -57,31 +61,30 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
       sendMessage('joinGame', { username, role: currentRole });
       await updatePlayer(player.id, {
         username: username as string,
-        isAI: false
+        isAI: false,
       });
     } else {
       await updatePlayer(player.id, {
         username: `AI_${t(role)}`,
-        isAI: true
+        isAI: true,
       });
     }
 
-      setCurrentStep('invitePlayers');
+    setCurrentStep('invitePlayers');
   };
 
   const handlePlayWithAI = (aiOption: 'culprit' | 'detectives') => {
     if (aiOption === 'culprit') {
-        players
-        .forEach((player) => {
-          onRoleChange(player.role, player.role === 'culprit');
-        });
-    } else  {
+      players.forEach((player) => {
+        onRoleChange(player.role, player.role === 'culprit');
+      });
+    } else {
       players
         .filter((p) => p.role.startsWith('detective'))
         .forEach((detective) => {
           onRoleChange(detective.role, true);
         });
-        onRoleChange('culprit', false);
+      onRoleChange('culprit', false);
     }
     setCurrentStep('invitePlayers');
   };
@@ -128,11 +131,11 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
                   <div key={p.id} className="flex flex-col items-center gap-2">
                     <img
                       className="w-20 h-22 cursor-pointer"
-                      src={`/images/${p.role}.png`}
+                      src={p.characterImage}
                       alt="player"
                       onClick={() => onRoleChange(p.role)}
                     />
-                    <p>{t(p.role)}</p>
+                    <p>{p.characterName}</p>
                   </div>
                 ))}
             </div>
@@ -148,7 +151,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
                       <span key={p.id} className="flex flex-col items-center">
                         <img
                           className="w-20 h-22"
-                          src={`/images/${p.role}.png`}
+                          src={p.characterImage}
                           alt="player"
                           onClick={() => onRoleChange(p.role)}
                         />
@@ -158,7 +161,7 @@ const ChooseRole = ({ setCurrentStep }: ChooseRoleProps) => {
                 </div>
               </div>
             ) : null}
-        </div>
+          </div>
         </div>
       )}
       {showAIOptions && (

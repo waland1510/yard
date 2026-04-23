@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+// import { themes } from '../app/themes';
 import {
   initialPlayers,
   Player,
@@ -26,6 +27,8 @@ export interface ClientGameState extends GameState {
   ) => void;
   setPosition: (playerRole: RoleType, position: number) => void;
   setIsDoubleMove: (isDoubleMove?: boolean) => void;
+  theme: string;
+  setTheme: (theme: string) => void;
 }
 
 export const useGameStore = create<ClientGameState>((set, get) => ({
@@ -92,4 +95,6 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
     }),
   isDoubleMove: false,
   setIsDoubleMove: (isDoubleMove) => set({ isDoubleMove }),
+  theme: 'classic',
+  setTheme: (theme) => set({ theme }),
 }));

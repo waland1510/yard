@@ -19,10 +19,11 @@ export const Start = ({
   const [isLoading, setIsLoading] = useState(false);
   const { sendMessage } = useWebSocket('');
   const { t } = useTranslation();
+	  const { theme } = useGameStore();
   const handleNewGame = async () => {
     try {
       setIsLoading(true);
-      const { createdGame } = await createGame();
+      const { createdGame } = await createGame({ theme });
       useGameStore.setState(createdGame);
       if (createdGame) {
         sendMessage('startGame', { ch: createdGame.channel });
