@@ -1134,10 +1134,11 @@ ${Array.from(allPossibleMoves.entries())
         }
       }
 
-      // Check if Mr. X is caught
+      // Check if Mr. X is caught - HIGHEST PRIORITY
       const culpritPos = culprit?.position;
       if (culpritPos && detectives.some(d => d.position === culpritPos)) {
-        return player.role === 'culprit' ? -100 : 100; // Reward for catching, penalty for being caught
+        // Massive reward for catching Mr. X - this is the ultimate goal
+        return player.role === 'culprit' ? -1000 : 1000;
       }
     }
 
@@ -1274,9 +1275,7 @@ ${Array.from(allPossibleMoves.entries())
       }
 
       // ---------------------------------------------------------------
-      // Fix Bug 1: Mid/late-game pursuit scoring (was completely missing).
-      // This is the CRITICAL fix — without it, detective scores were all 0
-      // after move 3, causing purely random movement.
+      // Mid/late-game pursuit scoring - AGGRESSIVE CATCH LOGIC
       // ---------------------------------------------------------------
       if (currentMoveNumber > 3) {
         const culprit = gameState.players.find(p => p.role === 'culprit');
@@ -1301,15 +1300,15 @@ ${Array.from(allPossibleMoves.entries())
             return sum + this.calculateDistance(targetPosition, t.position) * t.weight;
           }, 0) / totalWeight;
 
-          // Core pursuit score: strongly prefer moves that close the gap
-          // Max score 60 when adjacent, 0 when 6+ hops away
-          score += Math.max(0, (6 - weightedDistance)) * 10;
+          // Core pursuit score: AGGRESSIVELY prefer moves that close the gap
+          // Max score 100 when adjacent, 0 when 8+ hops away
+          score += Math.max(0, (8 - weightedDistance)) * 12.5;
 
-          // Bonus for being able to reach a high-probability culprit position in one hop
-          const adjacentCulpritPositions = culpritTargets.filter(t =>
+          // MASSIVE bonus for being able to catch Mr. X in one hop
+          const catchOpportunities = culpritTargets.filter(t =>
             this.calculateDistance(targetPosition, t.position) <= 1
           );
-          score += adjacentCulpritPositions.reduce((s, t) => s + t.weight * 50, 0);
+          score += catchOpportunities.reduce((s, t) => s + t.weight * 150, 0);
 
           // Block escape routes: bonus for being adjacent to multiple culprit exits
           for (const t of culpritTargets) {
@@ -1321,18 +1320,27 @@ ${Array.from(allPossibleMoves.entries())
               ...(culpritNode.underground || []),
             ];
             if (escapeRoutes.includes(targetPosition)) {
-              score += t.weight * 20; // Blocking an escape route
+              score += t.weight * 35;
             }
           }
+
+          // NEW: Bonus for surrounding Mr. X - coordinate with other detectives
+          const surroundingBonus = this.calculateSurroundingBonus(
+            targetPosition,
+            culpritTargets.map(t => t.position),
+            otherDetectives,
+            map
+          );
+          score += surroundingBonus * 1.5;
         }
 
-        // Anti-clustering: small penalty for being too close to other detectives
+        // Anti-clustering: penalty reduced in endgame to allow tighter pursuit
         if (otherDetectives.length > 0) {
           const minDetectiveDistance = Math.min(
             ...otherDetectives.map(d => this.calculateDistance(targetPosition, d.position))
           );
           if (minDetectiveDistance < 2) {
-            score -= 20;
+            score -= 15;
           }
         }
       }
@@ -2641,13 +2649,7 @@ ${Array.from(allPossibleMoves.entries())
     gameState: GameState,
     gamePhase: 'early' | 'mid' | 'late' | 'endgame'
   ): boolean {
-
     if (!player.doubleTickets || player.doubleTickets <= 0) {
-      return false;
-    }
-
-    // Only use double tickets in late game or endgame when close to culprit
-    if (gamePhase === 'early' || gamePhase === 'mid') {
       return false;
     }
 
@@ -2660,8 +2662,22 @@ ${Array.from(allPossibleMoves.entries())
       ...possibleCulpritPositions.map(pos => this.calculateDistance(move.targetPosition, pos.position))
     );
 
-    // Use double ticket if very close to culprit (within 2 moves)
-    return minDistanceToCulprit <= 2;
+    // Use double ticket if can catch Mr. X or get within catching distance
+    if (minDistanceToCulprit <= 2) {
+      return true;
+    }
+
+    // Use double ticket in late/endgame when moderately close (within 4 moves)
+    if ((gamePhase === 'late' || gamePhase === 'endgame') && minDistanceToCulprit <= 4) {
+      return true;
+    }
+
+    // Use double ticket if this move has a very high score (good strategic position)
+    if (move.score >= 100) {
+      return true;
+    }
+
+    return false;
   }
 
   private calculateCulpritCentroid(
@@ -2697,22 +2713,27 @@ ${Array.from(allPossibleMoves.entries())
   ): number {
     let score = 0;
 
-    // Primary hunter should be closest to culprit
+    // Primary hunter should be closest to culprit - AGGRESSIVE PURSUIT
     if (possibleCulpritPositions.length > 0) {
       const avgDistanceToCulprit = possibleCulpritPositions.reduce((sum, pos) => {
         return sum + (this.calculateDistance(move.targetPosition, pos.position) * pos.probability);
       }, 0);
 
-      // Strong bonus for being close to culprit
-      score += (10 - Math.min(avgDistanceToCulprit, 10)) * 8;
+      // AGGRESSIVE bonus for being close to culprit (doubled from 8 to 16)
+      score += (10 - Math.min(avgDistanceToCulprit, 10)) * 16;
 
-      // Ensure other detectives aren't too close to avoid clustering
+      // MASSIVE bonus for being within catching distance (1 hop)
+      if (avgDistanceToCulprit <= 1) {
+        score += 200;
+      }
+
+      // Reduce clustering penalty to allow tighter pursuit in late game
       const minDistanceToOthers = Math.min(
         ...otherDetectives.map(d => this.calculateDistance(move.targetPosition, d.position))
       );
 
       if (minDistanceToOthers < 2) {
-        score -= 25; // Penalty for clustering
+        score -= 10; // Reduced penalty to allow coordinated pursuit
       }
     }
 
@@ -2743,26 +2764,51 @@ ${Array.from(allPossibleMoves.entries())
       const totalConnections = (targetNode.taxi?.length || 0) +
                              (targetNode.bus?.length || 0) +
                              (targetNode.underground?.length || 0);
-      score += totalConnections * 3;
+      score += totalConnections * 5; // Increased from 3
 
-      // Special bonus for underground stations
+      // Special bonus for underground stations (increased)
       if (targetNode.underground && targetNode.underground.length > 0) {
+        score += 25;
+      }
+
+      // NEW: Bonus for bus stops (good coverage)
+      if (targetNode.bus && targetNode.bus.length > 0) {
         score += 15;
       }
     }
 
-    // Position to intercept culprit escape routes
+    // Position to intercept culprit escape routes - MORE AGGRESSIVE
     if (possibleCulpritPositions.length > 0) {
       const interceptValue = possibleCulpritPositions.reduce((sum, pos) => {
         const distance = this.calculateDistance(move.targetPosition, pos.position);
-        // Optimal intercept distance is 2-4 moves
-        if (distance >= 2 && distance <= 4) {
-          return sum + (pos.probability * 10);
+        // Optimal intercept distance is 1-3 moves (tighter than before)
+        if (distance >= 1 && distance <= 3) {
+          return sum + (pos.probability * 25); // Increased from 10
+        }
+        if (distance === 0) {
+          // Directly on culprit position - maximum bonus
+          return sum + (pos.probability * 300);
         }
         return sum;
       }, 0);
 
       score += interceptValue;
+
+      // NEW: Calculate escape route blocking bonus
+      for (const pos of possibleCulpritPositions) {
+        const culpritNode = map.get(pos.position);
+        if (!culpritNode) continue;
+
+        const escapeRoutes = [
+          ...(culpritNode.taxi || []),
+          ...(culpritNode.bus || []),
+          ...(culpritNode.underground || []),
+        ];
+
+        // Bonus for each escape route this position can block
+        const blockedRoutes = escapeRoutes.filter(route => route === move.targetPosition).length;
+        score += blockedRoutes * 40 * pos.probability;
+      }
     }
 
     return score;
