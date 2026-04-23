@@ -29,7 +29,7 @@ server.register(app);
 server.register(ws);
 
 async function handleAIMove(currentTurn, currentChannel) {
-  const game = await hasActiveGame(currentChannel);
+  let game = await hasActiveGame(currentChannel);
   try {
     const nextPlayer = game.players.find(p => p.role === currentTurn);
     if (nextPlayer?.isAI) {
@@ -42,19 +42,40 @@ async function handleAIMove(currentTurn, currentChannel) {
       // Add a 2-second timeout before checking the next turn
       await setTimeout(2000);
 
+      // Update the game state with the AI move
+      await addMove(game.id, aiMove.role, aiMove.type, aiMove.position, aiMove.secret, aiMove.double);
+
+      // Fetch the updated game state AFTER the move
+      game = await hasActiveGame(currentChannel);
+
+      // CHECK IF CULPRIT IS CAUGHT (detective landed on culprit's position)
+      const culprit = game.players.find(p => p.role === 'culprit');
+      const detectives = game.players.filter(p => p.role !== 'culprit');
+      const caughtDetective = detectives.find(d => d.position === culprit?.position);
+
+      if (caughtDetective && culprit) {
+        // Game over - detectives win!
+        broadcast(currentChannel, {
+          type: 'endGame',
+          data: {
+            winner: 'detectives',
+            reason: 'Culprit caught!',
+          },
+        });
+        await updateGame(game.id, { status: 'finished' });
+        return;
+      }
+
       // Broadcast AI move
       broadcast(currentChannel, {
         type: 'makeMove',
         data: {
           ...aiMove,
-          currentTurn: getNextRole(currentTurn, aiMove.double || false),
+          currentTurn: getNextRole(aiMove.role, aiMove.double || false),
         },
       });
 
-      // Update the game state with the AI move
-      await addMove(game.id, aiMove.role, aiMove.type, aiMove.position, aiMove.secret, aiMove.double);
-
-      // Fetch the updated game state
+      // Update the game state with the new turn
       await updateGame(game.id, {
         currentTurn: getNextRole(aiMove.role, aiMove.double || false),
       });
@@ -152,7 +173,33 @@ server.register(async function (fastify) {
 
           case 'makeMove':
             if (currentChannel) {
-              const { role, double } = parsedMessage.data;
+              const { role, double, position } = parsedMessage.data;
+
+              // Update the game state with the human move
+              const game = await hasActiveGame(currentChannel);
+              await addMove(game.id, role, parsedMessage.data.type, position, parsedMessage.data.secret, double);
+
+              // Fetch updated game state
+              const updatedGame = await hasActiveGame(currentChannel);
+
+              // CHECK IF CULPRIT IS CAUGHT after human move
+              const culprit = updatedGame.players.find(p => p.role === 'culprit');
+              const detectives = updatedGame.players.filter(p => p.role !== 'culprit');
+              const caughtDetective = detectives.find(d => d.position === culprit?.position);
+
+              if (caughtDetective && culprit) {
+                // Game over - detectives win!
+                broadcast(currentChannel, {
+                  type: 'endGame',
+                  data: {
+                    winner: 'detectives',
+                    reason: 'Culprit caught!',
+                  },
+                });
+                await updateGame(updatedGame.id, { status: 'finished' });
+                break;
+              }
+
               const currentTurn = getNextRole(role as RoleType, double || false);
 
               // Broadcast the current move
