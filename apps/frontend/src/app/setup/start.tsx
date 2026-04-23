@@ -1,9 +1,10 @@
 import { Spinner } from '@chakra-ui/react';
+import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createGame } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import useWebSocket from '../use-websocket';
-import { useTranslation } from 'react-i18next';
 
 interface StartProps {
   existingChannel: string | null;
@@ -19,7 +20,8 @@ export const Start = ({
   const [isLoading, setIsLoading] = useState(false);
   const { sendMessage } = useWebSocket('');
   const { t } = useTranslation();
-	  const { theme } = useGameStore();
+  const { theme } = useGameStore();
+
   const handleNewGame = async () => {
     try {
       setIsLoading(true);
@@ -38,35 +40,46 @@ export const Start = ({
 
   if (isLoading) {
     return (
-      <div className="text-center">
-        <div>
-         {t('waitForServer')}
-        </div>
-        <Spinner />
+      <div className="flex flex-col items-center gap-3 text-white/70">
+        <span className="text-sm tracking-widest uppercase">{t('waitForServer')}</span>
+        <Spinner color="white" />
       </div>
     );
   }
+
   return (
-    <div className="text-center">
-      <p className="text-lg text-gray-700">
-        {existingChannel && t('welcome')}
-      </p>
+    <div className="flex flex-col items-center gap-4">
       {existingChannel && (
-        <button
-          className="px-6 py-2 bg-yellow-600 text-black rounded-lg shadow-md hover:bg-red-700 transition duration-300"
-          onClick={handleContinueGame}
-        >
-         {t('continueGame')}
-        </button>
+        <p className="text-white/60 text-sm tracking-wide">{t('welcome')}</p>
       )}
-      <button
-        className="px-6 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-300"
-        onClick={() => {
-          handleNewGame();
-        }}
-      >
-        {t('start')}
-      </button>
+      <div className="flex gap-4 flex-wrap justify-center">
+        {existingChannel && (
+          <motion.button
+            onClick={handleContinueGame}
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.96 }}
+            className="px-8 py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-black"
+            style={{
+              background: 'linear-gradient(135deg, #c9922a, #a07010)',
+              boxShadow: '0 4px 20px rgba(180,130,0,0.4)',
+            }}
+          >
+            {t('continueGame')}
+          </motion.button>
+        )}
+        <motion.button
+          onClick={handleNewGame}
+          whileHover={{ scale: 1.05, y: -2 }}
+          whileTap={{ scale: 0.96 }}
+          className="px-8 py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-white"
+          style={{
+            background: 'linear-gradient(135deg, #2a6a3a, #1a4a24)',
+            boxShadow: '0 4px 20px rgba(40,120,60,0.4)',
+          }}
+        >
+          {t('start')}
+        </motion.button>
+      </div>
     </div>
   );
 };

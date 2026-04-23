@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useRunnerStore } from '../../../stores/use-runner-store';
 import { Connections } from './connections';
+import { MoveEffects } from './move-effects';
+import { RevealSpotlight } from './move-effects/reveal-spotlight';
 import { Nodes } from './nodes';
 import { RiverPath } from './river-path';
 import { Box, Center, Text } from '@chakra-ui/react';
@@ -8,9 +10,10 @@ import { useGameStore } from '../../../stores/use-game-store';
 import { useTranslation } from 'react-i18next';
 
 export const Board = () => {
-  const {isMagnifyEnabled} = useRunnerStore();
+  const { isMagnifyEnabled, currentRole } = useRunnerStore();
   const { t } = useTranslation();
   const { status, currentTurn } = useGameStore();
+  const isYourTurn = currentRole === currentTurn;
   const [magnifyArea, setMagnifyArea] = useState({ x: 0, y: 0, radius: 100 });
 
   const handleMouseMove = (event: {
@@ -38,7 +41,13 @@ export const Board = () => {
       <svg
         width="1200"
         height="850"
-        style={{ border: '2px solid gray', background: '#aaa', opacity: status === 'finished' ? 0.3 : 1 }}
+        style={{
+          border: '2px solid gray',
+          background: '#aaa',
+          opacity: status === 'finished' ? 0.3 : isYourTurn ? 1 : 0.88,
+          transition: 'opacity 0.4s ease',
+          boxShadow: isYourTurn ? '0 0 40px rgba(120,200,160,0.35)' : 'none',
+        }}
         onMouseMove={handleMouseMove}
       >
         {isMagnifyEnabled && (
@@ -58,6 +67,8 @@ export const Board = () => {
           <RiverPath />
           <Connections />
           <Nodes />
+          <MoveEffects />
+          <RevealSpotlight />
         </g>
         <defs>
           {isMagnifyEnabled && (

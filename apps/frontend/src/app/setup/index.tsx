@@ -1,19 +1,25 @@
 import { useDisclosure } from '@chakra-ui/hooks';
 import {
-  Box, Card, Drawer,
-  DrawerBody, DrawerCloseButton, DrawerContent, DrawerHeader,
-  DrawerOverlay, Spinner, useToast
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
+  DrawerOverlay,
+  Spinner,
+  useToast,
 } from '@chakra-ui/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createIpInfo, getGameByChannel } from '../../api';
 import { useGameStore } from '../../stores/use-game-store';
 import { AddUsername } from './add-username';
+import { CinematicBackground } from './cinematic-background';
 import ChooseRole from './choose-role';
 import { Start } from './start';
 import { ThemeSelector } from './theme-selector';
-import { VideoBackground } from './video-background';
 
 const setupWorkflow = [
   'startGame',
@@ -80,6 +86,18 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
     }
   };
 
+  const play = () => {
+    navigate(`/game/${joiningChannel ?? channel}`);
+    navigator.clipboard.writeText(`${window.location.origin}/game/${channel}`);
+    toast({
+      title: t('linkCopied'),
+      description: t('shareLink'),
+      status: 'success',
+      duration: 10000,
+      isClosable: true,
+    });
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 'startGame':
@@ -96,14 +114,20 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
         return <ChooseRole setCurrentStep={setCurrentStep} />;
       case 'invitePlayers':
         return (
-          <div className="text-center">
-            <p className="text-lg text-gray-700">{t('invite')}</p>
-            <button
-              className="px-6 py-2 bg-yellow-600 text-black rounded-lg shadow-md hover:bg-red-700 transition duration-300"
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-white/70 text-sm tracking-widest uppercase">{t('invite')}</p>
+            <motion.button
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.96 }}
               onClick={play}
+              className="px-8 py-3 rounded-xl font-bold text-sm tracking-widest uppercase text-black"
+              style={{
+                background: 'linear-gradient(135deg, #c9922a, #a07010)',
+                boxShadow: '0 4px 20px rgba(180,130,0,0.4)',
+              }}
             >
               {t('copyAndPlay')}
-            </button>
+            </motion.button>
           </div>
         );
       default:
@@ -111,71 +135,109 @@ export const Setup = ({ renderSteps = true }: SetupProps) => {
     }
   };
 
-  const play = () => {
-    navigate(`/game/${joiningChannel ?? channel}`);
-    navigator.clipboard.writeText(`${window.location.origin}/game/${channel}`);
-    toast({
-      title: t('linkCopied'),
-      description: t('shareLink'),
-      status: 'success',
-      duration: 10000,
-      isClosable: true,
-    });
-  };
   const rules = t('rulesContent', { returnObjects: true });
+
   return (
-    <div className="flex relative w-full h-full">
-      <div className="flex flex-col absolute w-full h-[100vh] z-10 p-10 items-start justify-start text-black">
-        <Box
-          as='button'
-          bg="#ACD8AF"
-          color="black"
-          borderRadius="lg"
-          px={4}
-          py={2}
-          boxShadow="md"
-          _hover={{ bg: '#8CC690' }}
-          transition="background-color 0.3s"
-          className='absolute top-0 right-0 ml-auto mr-10 mt-10'
-          onClick={onOpen}
-        >
-          {t('gameRules')}
-        </Box>
-        <img
-          className="w-96 rounded"
+    <div className="relative w-full min-h-screen flex flex-col items-center justify-center">
+      <CinematicBackground />
+
+      {/* Rules button */}
+      <motion.button
+        onClick={onOpen}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="absolute top-6 right-6 z-20 px-4 py-2 rounded-lg text-sm font-semibold text-white/80 backdrop-blur-sm"
+        style={{
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.15)',
+        }}
+      >
+        {t('gameRules')}
+      </motion.button>
+
+      {/* Main content column */}
+      <div className="relative z-10 flex flex-col items-center w-full max-w-3xl px-8 py-12">
+        {/* Logo */}
+        <motion.img
           src="/images/catch.png"
           alt="Game Logo"
+          className="w-72 rounded-lg mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+          style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.7))' }}
         />
-        <ThemeSelector />
-        <Card
-          style={{ backgroundColor: 'inherit' }}
-          className="w-full h-[300px] px-6 justify-center"
+
+        {/* Greeting */}
+        {username && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="text-white/50 text-xs tracking-[0.25em] uppercase mb-6"
+          >
+            {t('hey')} {username.toUpperCase()}
+            {city ? ` · ${city}` : ''}
+          </motion.p>
+        )}
+
+        {/* Theme selector */}
+        <motion.div
+          className="w-full"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
         >
-          {username && (
-            <p className="text-lg text-gray-700 text-center">
-              {t('hey')} {username.toUpperCase()}
-              {city ? ` ${t('from', { city })}` : ''}
-            </p>
-          )}
+          <ThemeSelector />
+        </motion.div>
+
+        {/* Glass step panel */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.5 }}
+          className="w-full rounded-2xl p-8 min-h-[200px] flex items-center justify-center"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          }}
+        >
           {renderSteps ? (
-            renderStep()
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="w-full"
+              >
+                {renderStep()}
+              </motion.div>
+            </AnimatePresence>
           ) : (
-            <div className="text-center">
-              <div>{t('waitForServer')}</div>
-              <Spinner />
+            <div className="flex flex-col items-center gap-3 text-white/70">
+              <div className="text-sm tracking-widest uppercase">{t('waitForServer')}</div>
+              <Spinner color="white" />
             </div>
           )}
-        </Card>
+        </motion.div>
       </div>
-      <VideoBackground />
+
+      {/* Rules drawer */}
       <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
         <DrawerOverlay />
-        <DrawerContent>
-          <DrawerCloseButton />
-          <DrawerHeader bg="#ACD8AF">{t('gameRules')}</DrawerHeader>
-          <DrawerBody bg="#ACD8AF">
+        <DrawerContent bg="#14141e" color="white">
+          <DrawerCloseButton color="white" />
+          <DrawerHeader borderBottom="1px solid rgba(255,255,255,0.1)">
+            {t('gameRules')}
+          </DrawerHeader>
+          <DrawerBody>
             {Array.isArray(rules) ? (
-              <ul className="list-disc pl-4">
+              <ul className="list-disc pl-4 space-y-2 text-white/80">
                 {rules.map((rule, index) => (
                   <li key={index}>{rule}</li>
                 ))}

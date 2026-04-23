@@ -24,6 +24,8 @@ import { Panel } from './panel';
 import { RightDrawer } from './right-drawer';
 import { Setup } from '../setup';
 import { useTranslation } from 'react-i18next';
+import { TurnBanner } from './turn-banner';
+import { VictoryOverlay } from './victory-overlay';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -207,6 +209,8 @@ export const Game = () => {
       </VStack>
 
       <RightDrawer isRightOpen={isRightOpen} onRightClose={onRightClose} />
+      <TurnBanner />
+      <VictoryOverlay />
     </Flex>
   );
 };

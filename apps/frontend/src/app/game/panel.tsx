@@ -9,6 +9,7 @@ import { UndergroundIcon } from './icons/underground-icon';
 import { SecretIcon } from './icons/secret-icon';
 import { DoubleIcon } from './icons/double-icon';
 import { useTranslation } from 'react-i18next';
+import { TicketCount } from './ticket-count';
 
 export const Panel = () => {
   const {
@@ -119,7 +120,7 @@ export const Panel = () => {
                 >
                   <div className="text-2xl">{item.icon}</div>
                 </button>
-                <div className="text-lg font-medium">{item.count}</div>
+                <TicketCount count={item.count} />
               </Fragment>
             ))}
           </div>
@@ -135,7 +136,7 @@ export const Panel = () => {
             >
               <span className="text-2xl">{item.icon}</span>
             </button>
-            <div className="text-lg font-medium">{item.count}</div>
+            <TicketCount count={item.count} />
           </Fragment>
         ))}
       </div>
