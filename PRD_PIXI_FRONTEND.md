@@ -2,295 +2,308 @@
 
 ## Problem Statement
 
-The current Scotland Yard game frontend uses SVG rendering for the game board, which provides a functional but static "map-like" experience. Players interact with abstract nodes and colored lines rather than feeling immersed in a living game world. The SVG approach limits visual polish, animation capabilities, and the ability to create a cinematic video game feel that matches the tension of a cat-and-mouse chase through London.
+The current Scotland Yard game frontend uses SVG rendering for the game board, which provides a functional but static "map-like" experience. Players interact with abstract nodes and colored lines rather than feeling immersed in a living game world. The SVG approach limits visual polish, animation capabilities, and the ability to create a modern deduction game experience.
+
+More critically: the existing frontend is purely a board renderer. It has no deduction layer — no system that tracks what detectives know, what positions are still possible, or how certainty evolves over the game. This is the real gap.
+
+## Core Insight
+
+> We're not building a board renderer. We're building a **deduction engine with a visual layer**.
+
+The rendering is in service of the deduction experience — not the other way around. Everything visual exists to make information and uncertainty legible.
 
 ## Solution
 
-Create a separate frontend application (`frontend-pixi`) using Pixi.js (WebGL rendering) that transforms the game board from a static diagram into a stylized 3D video game world. The new frontend will feature:
+Create `apps/frontend-pixi`: a Pixi.js (WebGL) frontend built gameplay-first. Architecture layers from the inside out:
 
-- Textured ground and animated Thames river
-- Building sprites at each node instead of numbered circles
-- Animated vehicle sprites on transport routes (taxis, buses)
-- Character sprites with walk animations for players
-- Slight isometric camera angle with parallax depth
-- Dynamic lighting, shadows, and ambient environmental effects
-- Cinematic camera movements and dramatic reveal effects
+1. **Deduction Engine** — computes all possible Mr. X positions from public information
+2. **Game State Layer** — Zustand stores + WebSocket, source of truth
+3. **Render State Selector** — translates game state + deduction output into a flat visual description
+4. **Pixi Board** — renders the visual layer (top-down city, characters, effects)
+5. **React HUD** — turn info, tickets, move history, deduction overlay controls
 
-Both frontends will remain functional and connect to the same backend, allowing users to choose between the classic SVG experience and the enhanced video game style experience.
+The game is playable (correctly) before it looks polished. Visual polish layers safely on top.
+
+## Design Decisions (Resolved)
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Entry point | URL params (`/game/:id?role=&name=`) | Board-first focus; setup screen deferred |
+| Visual style | Top-down city blocks (grey roads, green parks, blue Thames) | Feels like real places, not a sky map |
+| Camera | Free pan + scroll zoom + auto-focus (disabled after manual pan) | Standard video game navigation; doesn't fight user |
+| Isometric effect | None | Rotation breaks hit detection; no visual gain |
+| Location labels | Hybrid: ~25 landmarks named, rest show node number | Real-place feel without full data work |
+| Loading state | Board visible immediately, HUD activates on WebSocket connect | City always exists |
+| Player representation | Top-down sprites (Phase 1: colored circle placeholders) | Video game characters |
+| Mr. X visibility | Invisible between reveal turns | Faithful to rules |
+| Move selection | Click valid node → show chosen transport + allow quick override → confirm | Keep strategic depth, avoid silent decisions |
+| HUD layout | React overlay on fullscreen Pixi canvas | Right tool for each job |
+| Mr. X reveal | Camera pans + zooms to location, sprite slams in with ripple | Cinematic moment |
+| Game end | Full-screen React overlay, replay button | Simple, effective |
+| State flow | WebSocket → Zustand → derived render state → Pixi board | Clean separation of game logic and rendering |
+| Code reuse | Only `shared-utils` data + WebSocket protocol | Clean-room design |
+| Deduction engine | First-class system, not optional | Unlocks AI, hints, replay, heatmaps |
+| Backend authority | Server is sole source of truth for valid moves, reveal rounds, hidden logs | Prevents desync bugs |
+
+## Core Systems
+
+### 1. Deduction Engine
+
+The most important system in the codebase. Computes the set of all nodes Mr. X could currently be on, given only public information available to detectives.
+
+```ts
+type PossibleState = {
+  round: number;
+  possibleNodes: Set<number>;
+};
+
+function computePossiblePositions(
+  moveHistory: Move[],        // public ticket log (no positions)
+  revealHistory: Reveal[],    // position + round for each reveal
+  graph: ConnectionGraph,     // from shared-utils
+): PossibleState;
+```
+
+**Update logic per turn:**
+1. Start from the last known position (reveal or game start)
+2. For each ticket used since last known position, expand the set: `possibleNodes = all nodes reachable from any currentPossible via that ticket type`
+3. On a reveal turn: reset `possibleNodes` to the single revealed node
+4. On a double move: expand twice (set explodes — this is intentional, it's the mechanic)
+
+**Why this matters:**
+- Enables heatmap visualization (huge UX win for detectives)
+- Foundation for an AI hint system
+- Enables full post-game replay with "what detectives knew"
+- Makes the game feel intelligent, not just animated
+
+### 2. Render State
+
+The Pixi board and React HUD subscribe only to `RenderState` — never to raw game state.
+
+```ts
+type RenderState = {
+  nodes: {
+    id: number;
+    x: number;
+    y: number;
+    isValidMove: boolean;
+    possibleMrX: boolean;      // is this node in the deduction engine's current set?
+    possibleMrXWeight: number; // 0–1, normalized probability weight (for heatmap)
+  }[];
+  players: {
+    role: string;
+    nodeId: number;
+    visible: boolean;
+  }[];
+  activeTurn: string;
+  isMyTurn: boolean;
+  revealInProgress: boolean;
+  lastKnownMrXNode: number | null;
+  pendingMove: {              // set when player has clicked a node but not confirmed
+    nodeId: number;
+    transportType: TransportType;
+  } | null;
+};
+```
+
+The Pixi board reads `possibleMrX` / `possibleMrXWeight` to render the heatmap. The board never computes game logic itself.
+
+### 3. Tension Systems
+
+**Search Pressure:** As detectives narrow down possible positions, the heatmap visually contracts. Detectives see progress. Mr. X sees the noose tighten (if dev mode is on). This mechanical tension is communicated visually.
+
+**Uncertainty Spikes:** When Mr. X plays a double move, `possibleNodes` explodes. The heatmap suddenly blooms. This is intentional — it communicates why double moves are powerful without needing text explanation.
+
+**Reveal Impact:** After a reveal, `possibleNodes` resets to one node. The heatmap collapses dramatically. This moment should be visually distinct (pulse inward rather than outward).
 
 ## User Stories
 
-1. As a player, I want to see a textured game board with streets and landmarks, so that I feel like I'm playing in a living London world rather than on a diagram.
+1. As a detective, I want to see a heatmap of where Mr. X might be, so that I can make informed deduction decisions rather than guessing blindly.
 
-2. As a player, I want to see building sprites at each location, so that I can recognize nodes as actual places rather than abstract numbered circles.
+2. As a detective, I want the heatmap to update every turn based on which ticket Mr. X used, so that I can narrow down possibilities over time.
 
-3. As a player, I want to see taxi and bus sprites moving along routes, so that the transport system feels alive and real.
+3. As a detective, I want to see the heatmap explode on a double move, so that I immediately understand why double moves are strategically powerful.
 
-4. As a player, I want to see animated character sprites for detectives and Mr. X, so that players feel like characters inhabiting the world rather than static pieces.
+4. As a player, I want to see a top-down city board with real streets, parks, and the Thames, so that locations feel like actual places.
 
-5. As a player, I want the board to have a slight isometric angle, so that the game world has depth and feels 3D rather than flat.
+5. As a player, I want major landmarks to show their real London names, so that I can orient myself on the board.
 
-6. As a player, I want the camera to subtly pan with my mouse movement (parallax), so that I feel immersed in the game world.
+6. As a player, I want to pan and scroll-zoom freely around the board, so that I can navigate at my preferred detail level.
 
-7. As a player, I want valid move locations to pulse with glow effects, so that I intuitively know where I can move.
+7. As a player, I want the camera to focus on the active player's turn (unless I've manually panned), so that I stay oriented without losing camera control.
 
-8. As a player, I want my character to smoothly glide to new positions when moving, so that movement feels weighty and intentional rather than instant teleportation.
+8. As a player, I want valid move nodes to pulse on my turn, with the chosen transport type shown before I confirm, so that I understand what move I'm committing to.
 
-9. As a player, I want to see footstep particles or trails when characters move, so that movement leaves a visual trace.
+9. As a player, I want Mr. X to be invisible between reveal turns, so that hidden-movement tension is preserved.
 
-10. As a player, I want the Thames river to have animated water waves, so that the environment feels dynamic and alive.
+10. As a player, I want the camera to dramatically reveal Mr. X's position on reveal turns, so that reveals feel like exciting cinematic moments.
 
-11. As a player, I want streetlights or ambient glow at nodes, so that the board has atmospheric lighting.
+11. As a player, I want a minimal HUD (turn, tickets, move history), so that I have necessary information without the board being obscured.
 
-12. As a player, I want dramatic reveal effects when Mr. X shows their position, so that reveals feel like exciting cinematic moments.
+12. As a player, I want a turn timeline showing round numbers and upcoming reveal turns, so that I can plan around information timing.
 
-13. As a player, I want victory celebrations with screen effects (confetti, flash, text slam), so that winning feels impactful and celebratory.
+13. As a player, I want to replay the full game after it ends — seeing Mr. X's actual path and how it compared to what detectives suspected — so that I can learn and discuss strategy.
 
-14. As a player, I want the game to run smoothly at 60fps, so that animations and interactions feel responsive and polished.
+14. As a player, I want to hover a potential move and see how it would affect the possible-position set, so that I can plan deductions ahead.
 
-15. As a player, I want to join games and play with the same functionality as the SVG frontend, so that I have full feature parity.
+15. As a player, I want the game to end with a clear outcome overlay and replay option, so that the conclusion is impactful.
 
-16. As a player, I want to use the same game setup flow, ticket management, and move history, so that the core gameplay is familiar.
+16. As a developer, I want a debug panel that shows real Mr. X position, possible nodes, and move logs, so that I can verify game correctness without watching a full game.
 
-17. As a player, I want the magnify lens feature, so that I can zoom in on board areas for easier navigation.
+17. As a developer, I want the Pixi board to subscribe only to `RenderState`, so that rendering is fully decoupled from game rules.
 
-18. As a player, I want invalid moves to show red flash + shake feedback, so that I get clear error feedback.
+18. As a developer, I want placeholder graphics swappable for sprites without code changes, so that visual upgrades don't require refactoring.
 
-19. As a player, I want to play against AI or human opponents with the same WebSocket real-time sync, so that multiplayer works identically.
+## Architecture
 
-20. As a player, I want all translations (en, fr, ja, pl, ua) available, so that I can play in my preferred language.
+### Entry Point
 
-21. As a developer, I want both frontends to connect to the same backend, so that I can test them in parallel with real games.
+Single route: `/game/:gameId?role=detective1&name=Alice`
 
-22. As a developer, I want the Pixi board code organized in deep modules with testable interfaces, so that I can verify rendering logic in isolation.
+Games created externally (existing SVG frontend or REST API). No setup screen in scope.
 
-23. As a developer, I want to be able to swap placeholder assets with polished assets later, so that visual upgrades don't require code changes.
+### Layer Hierarchy
 
-## Implementation Decisions
+```
+WebSocket message
+  → WebSocket manager (singleton, fresh implementation)
+  → Zustand game store (raw game state — server is source of truth)
+  → Deduction engine (pure function, subscribes to game store)
+  → RenderState selector (game store + deduction output → RenderState)
+  → Pixi board (subscribes to RenderState only)
+  → React HUD (subscribes to Zustand + RenderState)
+```
 
-### Architecture
+### Pixi Visual Layers (bottom to top)
 
-**New Nx Application:** `apps/frontend-pixi`
-- Generated with `@nx/react:application`
-- Vite bundler, Jest unit testing
-- Runs on separate port (4201) from SVG frontend (4200)
-- Independent deployment target
+1. `GroundLayer` — grey road polygons, green parks, blue Thames
+2. `BuildingLayer` — colored node footprints, drop shadows, labels (~25 landmarks named)
+3. `HeatmapLayer` — faint colored overlays on `possibleMrX` nodes, intensity by weight
+4. `CharacterLayer` — player sprites (Phase 1: colored circles)
+5. `EffectLayer` — valid move glows, reveal ripples, flash feedback
+6. React HUD — CSS overlay: turn indicator, tickets, move history, turn timeline
 
-**Code Sharing Strategy:** Copy-first, extract-later
-- Initial implementation copies stores, hooks, i18n, UI components from `frontend`
-- After feature parity, extract shared code to `libs/` for consolidation
+### Camera
 
-### Pixi.js Board Architecture
+- `worldContainer` in Pixi; node coordinates from `shared-utils` used directly (1200×850 world units)
+- Auto-fit on load: `scale = Math.min(screenW / 1200, screenH / 850)`
+- Drag to pan, scroll to zoom
+- Auto-focus on active player's turn — **disabled after manual pan**, re-enabled on turn end
+- GSAP tweens via `camera.ts` module: `panTo(x, y, duration)`, `zoomTo(scale, duration)`
 
-**Layer Hierarchy (bottom to top):**
-1. `GroundLayer` — Tiled texture for streets, parks, Thames (animated water shader)
-2. `RoadLayer` — Textured roads along transport connections
-3. `BuildingLayer` — Building sprites at each node with drop shadows
-4. `VehicleLayer` — Animated taxi/bus sprites moving along routes
-5. `CharacterLayer` — Player character sprites with walk animations
-6. `EffectLayer` — Particle effects, highlights, spotlights, footstep trails
-7. `UILayer` — React/Chakra overlays (ticket counter, move history)
+### Move Selection (updated)
 
-**Camera System:**
-- Root `world` container with slight rotation (~3° for isometric feel)
-- `camera` container inside world for pan/zoom control
-- Parallax: camera offset tracks mouse position at 2% sensitivity
-- Dynamic zoom: slight zoom-in on player's turn
+1. Valid nodes pulse/glow on player's turn
+2. Player clicks a node
+3. App determines available transport types for that edge (from `shared-utils`)
+4. **Auto-selects first available (taxi → bus → underground) but shows it in a small overlay near the node**
+5. Player can tap a transport icon to override before confirming
+6. Move commits on confirm (or after short delay if no override)
+7. `makeMove` sent via WebSocket
 
-**State Management:**
-- Zustand stores copied from existing frontend
-- Direct subscription pattern: Pixi component subscribes to store, updates Pixi objects imperatively
-- No React renderer for Pixi — ref-based imperative initialization
+### Backend Authority
 
-**Animation System:**
-- GSAP for all tweens (character movement, highlights, camera transitions)
-- Pixi `AnimatedSprite` for character walk cycles
-- Pixi `ParticleContainer` for effects (footsteps, confetti, reveals)
+The server is the sole source of truth for:
+- Valid move set (client computes for UX preview; server validates)
+- Reveal rounds (client uses `showCulpritAtMoves` constant from `shared-utils`)
+- Mr. X's actual hidden position (never sent to detective clients)
+- Move acceptance / rejection
 
-### Asset Strategy
-
-**Phase 1 (MVP):** Placeholder geometry
-- Buildings: Colored rectangles with drop shadows
-- Vehicles: Colored circles/rectangles
-- Characters: Simple animated shapes
-- Ground: Solid color or simple tiled pattern
-
-**Phase 2 (Polish):** Replace with sprite assets
-- Buildings: 5-10 building variants + 3-4 landmark sprites
-- Vehicles: Top-down taxi, bus, train sprites (~16x16px)
-- Characters: 4-frame walk cycle sprite sheets for detective and Mr. X
-- Ground: Textured tiles (cobblestone, asphalt, grass, water)
-
-**Asset Sources:** AI generation, asset store packs, or custom art (decision deferred)
+The deduction engine runs client-side on public information only and can diverge from server ground truth only in ways visible to detectives (i.e. it represents detective knowledge, not actual state).
 
 ### Dependencies
 
 **New packages:**
-- `pixi.js` (v8.x) — WebGL rendering engine
-- `gsap` — Animation/tween system
+- `pixi.js` v8 — WebGL rendering
+- `gsap` — tweens
 
-**Existing packages (no new installs):**
-- `zustand` — State management
-- `@yard/shared-utils` — Map data, game types
-- React, Chakra UI, i18next — UI shell
+**Existing (already in workspace):**
+- `zustand` — state management
+- `@yard/shared-utils` — map data, types
+- React, Chakra UI — HUD
 
-### WebSocket & Game Logic
+**Not in scope:**
+- i18next — English only in Phase 1
+- React Router — single route
 
-- Copy `useWebSocket` hook and `websocket-manager.ts` as-is
-- Same event protocol: `startGame`, `joinGame`, `makeMove`, `updateGameState`
-- Copied Zustand stores: `useGameStore`, `useRunnerStore`
-- Copied subscriptions: `usePlayerSubscription`, `usePlayersSubscription`
+## Project Phases
 
-### UI Shell
+### Phase 0 — Game Brain (playable before it looks good)
+- WebSocket manager + Zustand game store + URL entry
+- Derived `RenderState` selector
+- **Deduction engine**: `computePossiblePositions()` with full unit tests
+- **Debug panel**: React overlay toggling real Mr. X position, possible nodes, move logs
 
-- React Router for navigation (`/` setup, `/game/:gameId` game)
-- Chakra UI components copied from existing frontend
-- Setup screens: choose role, player count, AI configuration
-- Game HUD: ticket counters, turn indicator, move history panel
-- Pixi canvas embedded in game page alongside Chakra UI panels
+> At end of Phase 0: game logic is correct and testable with zero Pixi code.
 
-### i18n
+### Phase 1 — Minimal Playable Board
+- Pixi canvas + `worldContainer` + camera (pan, zoom, auto-fit)
+- Character layer: colored circle placeholders at node positions
+- Valid move glows + click-to-move with transport preview + override
+- React HUD: turn indicator, ticket counts
+- Auto-focus camera on active player's turn
 
-- Copy `i18n.ts` configuration and `locales/` folder
-- Same 5 languages: en, fr, ja, pl, ua
-- `useTranslation` hook works identically
+> At end of Phase 1: fully playable (ugly) game.
 
-### Testing Strategy
+### Phase 2 — Spatial Awareness
+- `GroundLayer`: roads, parks, Thames
+- `BuildingLayer`: node footprints + labels + ~25 landmark names
+- `HeatmapLayer`: possible Mr. X nodes rendered as faint highlights
+- Integrate character positions with real map coordinates
+- Move history collapsible drawer
+- Turn timeline UI (round numbers, upcoming reveal markers)
 
-**Unit Tests (Jest):**
-- Game logic (stores, hooks, WebSocket handling)
-- Move validation logic
-- State transformation functions
+> At end of Phase 2: game looks like a city; detectives have deduction tools.
 
-**Manual Testing:**
-- Visual verification of Pixi rendering
-- Side-by-side comparison with SVG frontend
-- Parallel play: SVG and Pixi clients in same game
+### Phase 3 — Deduction UX (the differentiator)
+- Hover simulation: hover a move → preview updated possible-position set
+- Heatmap weight visualization (intensity by probability)
+- Uncertainty spike on double move (heatmap bloom animation)
+- Search pressure feedback (heatmap contracts as set narrows)
 
-**Deferred:**
-- Pixi rendering tests (requires canvas mocking infrastructure)
-- Visual regression tests (requires Playwright setup)
+> At end of Phase 3: game feels intelligent.
 
-### Build & Deployment
+### Phase 4 — Animation & Drama
+- GSAP character movement tweens
+- Mr. X reveal: camera pan + zoom + sprite slam + ripple
+- Invalid move red flash feedback
+- Auto-focus camera softened: disable after manual pan
 
-- `nx build frontend-pixi` → `dist/apps/frontend-pixi`
-- Separate Vercel project or subdomain for deployment
-- During development: `nx serve frontend-pixi` on port 4201
+### Phase 5 — Replay & Insight
+- Full game timeline stored in client state
+- Post-game replay: turn-by-turn playback, actual Mr. X path revealed
+- "What detectives knew vs reality" overlay
 
-### Technical Clarifications
+### Phase 6 — Visual Polish
+- Top-down character sprites (replace placeholder circles)
+- Animated 4-frame walk cycle
+- Animated Thames water
+- Vehicle sprites on transport routes
+- Footstep particle trails
+- 60fps performance pass
 
-- Pixi v8 uses new `Application.init()` async initialization pattern
-- Pixi `Graphics` API differs from SVG path syntax — manual path translation required
-- Zustand works standalone without React — stores can be imported and subscribed directly
-- GSAP works with Pixi objects: `gsap.to(sprite, { x, y, duration })`
-- Pixi filters (blur, glow) are GPU-accelerated, unlike SVG filters
-
-## Testing Decisions
-
-### What Makes a Good Test
-
-- Test external behavior, not internal Pixi rendering details
-- Test game logic purity: given state X, output should be Y
-- Test WebSocket event handling: on event E, state should update to S
-- Do NOT test Pixi object creation directly (implementation detail)
-
-### Modules to Test
-
-1. **Stores** — State updates, selectors, subscriptions
-2. **WebSocket Manager** — Connection, event emission, reconnection logic
-3. **Move Validation** — `isMoveAllowed`, `getAvailableType` functions
-4. **Game Logic** — Turn management, victory conditions
-5. **State Transformers** — Game state → render data conversion functions
-
-### Prior Art
-
-- Existing Jest tests in `apps/frontend/src/` for stores and hooks
-- `shared-utils` has utility function tests
-- Pattern: Arrange-Act-Assert with Jest + React Testing Library
-
-### Out of Scope for Testing
-
-- Pixi rendering correctness (manual verification)
-- Animation timing (GSAP internal behavior)
-- Asset loading (assumed working)
+### Phase 7 — Release
+- Production backend connection + deployment
+- Parallel SVG + Pixi manual testing
 
 ## Out of Scope
 
-The following are explicitly **out of scope** for this PRD:
+1. Setup / lobby screens — URL entry only
+2. Isometric rotation — top-down only
+3. i18n — English only in Phase 1
+4. Magnify lens — not carried over
+5. Sound effects / music
+6. Mobile touch controls — desktop only
+7. Backend changes — protocol unchanged
+8. AI improvement — same AI backend
+9. Shared library extraction — standalone app
 
-1. **Full 3D rendering** — Three.js isometric board with true 3D models
-2. **Day/night cycle** — Dynamic lighting changes based on game time
-3. **Weather effects** — Rain, fog, snow overlays (infrastructure for water shader is in-scope)
-4. **Custom asset creation** — Placeholder geometry is in-scope; polished art assets are Phase 2
-5. **Sound effects / music** — Audio system not included
-6. **Mobile touch controls** — Desktop mouse interaction only
-7. **Accessibility features beyond existing** — Match current frontend a11y, no new features
-8. **Backend changes** — All WebSocket events and database schema remain unchanged
-9. **AI improvement** — AI logic unchanged; Pixi frontend uses same AI backend
-10. **Extracting shared libraries** — Copy-first approach; library extraction is follow-up work
-11. **Visual regression testing** — Manual testing for V1
-12. **Performance optimization** — Baseline Pixi performance is sufficient; optimization is follow-up
+## Technical Notes
 
-## Further Notes
-
-### Project Phases
-
-**Phase 1: Scaffolding (Week 1)**
-- Generate Nx app, install dependencies
-- Copy stores, hooks, i18n, UI components
-- Basic routing and WebSocket connection
-
-**Phase 2: Board Foundation (Week 2)**
-- Pixi Application initialization
-- Layer container hierarchy
-- Ground texture and river rendering
-
-**Phase 3: Video Game Elements (Week 3)**
-- Building sprites at nodes
-- Road textures on connections
-- Vehicle sprites on routes
-
-**Phase 4: Characters & Animation (Week 4)**
-- Character sprite sheets
-- Walk cycle animations
-- Movement tweens with GSAP
-
-**Phase 5: Polish & Effects (Week 5)**
-- Particle effects (footsteps, reveals, victory)
-- Camera parallax and dynamic zoom
-- Highlight effects, dramatic reveals
-
-**Phase 6: Parity & Testing (Week 6)**
-- Full feature parity with SVG frontend
-- Manual testing, bug fixes
-- Documentation
-
-### Asset Pipeline Notes
-
-Assets should be loaded via Pixi's `Assets` loader with a loading screen:
-```ts
-await Assets.load([
-  '/assets/ground.png',
-  '/assets/buildings.png',
-  '/assets/characters.png',
-  '/assets/vehicles.png',
-]);
-```
-
-Placeholder assets can be generated programmatically with Pixi `Graphics` during development.
-
-### Performance Considerations
-
-- Use `ParticleContainer` for high-count elements (particles, vehicles)
-- Batch static elements into textures where possible
-- Limit GSAP tweens to active animations (cleanup on complete)
-- Monitor frame rate with Pixi's built-in FPS meter during development
-
-### Future Enhancements (Post-V1)
-
-- Extract shared code to `libs/game-state`, `libs/ui-components`
-- Add visual regression tests with Playwright
-- Shader-based effects (water waves, fog, lighting)
-- Replace placeholder assets with polished art
-- Optional: 3D camera rotation, zoom controls
-- Optional: Sound effects and background music
+- Pixi v8: `await Application.init({ resizeTo: window })`
+- Deduction engine is a pure function — no Pixi, no React, no side effects. Import anywhere.
+- Zustand stores work standalone (no React context required)
+- GSAP tweens Pixi objects: `gsap.to(sprite, { x, y, duration: 0.4, ease: 'power2.out' })`
+- `showCulpritAtMoves = [3, 8, 13, 18, 24]` from `shared-utils` — reveal round constants
+- Camera fit: `scale = Math.min(screenW / 1200, screenH / 850)`
+- Server validates all moves — client deduction engine represents detective knowledge only, not ground truth
