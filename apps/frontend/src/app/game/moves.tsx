@@ -1,4 +1,4 @@
-import { DrawerBody, Flex, Text } from '@chakra-ui/react';
+import { Box, Flex, Text } from '@chakra-ui/react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FaEye } from 'react-icons/fa6';
@@ -24,7 +24,7 @@ export const Moves = () => {
   const currentRound = moves.length;
 
   return (
-    <DrawerBody bg="#0f1420" p={3} overflowY="auto" maxH="100%">
+    <Box bg="#0f1420" p={3} overflowY="auto" maxH="100%" borderRadius="md">
       <Flex direction="column" gap={2}>
         {Array.from({ length: 24 }).map((_, index) => {
           const round = index + 1;
@@ -156,6 +156,6 @@ export const Moves = () => {
           );
         })}
       </Flex>
-    </DrawerBody>
+    </Box>
   );
 };

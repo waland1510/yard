@@ -26,6 +26,7 @@ import { Setup } from '../setup';
 import { useTranslation } from 'react-i18next';
 import { TurnBanner } from './turn-banner';
 import { VictoryOverlay } from './victory-overlay';
+import { characterImageFor } from '../../utils/resolve-character';
 
 export const Game = () => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export const Game = () => {
   const { sendMessage } = useWebSocket(channel);
   const toast = useToast();
   const username = localStorage.getItem('username');
-  const { players, setChannel, currentTurn, status } = useGameStore();
+  const { players, setChannel, currentTurn, status, theme } = useGameStore();
   const { currentRole, setCurrentRole, batchUpdate } = useRunnerStore();
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
@@ -187,8 +188,12 @@ export const Game = () => {
           onClick={() => onRoleChange(currentTurn)}
         >
           <img
-            className="w-10 h-12"
-            src={`/images/${currentTurn}.png`}
+            className="w-10 h-12 object-contain"
+            src={characterImageFor(
+              currentTurn,
+              theme,
+              players.find((p) => p.role === currentTurn)?.characterImage
+            )}
             alt="player"
           />
           {currentRole !== 'culprit' &&

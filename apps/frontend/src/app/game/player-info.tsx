@@ -2,6 +2,7 @@ import { VStack, Text, Badge } from '@chakra-ui/react';
 import { Player, RoleType, showCulpritAtMoves } from '@yard/shared-utils';
 import { PlayerPosition } from './player-position';
 import { useGameStore } from '../../stores/use-game-store';
+import { characterImageFor } from '../../utils/resolve-character';
 import { themes } from '../themes';
 
 interface PlayerInfoProps {
@@ -29,7 +30,11 @@ export const PlayerInfo = ({
       <Text fontSize="lg" fontWeight="bold" color="teal.900">
         {player.username?.slice(0, 10) ?? player.characterName}
       </Text>
-      <img className="w-10 h-12" src={player.characterImage} alt="player" />
+      <img
+        className="w-10 h-12 object-contain"
+        src={characterImageFor(player.role, theme, player.characterImage)}
+        alt="player"
+      />
       <PlayerPosition
         position={player.position}
         showPosition={player.role !== 'culprit' || showCulpritPosition}

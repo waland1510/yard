@@ -8,6 +8,7 @@ import { useGameStore } from '../../../stores/use-game-store';
 import { useRunnerStore } from '../../../stores/use-runner-store';
 import { getAvailableType } from '../../../utils/available-type';
 import { isMoveAllowed } from '../../../utils/move-allowed';
+import { characterImageFor } from '../../../utils/resolve-character';
 import { AnimatedImage } from './animated-image';
 import { useToast } from '@chakra-ui/react';
 
@@ -150,7 +151,7 @@ export const Nodes = () => {
     position: players.find((p) => p.role === role)?.position,
     currentRole: players.find((p) => p.position === currentPosition)?.role,
   };
-  const { moves, players: storePlayers, currentTurn } = useGameStore();
+  const { moves, players: storePlayers, currentTurn, theme } = useGameStore();
   const playerStorePosition = storePlayers.find(
     (p) => p.role === role
   )?.position;
@@ -232,7 +233,7 @@ export const Nodes = () => {
         return (
           <Fragment key={`player-${node.id}`}>
             <AnimatedImage
-              href={`/images/${playerRole}.png`}
+              href={characterImageFor(playerRole, theme, player?.characterImage)}
               previousX={playersNode?.x || node.x}
               previousY={playersNode?.y || node.y}
               targetX={node.x}

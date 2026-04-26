@@ -9,6 +9,7 @@ import { UndergroundIcon } from './icons/underground-icon';
 import { SecretIcon } from './icons/secret-icon';
 import { DoubleIcon } from './icons/double-icon';
 import { useTranslation } from 'react-i18next';
+import { characterImageFor } from '../../utils/resolve-character';
 import { TicketCount } from './ticket-count';
 
 export const Panel = () => {
@@ -23,6 +24,7 @@ export const Panel = () => {
   const player = useGameStore((state) =>
     state.players.find((p) => p.role === currentRole)
   );
+  const theme = useGameStore((state) => state.theme);
   const { t } = useTranslation();
   const players = usePlayersSubscription();
   const runnerPosition = players.find((p) => p.role === currentRole)?.position;
@@ -100,8 +102,8 @@ export const Panel = () => {
           </p>
         </div>
         <img
-          className="w-10 h-12 rounded-full"
-          src={`/images/${currentRole}.png`}
+          className="w-10 h-12 rounded-full object-contain"
+          src={characterImageFor(currentRole, theme, player?.characterImage)}
           alt="player"
         />
       </div>

@@ -13,6 +13,7 @@ import {
 import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
 import { addMove, updateGame, updatePlayer } from '../../api';
 import { useTranslation } from 'react-i18next';
+import { characterImageFor } from '../../utils/resolve-character';
 
 export const Header = () => {
   const {
@@ -22,6 +23,7 @@ export const Header = () => {
     isDoubleMove,
     id: gameId,
     setStatus,
+    theme,
   } = useGameStore();
   const {
     currentPosition,
@@ -177,7 +179,14 @@ export const Header = () => {
         borderRadius="md"
         gridGap={2}
       >
-        <Image src="/images/culprit.png" w={10} />
+        <Image
+          src={characterImageFor(
+            'culprit',
+            theme,
+            players.find((p) => p.role === 'culprit')?.characterImage
+          )}
+          w={10}
+        />
         <Badge colorScheme="orange">
           {t('round')}: {culpritMoves.length}
         </Badge>
