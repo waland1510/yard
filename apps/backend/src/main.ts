@@ -28,13 +28,20 @@ const channels: Record<string, Set<WebSocket>> = {};
 server.register(app);
 server.register(ws);
 
+const aiMoveInProgress = new Set<string>();
+
 async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
+  const lockKey = `${currentChannel}:${currentTurn}`;
+  if (aiMoveInProgress.has(lockKey)) return;
+  aiMoveInProgress.add(lockKey);
+
   let game = await hasActiveGame(currentChannel);
-  if (!game) return;
+  if (!game) { aiMoveInProgress.delete(lockKey); return; }
   try {
     const nextPlayer = game.players.find(p => p.role === currentTurn);
     if (nextPlayer?.isAI) {
       console.log('AI player found:', nextPlayer);
+      const moveCountBefore = game.moves.length;
       const aiMove = await aiService.calculateMove(
         game,
         nextPlayer as Player
@@ -42,9 +49,15 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
 
       await setTimeout(2000);
 
-      if (!aiMove.role || aiMove.position === undefined || !game.id) return;
+      // Re-check: if a move was already added during the delay, abort
+      game = await hasActiveGame(currentChannel);
+      if (!game?.id) { aiMoveInProgress.delete(lockKey); return; }
+      if (game.moves.length !== moveCountBefore) { aiMoveInProgress.delete(lockKey); return; }
+
+      if (!aiMove.role || aiMove.position === undefined) { aiMoveInProgress.delete(lockKey); return; }
 
       await addMove(game.id, aiMove.role, aiMove.type, aiMove.position, aiMove.secret, aiMove.double);
+      aiMoveInProgress.delete(lockKey);
 
       game = await hasActiveGame(currentChannel);
       if (!game?.id) return;
@@ -85,6 +98,7 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
       }
     }
   } catch (error) {
+    aiMoveInProgress.delete(`${currentChannel}:${currentTurn}`);
     console.error('AI move calculation failed:', error);
   }
 }

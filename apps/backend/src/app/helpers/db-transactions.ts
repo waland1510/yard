@@ -8,7 +8,7 @@ const db = drizzle(ENV.DATABASE_URL, {
   casing: 'snake_case',
 });
 
-export async function createGame(channel: string, players: any[], currentTurn: string) {
+export async function createGame(channel: string, players: any[], currentTurn: string, theme = 'classic') {
   try {
     return await db.transaction(async (trx) => {
       const [game] = await trx
@@ -19,7 +19,8 @@ export async function createGame(channel: string, players: any[], currentTurn: s
           players: [],
           moves: [],
           status: 'active',
-        })
+          theme,
+        } as any)
         .returning()
         .execute();
 
@@ -106,10 +107,12 @@ export async function saveIpInfo(ipInfo: IpInfo) {
       return null;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, createdAt, ...ipInfoValues } = ipInfo;
     const [savedIpInfo] = await db.transaction(async (trx) => {
       return await trx
         .insert(ipInfoTable)
-        .values({...ipInfo})
+        .values(ipInfoValues)
         .returning();
     });
 

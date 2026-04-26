@@ -15,16 +15,15 @@ const TRANSPORT_COLORS: Record<string, string> = {
 };
 
 export const Moves = () => {
-  const { moves, theme } = useGameStore((state) => ({
-    moves: state.moves.filter((m) => m.role === 'culprit'),
-    theme: state.theme,
-  }));
+  const allMoves = useGameStore((state) => state.moves);
+  const theme = useGameStore((state) => state.theme);
+  const moves = allMoves.filter((m) => m.role === 'culprit');
   const { t } = useTranslation();
-  const selectedTheme = themes[theme];
+  const selectedTheme = themes[theme] ?? themes['classic'];
   const currentRound = moves.length;
 
   return (
-    <Box bg="#0f1420" p={3} overflowY="auto" maxH="100%" borderRadius="md">
+    <Box bg="#0f1420" p={3} borderRadius="md">
       <Flex direction="column" gap={2}>
         {Array.from({ length: 24 }).map((_, index) => {
           const round = index + 1;
@@ -64,7 +63,6 @@ export const Moves = () => {
                 overflow: 'hidden',
               }}
             >
-              {/* Left color accent */}
               {isPast && (
                 <div
                   style={{
@@ -79,7 +77,6 @@ export const Moves = () => {
               )}
 
               <Flex align="center" gap={3} pl={2}>
-                {/* Round number */}
                 <Flex
                   w={7}
                   h={7}
@@ -95,7 +92,6 @@ export const Moves = () => {
                   {round}
                 </Flex>
 
-                {/* Transport + position */}
                 <Flex direction="column" flex={1} minW={0}>
                   <Text
                     fontSize="xs"
@@ -134,7 +130,6 @@ export const Moves = () => {
                 </Flex>
               </Flex>
 
-              {/* Current round pulse */}
               <AnimatePresence>
                 {isCurrent && (
                   <motion.div

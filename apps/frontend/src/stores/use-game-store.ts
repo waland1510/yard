@@ -38,9 +38,19 @@ export const useGameStore = create<ClientGameState>((set, get) => ({
   status: 'active',
   setStatus: (status) => set({ status }),
   updateMoves: (move) =>
-    set((state) => ({
-      moves: move ? [...state.moves, move] : state.moves,
-    })),
+    set((state) => {
+      if (!move) return { moves: state.moves };
+      const last = state.moves[state.moves.length - 1];
+      if (
+        last &&
+        last.role === move.role &&
+        last.type === move.type &&
+        last.position === move.position
+      ) {
+        return { moves: state.moves };
+      }
+      return { moves: [...state.moves, move] };
+    }),
   currentTurn: Role.culprit,
   setCurrentTurn: (currentTurn) => set({ currentTurn }),
   players: initialPlayers,

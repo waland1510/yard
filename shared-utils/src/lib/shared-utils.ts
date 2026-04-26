@@ -21,6 +21,7 @@ export interface GameState {
   moves: Move[];
   isDoubleMove: boolean;
   status: Status;
+  theme?: string;
 }
 
 export interface Player {

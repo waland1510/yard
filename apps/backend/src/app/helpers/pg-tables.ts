@@ -8,6 +8,7 @@ export const gamesTable = pgTable('games', {
   moves: jsonb('moves').notNull(),
   status: varchar('status', { length: 50 }).notNull(),
   isDoubleMove: boolean('is_double_move').default(false),
+  theme: varchar('theme', { length: 100 }).default('classic'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

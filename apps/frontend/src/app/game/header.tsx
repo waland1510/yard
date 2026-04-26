@@ -11,7 +11,7 @@ import {
   FaEye,
 } from 'react-icons/fa6';
 import { getNextRole, MoveType, showCulpritAtMoves } from '@yard/shared-utils';
-import { addMove, updateGame, updatePlayer } from '../../api';
+import { updateGame, updatePlayer } from '../../api';
 import { useTranslation } from 'react-i18next';
 import { characterImageFor } from '../../utils/resolve-character';
 
@@ -64,14 +64,6 @@ export const Header = () => {
         return;
       }
       sendMessage('makeMove', { ...move, secret: isSecret, double: isDouble, role: currentRole, type: currentType });
-      addMove({
-        gameId,
-        type: currentType,
-        role: currentRole,
-        position: move.position,
-        secret: isSecret,
-        double: isDouble,
-      });
       updatePlayer(currentPlayer.id, {
         position: move.position,
         previousPosition: currentPlayer.position,

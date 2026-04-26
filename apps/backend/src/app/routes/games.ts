@@ -30,7 +30,7 @@ export default async function (fastify: FastifyInstance) {
     const { theme } = request.body as { theme: string };
     const { channel, players, currentTurn } = createGameState(theme);
     try {
-      const createdGame = await createGame(channel, players, currentTurn);
+      const createdGame = await createGame(channel, players, currentTurn, theme);
       reply.code(201).send({
         success: true,
         createdGame,

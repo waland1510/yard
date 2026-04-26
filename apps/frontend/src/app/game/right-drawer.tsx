@@ -25,14 +25,12 @@ export const RightDrawer = ({
     </Box>
   );
 
-  const body = <Moves />;
-
   return (
     <Drawer
       isOpen={isRightOpen}
       onClose={onRightClose}
       header={header}
-      body={body}
+      body={<Moves />}
       placement="right"
     />
   );
