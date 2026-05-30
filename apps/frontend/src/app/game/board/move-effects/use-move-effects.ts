@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../../../stores/use-game-store';
 import { useNodesStore } from '../../../../stores/use-nodes-store';
 import { useRunnerStore } from '../../../../stores/use-runner-store';
-import { EffectTransport } from './effect-variants';
+import { EffectTransport } from './effect-types';
 import { playSfx, SfxKey } from './sfx';
 
 export interface ActiveEffect {

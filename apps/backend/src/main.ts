@@ -17,13 +17,50 @@ const server = fastify({
 });
 const aiService = new AIPlayerService();
 
+// CORS allowlist: the legacy SVG frontend (:4200) plus the new FPV frontend (:4201).
+// FRONTEND_URL stays the canonical prod origin; the localhost dev origins are added so
+// both local frontends can talk to one backend without surgery.
+const allowedOrigins = [
+  ENV.FRONTEND_URL,
+  'http://localhost:4200',
+  'http://localhost:4201',
+].filter(Boolean);
 server.register(cors, {
-  origin: [ENV.FRONTEND_URL],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });
 
 const channels: Record<string, Set<WebSocket>> = {};
+// Per-channel member presence — which role each connection is using. Lets new joiners
+// know who's already claimed a seat. Maintained on joinGame and on socket close.
+const channelMembers: Record<
+  string,
+  Map<WebSocket, { role: string; username: string }>
+> = {};
+
+function broadcastPresence(channel: string) {
+  const members = channelMembers[channel];
+  if (!members) return;
+  broadcast(channel, {
+    type: 'presence',
+    data: {
+      members: Array.from(members.values()),
+    },
+  });
+}
+
+// REST endpoint for clients that haven't WS-connected yet (e.g., the JoinOverlay)
+server.get<{ Params: { channel: string } }>(
+  '/api/presence/:channel',
+  async (request) => {
+    const { channel } = request.params;
+    const members = channelMembers[channel];
+    return {
+      members: members ? Array.from(members.values()) : [],
+    };
+  }
+);
 
 server.register(app);
 server.register(ws);
@@ -143,6 +180,20 @@ server.register(async function (fastify) {
             }
             channels[currentChannel].add(connection as unknown as WebSocket);
 
+            // Track presence: which role this connection has claimed
+            if (!channelMembers[currentChannel]) {
+              channelMembers[currentChannel] = new Map();
+            }
+            if (parsedMessage.data.role) {
+              channelMembers[currentChannel].set(
+                connection as unknown as WebSocket,
+                {
+                  role: parsedMessage.data.role,
+                  username: parsedMessage.data.username ?? '',
+                }
+              );
+            }
+
             broadcast(currentChannel, {
               type: 'joinGame',
               data: {
@@ -150,6 +201,7 @@ server.register(async function (fastify) {
                 role: parsedMessage.data.role,
               },
             });
+            broadcastPresence(currentChannel);
 
             if (game && !game.moves.length) {
               try {
@@ -243,8 +295,12 @@ server.register(async function (fastify) {
       connection.on('close', () => {
         if (currentChannel && channels[currentChannel]) {
           channels[currentChannel].delete(connection as unknown as WebSocket);
+          channelMembers[currentChannel]?.delete(connection as unknown as WebSocket);
           if (channels[currentChannel].size === 0) {
             delete channels[currentChannel];
+            delete channelMembers[currentChannel];
+          } else {
+            broadcastPresence(currentChannel);
           }
         }
       });

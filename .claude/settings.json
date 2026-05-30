@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun nx *)",
+      "Bash(mkdir -p _legacy)",
+      "Bash(git mv *)",
+      "Bash(mv src/app src/debug src/deduction src/hud src/main.tsx src/pixi src/render src/setup src/stores src/styles.css _legacy/)",
+      "Bash(cd /Users/vandrushchak/apps/Other/yard && mv apps/frontend-pixi/_legacy apps/frontend-pixi/src/_legacy && ls apps/frontend-pixi/src/)",
+      "Bash(bun add *)",
+      "Bash(tee /tmp/pixi-dev.log)",
+      "Read(//private/tmp/**)",
+      "Bash(timeout 60 sh -c 'until grep -E \"Local:|error|Error|VITE.*ready\" /private/tmp/claude-503/-Users-vandrushchak-apps-Other-yard/7cd51574-1d35-4d77-be3f-6b0235f9519c/tasks/banpxsgf5.output 2>/dev/null; do sleep 1; done')",
+      "Bash(curl -s -m 2 -o /dev/null -w \"%{http_code}\" http://localhost:4201/)",
+      "Bash(curl -s -m 2 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4201/)",
+      "Bash(ps -p 83965 -o pid,stat,time,command)",
+      "Bash(bun x *)",
+      "Bash(curl -s -m 2 http://localhost:4201/)",
+      "Bash(node /Users/vandrushchak/apps/Other/yard/node_modules/vite/bin/vite.js --port 4201 --host localhost)",
+      "Bash(curl -s -m 2 -o /dev/null -w \"Status: %{http_code}\\\\n\" http://localhost:4201/)",
+      "Bash(lsof -nP -iTCP:4201 -sTCP:LISTEN)",
+      "Bash(ps -p 92751 -o pid,stat,time,rss)",
+      "Bash(pkill -f \"vite.js.*frontend-pixi\")",
+      "Bash(pkill -f \"nx serve frontend-pixi\")",
+      "Bash(node /Users/vandrushchak/apps/Other/yard/node_modules/vite/bin/vite.js build)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"tsc exit=$?\")"
+    ],
+    "additionalDirectories": [
+      "/Users/vandrushchak/apps/Other/yard/apps/frontend-pixi/_legacy"
+    ]
+  }
+}

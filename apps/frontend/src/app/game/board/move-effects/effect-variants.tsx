@@ -1,22 +1,6 @@
 import { motion } from 'framer-motion';
 import React from 'react';
-
-export type EffectTransport =
-  | 'taxi'
-  | 'bus'
-  | 'underground'
-  | 'river'
-  | 'secret'
-  | 'double'
-  | 'shadow';
-
-export interface EffectProps {
-  x: number;
-  y: number;
-  theme: string;
-  cinematic?: boolean;
-  delay?: number;
-}
+import type { EffectTransport, EffectProps } from './effect-types';
 
 const CLASSIC: Record<EffectTransport, string> = {
   taxi: '#f5d000',
@@ -343,24 +327,4 @@ const ShadowEffect: React.FC<EffectProps> = ({ x, y, theme, delay = 0 }) => {
   );
 };
 
-export const renderEffect = (
-  transport: EffectTransport,
-  props: EffectProps
-): React.ReactNode => {
-  switch (transport) {
-    case 'taxi':
-      return <TaxiEffect {...props} />;
-    case 'bus':
-      return <BusEffect {...props} />;
-    case 'underground':
-      return <UndergroundEffect {...props} />;
-    case 'river':
-      return <RiverEffect {...props} />;
-    case 'secret':
-      return <SecretEffect {...props} />;
-    case 'double':
-      return <DoubleEffect {...props} />;
-    case 'shadow':
-      return <ShadowEffect {...props} />;
-  }
-};
+export { TaxiEffect, BusEffect, UndergroundEffect, RiverEffect, SecretEffect, DoubleEffect, ShadowEffect };

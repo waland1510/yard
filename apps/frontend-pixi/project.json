@@ -1,0 +1,8 @@
+{
+  "name": "frontend-pixi",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/frontend-pixi/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {}
+}

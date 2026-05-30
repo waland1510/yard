@@ -123,7 +123,13 @@ export type MessageType =
   | 'makeMove'
   | 'updateGameState'
   | 'impersonate'
-  | 'endGame';
+  | 'endGame'
+  | 'presence';
+
+export interface PresenceMember {
+  role: string;
+  username: string;
+}
 
 export interface Message {
   type: MessageType;
@@ -145,6 +151,7 @@ export interface Message {
     reason?: string;
     currentRole?: RoleType;
     currentTurn?: RoleType;
+    members?: PresenceMember[];
   };
 }
 

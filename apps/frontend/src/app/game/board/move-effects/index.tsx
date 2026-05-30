@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderEffect } from './effect-variants';
+import { renderEffect } from './effect-render';
 import { ActiveEffect, useMoveEffects } from './use-move-effects';
 
 const EffectRenderer: React.FC<{ effect: ActiveEffect }> = ({ effect }) => {
