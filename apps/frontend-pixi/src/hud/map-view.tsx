@@ -27,6 +27,7 @@ import {
 import { nodeDisplayName } from '../core/map-data';
 import { useGameStateStore } from '../stores/game-state-store';
 import { getTheme, characterFor } from '../core/theme-registry';
+import { spawnSpotlight, spawnTrailDot, spawnPulse, type EffectHandle } from './map-effects';
 
 export interface MapViewProps {
   currentNodeId: number;
@@ -41,6 +42,8 @@ export interface MapViewProps {
   /** Move count for the culprit so we can reveal Mr. X on rounds 3/8/13/18/24. */
   culpritMoveCount: number;
   ticketsByKind: Partial<Record<TransportKind, number>>;
+  /** Post-game replay (#11): show the REPLAY badge and disable interaction. */
+  isReplay?: boolean;
   onConnectionClick: (conn: Connection) => void;
 }
 
@@ -258,6 +261,7 @@ export function MapView({
   players,
   culpritMoveCount,
   ticketsByKind,
+  isReplay = false,
   onConnectionClick,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -287,12 +291,53 @@ export function MapView({
     >
   >(new Map());
   const connectionClickListeners = useRef<google.maps.MapsEventListener[]>([]);
+  // Legacy-parity effects (#4): looping valid-move pulses (cancelled on rebuild), and refs
+  // to avoid re-firing one-shot effects every render.
+  const pulseHandlesRef = useRef<EffectHandle[]>([]);
+  const zoneCirclesRef = useRef<google.maps.Circle[]>([]);
+  const lastSpotlightPosRef = useRef<number | null>(null);
+  const lastTurnZoomRef = useRef<string | null>(null);
   const themeId = useGameStateStore((s) => s.theme);
+  const status = useGameStateStore((s) => s.status);
 
   const [mapReady, setMapReady] = useState(false);
   const [streetViewLocation, setStreetViewLocation] = useState<
     { lat: number; lng: number; label: string } | null
   >(null);
+  const [tourIndex, setTourIndex] = useState<number | null>(null);
+  const [pubs, setPubs] = useState<{ name: string; address: string; lat: number; lng: number }[]>([]);
+  const [pubIndex, setPubIndex] = useState<number | null>(null);
+
+  const goToTourNode = (idx: number) => {
+    const id = ALL_NODE_IDS[idx];
+    const coords = coordsForNode(id);
+    setTourIndex(idx);
+    setPubIndex(null);
+    setStreetViewLocation({ lat: coords.lat, lng: coords.lng, label: `Node ${id} (${idx + 1}/${ALL_NODE_IDS.length})` });
+  };
+
+  const goToPub = (idx: number) => {
+    const pub = pubs[idx];
+    if (!pub) return;
+    setPubIndex(idx);
+    setTourIndex(null);
+    setStreetViewLocation({ lat: pub.lat, lng: pub.lng, label: `🍺 ${pub.name} (${idx + 1}/${pubs.length})` });
+  };
+
+  const startPubTour = () => {
+    if (pubs.length > 0) { goToPub(0); return; }
+    fetch('/data/london-pubs.json')
+      .then(r => r.json())
+      .then((data: { name: string; address: string; lat: number; lng: number }[]) => {
+        setPubs(data);
+        if (data.length > 0) {
+          setPubIndex(0);
+          setTourIndex(null);
+          setStreetViewLocation({ lat: data[0].lat, lng: data[0].lng, label: `🍺 ${data[0].name} (1/${data.length})` });
+        }
+      })
+      .catch(() => console.error('Could not load london-pubs.json'));
+  };
 
   const isCulpritOnRevealRound = REVEAL_ROUNDS.includes(culpritMoveCount);
 
@@ -327,7 +372,6 @@ export function MapView({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Build the static graph once: every node + every edge, drawn subtly.
@@ -368,8 +412,8 @@ export function MapView({
     }
 
     return () => {
-      for (const m of baseNodeMarkersRef.current) m.setMap(null);
-      for (const e of baseEdgePolylinesRef.current) e.setMap(null);
+      for (const m of baseNodeMarkersRef.current) m?.setMap(null);
+      for (const e of baseEdgePolylinesRef.current) e?.setMap(null);
       baseNodeMarkersRef.current = [];
       baseEdgePolylinesRef.current = [];
     };
@@ -381,12 +425,15 @@ export function MapView({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    for (const l of connectionClickListeners.current) l.remove();
+    // Null-guard: a hot reload can leave stale/holey entries in these arrays.
+    for (const l of connectionClickListeners.current) l?.remove();
     connectionClickListeners.current = [];
-    for (const m of highlightMarkersRef.current) m.setMap(null);
-    for (const e of highlightEdgesRef.current) e.setMap(null);
+    for (const m of highlightMarkersRef.current) m?.setMap(null);
+    for (const e of highlightEdgesRef.current) e?.setMap(null);
     highlightMarkersRef.current = [];
     highlightEdgesRef.current = [];
+    for (const h of pulseHandlesRef.current) h?.cancel();
+    pulseHandlesRef.current = [];
     if (currentMarkerRef.current) currentMarkerRef.current.setMap(null);
 
     const here = coordsForNode(currentNodeId);
@@ -432,7 +479,7 @@ export function MapView({
             ? 'no ticket'
             : conn.kind === 'river'
             ? `free ${KIND_LABEL[conn.kind].toLowerCase()}`
-            : `1 / ${tickets} ${KIND_LABEL[conn.kind].toLowerCase()}`
+            : `${KIND_LABEL[conn.kind]} · ${tickets - 1} left after`
         }`,
         cursor: empty || !interactive ? 'not-allowed' : 'pointer',
       });
@@ -449,6 +496,15 @@ export function MapView({
       });
       connectionClickListeners.current.push(rcListener);
       highlightMarkersRef.current.push(dest);
+
+      // Valid-move pulse (#4): looping aura under each affordable destination. A low
+      // ticket count (1–2) warms the colour as a soft scarcity warning.
+      if (!empty && interactive) {
+        const lowTicket = conn.kind !== 'river' && tickets > 0 && tickets <= 2;
+        pulseHandlesRef.current.push(
+          spawnPulse(map, target, lowTicket ? '#ff9f43' : KIND_COLOR[conn.kind])
+        );
+      }
     }
   }, [
     mapReady,
@@ -506,6 +562,11 @@ export function MapView({
             /* keep the SVG fallback */
           });
       } else if (existing.toLat !== toLat || existing.toLng !== toLng) {
+        // Movement trail (#4): drop a fading breadcrumb at the node just left, and a
+        // small landing flourish at the destination, both in the player's role colour.
+        const roleColor = ROLE_COLOR[p.role] ?? '#888';
+        spawnTrailDot(map, { lat: existing.toLat, lng: existing.toLng }, roleColor);
+        spawnSpotlight(map, { lat: toLat, lng: toLng }, roleColor, 140);
         // Position changed → start a smooth slide from CURRENT visual position
         // (read live from the marker, not the previous target — handles
         // mid-animation interruptions gracefully) to the new target.
@@ -564,10 +625,86 @@ export function MapView({
   useEffect(() => {
     const ref = playerMarkersRef.current;
     return () => {
-      for (const slot of ref.values()) slot.marker.setMap(null);
+      for (const slot of ref.values()) slot.marker?.setMap(null);
       ref.clear();
+      for (const h of pulseHandlesRef.current) h?.cancel();
+      pulseHandlesRef.current = [];
     };
   }, []);
+
+  // Reveal spotlight (#4): an expanding ring at Mr. X's node on a reveal round.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    if (!isCulpritOnRevealRound) {
+      lastSpotlightPosRef.current = null;
+      return;
+    }
+    const culprit = players.find((p) => p.role === 'culprit');
+    if (!culprit) return;
+    if (lastSpotlightPosRef.current === culprit.position) return;
+    lastSpotlightPosRef.current = culprit.position;
+    spawnSpotlight(map, coordsForNode(culprit.position), '#ff3b30', 380);
+  }, [mapReady, isCulpritOnRevealRound, players]);
+
+  // Turn camera (#4): zoom in on your turn; pull back to an overview on the culprit's
+  // turn so detectives can read the whole chase.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    if (lastTurnZoomRef.current === currentTurnRole) return;
+    lastTurnZoomRef.current = currentTurnRole;
+    if (isMyTurn) map.setZoom(15);
+    else if (currentTurnRole === 'culprit') map.setZoom(13);
+  }, [mapReady, currentTurnRole, isMyTurn]);
+
+  // Capture-zone (#11): a faint reach radius around each detective so coverage — and
+  // Mr. X being surrounded — reads at a glance. Rebuilt as detectives move.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    for (const c of zoneCirclesRef.current) c?.setMap(null);
+    zoneCirclesRef.current = [];
+    for (const p of players) {
+      if (p.role === 'culprit') continue;
+      const color = ROLE_COLOR[p.role] ?? '#888';
+      zoneCirclesRef.current.push(
+        new google.maps.Circle({
+          map,
+          center: coordsForNode(p.position),
+          radius: 220,
+          strokeColor: color,
+          strokeOpacity: 0.35,
+          strokeWeight: 1,
+          fillColor: color,
+          fillOpacity: 0.06,
+          clickable: false,
+          zIndex: 2,
+        })
+      );
+    }
+    return () => {
+      for (const c of zoneCirclesRef.current) c?.setMap(null);
+      zoneCirclesRef.current = [];
+    };
+  }, [mapReady, players]);
+
+  // Capture shake (#4): a brief jolt of the board when the game ends.
+  useEffect(() => {
+    if (status !== 'finished') return;
+    const el = containerRef.current;
+    if (!el || typeof el.animate !== 'function') return;
+    el.animate(
+      [
+        { transform: 'translate(0,0)' },
+        { transform: 'translate(-6px, 4px)' },
+        { transform: 'translate(5px, -3px)' },
+        { transform: 'translate(-4px, 2px)' },
+        { transform: 'translate(0,0)' },
+      ],
+      { duration: 500, easing: 'ease-out' }
+    );
+  }, [status]);
 
   // Street View overlay lifecycle
   useEffect(() => {
@@ -595,7 +732,7 @@ export function MapView({
           .getPanorama({
             location: { lat: streetViewLocation.lat, lng: streetViewLocation.lng },
             radius: 120,
-            source: streetView.StreetViewSource.OUTDOOR,
+            source: streetView.StreetViewSource.GOOGLE,
           })
           .then((result) => {
             const panoPos = result.data.location?.latLng;
@@ -639,6 +776,15 @@ export function MapView({
     [isMyTurn, currentTurnRole]
   );
 
+  // Reveal countdown / indicator (#4).
+  const revealText = useMemo(() => {
+    if (isCulpritOnRevealRound) return `👁 Mr. X revealed · round ${culpritMoveCount}`;
+    const next = REVEAL_ROUNDS.find((r) => r > culpritMoveCount);
+    if (next == null) return null;
+    const inN = next - culpritMoveCount;
+    return `Mr. X reveal in ${inN} ${inN === 1 ? 'round' : 'rounds'}`;
+  }, [isCulpritOnRevealRound, culpritMoveCount]);
+
   const here = coordsForNode(currentNodeId);
 
   return (
@@ -655,21 +801,45 @@ export function MapView({
           background: '#1a1a1a',
         }}
       />
-      <div style={turnBanner(isMyTurn)}>{turnText}</div>
-      <button
-        type="button"
-        onClick={() =>
-          setStreetViewLocation({
-            lat: here.lat,
-            lng: here.lng,
-            label: nodeDisplayName(currentNodeId),
-          })
-        }
-        style={lookHereBtn}
-        title="Right-click any node to look there"
-      >
-        👁️ Look around
-      </button>
+      {!isReplay && <div style={turnBanner(isMyTurn)}>{turnText}</div>}
+      {!isReplay && revealText && (
+        <div style={revealBanner(isCulpritOnRevealRound)}>{revealText}</div>
+      )}
+      {isReplay && <div style={replayBadge}>● REPLAY</div>}
+      <div style={topRightButtons}>
+        <button
+          type="button"
+          onClick={() =>
+            setStreetViewLocation({
+              lat: here.lat,
+              lng: here.lng,
+              label: nodeDisplayName(currentNodeId),
+            })
+          }
+          style={lookHereBtn}
+          title="Right-click any node to look there"
+        >
+          👁️ Look around
+        </button>
+        <div style={tourButtonGroup}>
+          <button
+            type="button"
+            onClick={() => goToTourNode(0)}
+            style={tourBtn}
+            title="Cycle through all 217 game nodes"
+          >
+            🗺️ Nodes
+          </button>
+          <button
+            type="button"
+            onClick={startPubTour}
+            style={{ ...tourBtn, borderLeft: '1px solid rgba(255,255,255,0.15)' }}
+            title="Street view tour of 815 London pubs"
+          >
+            🍺 Pubs
+          </button>
+        </div>
+      </div>
       <div style={legendBox}>
         <div style={legendTitle}>Transport</div>
         {(Object.keys(KIND_LABEL) as TransportKind[]).map((k) => (
@@ -698,13 +868,39 @@ export function MapView({
               <div style={streetViewKicker}>Street view</div>
               <div style={streetViewTitle}>{streetViewLocation.label}</div>
             </div>
-            <button
-              type="button"
-              onClick={() => setStreetViewLocation(null)}
-              style={streetViewClose}
-            >
-              ✕ Close
-            </button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {tourIndex !== null && (
+                <>
+                  <button type="button" style={streetViewClose}
+                    onClick={() => goToTourNode((tourIndex - 1 + ALL_NODE_IDS.length) % ALL_NODE_IDS.length)}>
+                    ← Prev
+                  </button>
+                  <button type="button" style={streetViewClose}
+                    onClick={() => goToTourNode((tourIndex + 1) % ALL_NODE_IDS.length)}>
+                    Next →
+                  </button>
+                </>
+              )}
+              {pubIndex !== null && pubs.length > 0 && (
+                <>
+                  <button type="button" style={streetViewClose}
+                    onClick={() => goToPub((pubIndex - 1 + pubs.length) % pubs.length)}>
+                    ← Prev
+                  </button>
+                  <button type="button" style={streetViewClose}
+                    onClick={() => goToPub((pubIndex + 1) % pubs.length)}>
+                    Next →
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => { setStreetViewLocation(null); setTourIndex(null); setPubIndex(null); }}
+                style={streetViewClose}
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -733,11 +929,59 @@ function turnBanner(isMyTurn: boolean): React.CSSProperties {
   };
 }
 
-const lookHereBtn: React.CSSProperties = {
+const replayBadge: React.CSSProperties = {
+  position: 'fixed',
+  top: 12,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 5,
+  padding: '6px 16px',
+  background: 'rgba(124, 58, 237, 0.92)',
+  color: '#fff',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: 1.5,
+  textTransform: 'uppercase',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.4)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.45)',
+  pointerEvents: 'none',
+};
+
+function revealBanner(active: boolean): React.CSSProperties {
+  return {
+    position: 'fixed',
+    top: 52,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 5,
+    padding: '5px 14px',
+    background: active ? 'rgba(214, 31, 31, 0.92)' : 'rgba(10, 12, 16, 0.8)',
+    color: '#fff',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: 0.3,
+    borderRadius: 18,
+    border: `1px solid ${active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)'}`,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    pointerEvents: 'none',
+  };
+}
+
+const topRightButtons: React.CSSProperties = {
   position: 'fixed',
   top: 12,
   right: 12,
   zIndex: 5,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: 8,
+};
+
+const lookHereBtn: React.CSSProperties = {
   padding: '8px 14px',
   background: 'rgba(10, 12, 16, 0.92)',
   border: '1px solid rgba(255,255,255,0.25)',
@@ -749,6 +993,27 @@ const lookHereBtn: React.CSSProperties = {
   letterSpacing: '0.3px',
   cursor: 'pointer',
   boxShadow: '0 6px 22px rgba(0,0,0,0.45)',
+};
+
+const tourButtonGroup: React.CSSProperties = {
+  display: 'flex',
+  background: 'rgba(10, 12, 16, 0.92)',
+  border: '1px solid rgba(255,255,255,0.25)',
+  borderRadius: 22,
+  overflow: 'hidden',
+  boxShadow: '0 6px 22px rgba(0,0,0,0.45)',
+};
+
+const tourBtn: React.CSSProperties = {
+  padding: '8px 14px',
+  background: 'transparent',
+  border: 'none',
+  color: '#fff',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: '0.3px',
+  cursor: 'pointer',
 };
 
 const legendBox: React.CSSProperties = {

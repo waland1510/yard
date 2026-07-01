@@ -124,11 +124,30 @@ export type MessageType =
   | 'updateGameState'
   | 'impersonate'
   | 'endGame'
-  | 'presence';
+  | 'presence'
+  // Companion-device pairing (#1): host issues a code, companion redeems it, server links
+  // the two sockets to one role as map-primary + fpv-companion surfaces.
+  | 'pairRequest'
+  | 'pairCode'
+  | 'pairRedeem'
+  | 'paired'
+  | 'pairError'
+  // Companion live coordination (#6/#12): transient view/intent relay, heartbeat, unpair.
+  // The server forwards these to the paired peer socket; they never touch GameState.
+  | 'companionRelay'
+  | 'companionPing'
+  | 'companionPong'
+  | 'pairUnlink';
 
 export interface PresenceMember {
   role: string;
   username: string;
+  /** Stable per-connection id (#1) — distinguishes two devices on the same role. */
+  clientId?: string;
+  /** Reported hardware class. */
+  deviceType?: import('./companion').CompanionDevice;
+  /** Surface this device drives when paired. */
+  surface?: import('./companion').CompanionSurface;
 }
 
 export interface Message {
@@ -152,6 +171,14 @@ export interface Message {
     currentRole?: RoleType;
     currentTurn?: RoleType;
     members?: PresenceMember[];
+    // Companion pairing (#1)
+    code?: string;
+    clientId?: string;
+    deviceType?: import('./companion').CompanionDevice;
+    surface?: import('./companion').CompanionSurface;
+    peerClientId?: string;
+    peerSurface?: import('./companion').CompanionSurface;
+    expiresAt?: number;
   };
 }
 
@@ -202,3 +229,4 @@ export interface PredictedCulpritMove {
 }
 
 export * from './grid-map';
+export * from './companion';

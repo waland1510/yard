@@ -17,6 +17,7 @@ import {
   VehicleKind,
 } from '../three/vehicles';
 import { createPovControls, PovControls } from '../three/controls';
+import { createTouchControls } from '../three/touch-controls';
 import { playRide } from '../three/ride';
 import { Hud } from '../hud/hud';
 import { Crosshair } from '../hud/crosshair';
@@ -25,16 +26,23 @@ import { PaperMap } from '../hud/paper-map';
 import { VehicleLabels } from '../hud/vehicle-labels';
 import { HudShell } from '../hud/hud-shell';
 import { JoinOverlay } from '../hud/join-overlay';
-import { Attribution } from '../hud/attribution';
+import { MapSurface } from '../hud/map-surface';
+import { SurfaceToggle } from '../hud/surface-toggle';
 import { getConnections, getActiveDirections, getRiverDirections, type Connection } from '../game/connections';
 import { nodeDisplayName } from '../core/map-data';
 import { useGameStateStore } from '../stores/game-state-store';
-import { useRunnerStore } from '../stores/runner-store';
+import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
+import { detectDeviceProfile, deviceTypeFromProfile, isTouchPrimary, resolveQualityTier } from '../core/device-surface';
 import { getWebSocketClient } from '../net/websocket-client';
+import { CompanionSession, setCompanionSession, getCompanionSession } from '../net/companion-session';
+import { CompanionRelay, setCompanionRelay } from '../net/companion-relay';
+import { LivenessMonitor } from '../net/liveness-monitor';
+import { MoveAuthority } from '../net/move-authority';
 import { getGame } from '../net/rest-client';
+import type { SurfaceRole } from '../core/device-surface';
 import { validateMove, isCapture } from '../core/move-validator';
 import { notifications } from '../core/notification-service';
-import { replay } from '../core/replay-singleton';
+import { replay, useReplay } from '../core/replay-singleton';
 import { play as playSfx, setMuted as setAudioMuted } from '../core/audio-bus';
 import { deriveCurrentTurn } from '../core/turn-order';
 import { parseUrlSession } from './url-params';
@@ -53,6 +61,9 @@ export function Game() {
   const [hoveredInfo, setHoveredInfo] = useState<HoveredInfo | null>(null);
   const [riding, setRiding] = useState(false);
   const [pointerLocked, setPointerLocked] = useState(false);
+  // True when the FPV is driven by touch (phone) rather than pointer-lock mouse-look.
+  // Decided once at scene init from the device profile.
+  const [touchMode, setTouchMode] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
   const location = useLocation();
   const urlSession = useMemo(
@@ -60,9 +71,13 @@ export function Game() {
     [location.pathname, location.search]
   );
   // Invite link: user landed on /game/X with no explicit role. Show role picker before
-  // initializing the session.
+  // initializing the session — unless this is a companion pairing link (?pair=), in which
+  // case the device inherits the host's role and skips the picker.
   const needsJoin =
-    urlSession != null && !urlSession.isMock && !urlSession.roleExplicit;
+    urlSession != null &&
+    !urlSession.isMock &&
+    !urlSession.roleExplicit &&
+    !urlSession.pairCode;
   // Sentinels for the VehicleLabels component — world becomes available + sceneVersion
   // bumps each rebuild so labels rebuild their DOM accordingly.
   const worldRef = useRef<World | null>(null);
@@ -81,6 +96,11 @@ export function Game() {
   const viewingAs = useRunnerStore((s) => s.viewingAs);
   const mapOpen = useRunnerStore((s) => s.mapOpen);
   const setMapOpen = useRunnerStore((s) => s.setMapOpen);
+  // Which surface this device shows by default (#2): desktop → strategic map,
+  // phone → immersive FPV; overridable via the SurfaceToggle.
+  const activeSurface = useRunnerStore(selectActiveSurface);
+  const graphicsQuality = useRunnerStore((s) => s.graphicsQuality);
+  const deviceType = useRunnerStore((s) => s.deviceType);
   const isMockChannel = channel.startsWith('mock');
 
   // The role we're CURRENTLY VIEWING AS. Equals myRole unless the user clicked another
@@ -157,6 +177,21 @@ export function Game() {
     return useRunnerStore.subscribe(sync);
   }, []);
 
+  // Classify the device (phone vs desktop) so the default surface resolves correctly.
+  // Re-run on resize: a narrowed desktop window can cross into the phone threshold.
+  useEffect(() => {
+    const update = () =>
+      useRunnerStore.getState().setDeviceType(deviceTypeFromProfile(detectDeviceProfile()));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // Apply the resolved post-processing tier whenever the graphics pref or device class changes.
+  useEffect(() => {
+    worldRef.current?.setQuality(resolveQualityTier(graphicsQuality, deviceType));
+  }, [graphicsQuality, deviceType]);
+
   // Session init — re-runs when URL changes (e.g., JoinOverlay updates ?role=).
   useEffect(() => {
     // Wait for the joiner to pick a role before connecting to anything
@@ -183,6 +218,68 @@ export function Game() {
       useGameStateStore.getState().setTheme(urlSession.theme);
 
       const client = getWebSocketClient();
+      // Companion pairing (#1): wraps the WS transport; tracks this device's surface/peer.
+      const companionDevice = deviceTypeFromProfile(detectDeviceProfile());
+      const companion = new CompanionSession({
+        transport: { send: (t, d) => { client.send(t, d); } },
+        deviceType: companionDevice,
+      });
+      setCompanionSession(companion);
+
+      // Companion relay (#6): mirror transient view/intent to the paired peer. NEVER touches
+      // GameStateStore — only RunnerStore view state.
+      const relay = new CompanionRelay({
+        transport: { send: (t, d) => { client.send(t, d); } },
+        isPaired: () => companion.isPaired(),
+      });
+      setCompanionRelay(relay);
+      const liveness = new LivenessMonitor();
+
+      // Inbound relay → apply to local view state. `applyingRemote` guards the outbound
+      // subscription below so a mirrored value isn't immediately echoed back (ping-pong).
+      let applyingRemote = false;
+      relay.on('viewingAs', (role) => {
+        applyingRemote = true;
+        useRunnerStore.getState().setViewingAs(role);
+        applyingRemote = false;
+      });
+      relay.on('pendingMove', (pm) => {
+        useRunnerStore.getState().setPeerPendingMove(pm);
+      });
+
+      // Outbound relay: when this device's impersonation or pending move changes, send it.
+      let lastViewingAs = useRunnerStore.getState().viewingAs;
+      let lastPending = useRunnerStore.getState().pendingMove;
+      const unsubRelay = useRunnerStore.subscribe(() => {
+        const s = useRunnerStore.getState();
+        if (s.viewingAs !== lastViewingAs) {
+          lastViewingAs = s.viewingAs;
+          if (!applyingRemote) relay.send('viewingAs', s.viewingAs);
+        }
+        if (s.pendingMove !== lastPending) {
+          lastPending = s.pendingMove;
+          relay.send('pendingMove', s.pendingMove);
+        }
+      });
+
+      // Heartbeat (#12): ping the peer while paired; a checker flips peerConnected off when
+      // no signal arrives within the liveness window so the UI can show "disconnected" and
+      // move authority falls back to this (surviving) device.
+      const pingTimer = window.setInterval(() => {
+        if (companion.isPaired()) client.send('companionPing', {});
+      }, 4000);
+      const livenessTimer = window.setInterval(() => {
+        if (!companion.isPaired()) return;
+        const alive = liveness.isAlive(Date.now());
+        const runner = useRunnerStore.getState();
+        if (runner.peerConnected !== alive) {
+          runner.setPeerConnected(alive);
+          if (!alive) {
+            runner.setPeerPendingMove(null);
+            notifications.push('warning', 'Companion device disconnected');
+          }
+        }
+      }, 2000);
       client.setHandlers({
         onConnectionStatus: (s) => {
           useGameStateStore.getState().setConnection(s);
@@ -238,14 +335,69 @@ export function Game() {
         onPresence: ({ members }) => {
           useGameStateStore.getState().setOccupiedRoles(new Set(members.map((m) => m.role)));
         },
+        onPairing: (type, data) => {
+          companion.handleMessage(type, data);
+          // Mirror this device's assigned surface into the runner store so the active
+          // surface resolves to FPV (controller) or map (viewer).
+          const surface = companion.surface();
+          const role: SurfaceRole | null =
+            surface === 'fpv-companion'
+              ? 'controller'
+              : surface === 'map-primary'
+              ? 'viewer'
+              : null;
+          useRunnerStore.getState().setPairingRole(role);
+          // A companion inherits the host's role from the `paired` message.
+          if (type === 'paired' && data.role) {
+            const runner = useRunnerStore.getState();
+            if (runner.myRole !== data.role) {
+              runner.setIdentity(data.role, runner.myName || sessionName);
+            }
+          }
+          // Track peer connectivity for the heartbeat baseline (#12).
+          if (type === 'paired') {
+            const paired = companion.isPaired();
+            useRunnerStore.getState().setPeerConnected(paired);
+            if (paired) liveness.markSeen(Date.now());
+            else useRunnerStore.getState().setPeerPendingMove(null);
+          }
+        },
+        onCompanionRelay: (data) => {
+          liveness.markSeen(Date.now());
+          useRunnerStore.getState().setPeerConnected(true);
+          relay.handleMessage(
+            data as { kind: 'pendingMove' | 'viewingAs' | 'cameraHint'; payload: unknown }
+          );
+        },
+        onCompanionPing: () => {
+          liveness.markSeen(Date.now());
+          useRunnerStore.getState().setPeerConnected(true);
+          client.send('companionPong', {});
+        },
+        onCompanionPong: () => {
+          liveness.markSeen(Date.now());
+          useRunnerStore.getState().setPeerConnected(true);
+        },
         onError: () => {
           // graceful: notify, keep mock state alive
           notifications.push('error', 'Connection error');
         },
       });
       (window as unknown as { __wsClient?: ReturnType<typeof getWebSocketClient> }).__wsClient = client;
-      client.connect({ ...urlSession, name: sessionName });
-      return () => client.disconnect();
+      client.connect({
+        ...urlSession,
+        name: sessionName,
+        clientId: companion.clientId,
+        deviceType: companionDevice,
+      });
+      return () => {
+        client.disconnect();
+        setCompanionSession(null);
+        setCompanionRelay(null);
+        window.clearInterval(pingTimer);
+        window.clearInterval(livenessTimer);
+        unsubRelay();
+      };
     }
 
     // No URL session — fallback mock (e.g. direct hit on /game/demo)
@@ -265,6 +417,13 @@ export function Game() {
 
     const world = createWorld(canvas);
     worldRef.current = world;
+    // Apply the device-appropriate fidelity tier immediately (world defaults to high).
+    world.setQuality(
+      resolveQualityTier(
+        useRunnerStore.getState().graphicsQuality,
+        useRunnerStore.getState().deviceType
+      )
+    );
     let currentIntersection: IntersectionBuild | null = null;
     let vehicles: VehicleHandle[] = [];
     let lastBuiltForNode: number | null = null;
@@ -353,6 +512,24 @@ export function Game() {
         playSfx('invalid-move');
         notifications.push('warning', `Not your turn (${currentTurn})`);
         return;
+      }
+
+      // Companion move authority (#7): while paired with a connected peer, only the FPV
+      // controller commits — the map-primary desktop defers so the two devices don't race.
+      const companionSession = getCompanionSession();
+      if (companionSession) {
+        const canCommit = new MoveAuthority().canCommit({
+          myClientId: companionSession.clientId,
+          mySurface: companionSession.surface(),
+          peerPresent: useRunnerStore.getState().peerConnected,
+          myRole: role,
+          currentTurn: useGameStateStore.getState().currentTurn,
+        });
+        if (!canCommit) {
+          flashInvalid();
+          notifications.push('warning', 'Make the move from your phone');
+          return;
+        }
       }
 
       const useSecret = runner.pendingSecret && role === 'culprit';
@@ -507,12 +684,12 @@ export function Game() {
 
     vehicleClickRef.current = onVehicleClick;
 
-    controls = createPovControls({
+    const controlsOpts = {
       canvas,
       camera: world.camera,
       getVehicles: () => vehicles,
       onVehicleClick,
-      onHoverChange: (v) => {
+      onHoverChange: (v: VehicleHandle | null) => {
         if (!v) {
           setHoveredInfo(null);
           return;
@@ -526,7 +703,11 @@ export function Game() {
         });
       },
       addTick: world.addTick,
-    });
+    };
+    // Pointer lock is unavailable on touch devices — mount touch controls there instead.
+    const useTouch = isTouchPrimary(detectDeviceProfile());
+    setTouchMode(useTouch);
+    controls = useTouch ? createTouchControls(controlsOpts) : createPovControls(controlsOpts);
 
     // Pointer-lock state — tracks whether the canvas owns the cursor. HUD overlays
     // (Crosshair, VehicleLabels, Hud) gate visibility on this so they only appear
@@ -539,6 +720,8 @@ export function Game() {
     const keyHandler = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
         e.preventDefault();
+        // The TAB peek only applies in FPV — on the map surface the map is already shown.
+        if (selectActiveSurface(useRunnerStore.getState()) !== 'fpv') return;
         const cur = useRunnerStore.getState().mapOpen;
         const next = !cur;
         useRunnerStore.getState().setMapOpen(next);
@@ -611,29 +794,105 @@ export function Game() {
     vehicleClickRef.current?.(v);
   };
 
+  // FPV is the active surface (street view). When false, the strategic map owns the
+  // viewport. During a ride the cinematic always plays on the FPV canvas, so the map
+  // surface hides itself rather than unmounting (keeps Google Maps warm).
+  const isFpv = activeSurface === 'fpv';
+  // FPV is "engaged" (show crosshair-less HUD, tappable labels) when the player is
+  // actually playing it: pointer-locked on desktop, or past the intro on touch.
+  const fpvEngaged = touchMode ? !showIntro : pointerLocked;
+
+  // On-map replay (#11): when the post-game scrubber is active, drive the strategic map
+  // from the current snapshot (per-turn positions, Mr. X fully revealed) instead of live
+  // state. `useReplay()` re-renders on scrub so `replay.current()` reads the active turn.
+  const replayView = useReplay();
+  const replaySnap = replayView.isActive ? replay.current() : null;
+  const mapPlayers = replaySnap ? replaySnap.players : players;
+  const mapCurrentNodeId = replaySnap
+    ? replaySnap.culpritActualPosition ?? myPosition ?? 1
+    : myPosition;
+  const mapCulpritMoveCount = replaySnap
+    ? replaySnap.turnIndex + 1
+    : moves.filter((m) => m.role === 'culprit').length;
+
   return (
     <>
       {/* FPV canvas — full-screen, owns the cursor when pointer-locked. */}
       <canvas
         ref={canvasRef}
-        style={{ position: 'fixed', inset: 0, zIndex: 0, cursor: 'crosshair' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 0, cursor: 'crosshair', touchAction: 'none' }}
       />
       {needsJoin && urlSession && (
         <JoinOverlay channel={urlSession.channel} onJoin={() => { /* navigate happens inside */ }} />
       )}
-      <Hud
-        nodeId={myPosition ?? 1}
-        nodeName={nodeDisplayName(myPosition ?? 1)}
-        round={round}
-        tickets={tickets}
-        hoveredInfo={hoveredInfo}
-        mapHint={!mapOpen}
-      />
-      <Crosshair
-        pointerLocked={pointerLocked}
-        hoveredKind={hoveredInfo?.kind ?? null}
-        hidden={riding || mapOpen || !pointerLocked}
-      />
+      {/* FPV-surface HUD — only while street view owns the viewport. */}
+      {isFpv && (
+        <>
+          <Hud
+            nodeId={myPosition ?? 1}
+            nodeName={nodeDisplayName(myPosition ?? 1)}
+            round={round}
+            tickets={tickets}
+            hoveredInfo={hoveredInfo}
+            mapHint={!mapOpen}
+          />
+          <Crosshair
+            pointerLocked={pointerLocked}
+            hoveredKind={hoveredInfo?.kind ?? null}
+            hidden={riding || mapOpen || !pointerLocked}
+          />
+          <VehicleLabels
+            world={worldRef.current}
+            sceneVersion={sceneVersion}
+            getVehicles={() => vehiclesRef.current}
+            hidden={riding || mapOpen || !fpvEngaged}
+            onVehicleClick={(v) => vehicleClickRef.current?.(v)}
+          />
+          {showIntro && !fpvEngaged && !riding && !mapOpen && (
+            <Intro
+              onDismiss={() => {
+                setShowIntro(false);
+                // Pointer lock only applies to mouse controls; touch engages immediately.
+                if (!touchMode) canvasRef.current?.requestPointerLock();
+              }}
+            />
+          )}
+          {mapOpen && myPosition != null && (
+            <PaperMap
+              currentNodeId={myPosition}
+              connections={mapConnections}
+              isMyTurn={!riding && isMyTurn}
+              currentTurnRole={currentTurn}
+              viewerRole={viewerRole}
+              players={players}
+              culpritMoveCount={moves.filter((m) => m.role === 'culprit').length}
+              ticketsByKind={ticketsByKind}
+              onConnectionClick={(conn) => {
+                handleMapClick(conn);
+                canvasRef.current?.requestPointerLock();
+              }}
+              onClose={handleMapDismiss}
+            />
+          )}
+        </>
+      )}
+      {/* Strategic map as the primary surface (desktop default). Stays mounted while
+       *  the map is active and hides during a ride so the FPV cinematic shows through. */}
+      {!isFpv && mapCurrentNodeId != null && (
+        <MapSurface
+          currentNodeId={mapCurrentNodeId}
+          connections={replaySnap ? [] : mapConnections}
+          isMyTurn={!replaySnap && !riding && isMyTurn}
+          currentTurnRole={currentTurn}
+          viewerRole={replaySnap ? 'culprit' : viewerRole}
+          players={mapPlayers}
+          culpritMoveCount={mapCulpritMoveCount}
+          ticketsByKind={ticketsByKind}
+          hidden={riding}
+          isReplay={replayView.isActive}
+          onConnectionClick={handleMapClick}
+        />
+      )}
       {isMockChannel && (
         <div style={mockBadge}>
           <span style={mockDot} />
@@ -641,42 +900,7 @@ export function Game() {
           <span style={mockSub}>· AI disabled · backend offline</span>
         </div>
       )}
-      <VehicleLabels
-        world={worldRef.current}
-        sceneVersion={sceneVersion}
-        getVehicles={() => vehiclesRef.current}
-        hidden={riding || mapOpen || !pointerLocked}
-        onVehicleClick={(v) => vehicleClickRef.current?.(v)}
-      />
-      {/* Attribution was for the Google 3D Tiles photoreal world, which is no
-       *  longer instantiated. PaperMap's embedded MapView carries Google's own
-       *  attribution (its required Maps JS attribution renders inside the map
-       *  container itself). */}
-      {showIntro && !pointerLocked && !riding && !mapOpen && (
-        <Intro
-          onDismiss={() => {
-            setShowIntro(false);
-            canvasRef.current?.requestPointerLock();
-          }}
-        />
-      )}
-      {mapOpen && myPosition != null && (
-        <PaperMap
-          currentNodeId={myPosition}
-          connections={mapConnections}
-          isMyTurn={!riding && isMyTurn}
-          currentTurnRole={currentTurn}
-          viewerRole={viewerRole}
-          players={players}
-          culpritMoveCount={moves.filter((m) => m.role === 'culprit').length}
-          ticketsByKind={ticketsByKind}
-          onConnectionClick={(conn) => {
-            handleMapClick(conn);
-            canvasRef.current?.requestPointerLock();
-          }}
-          onClose={handleMapDismiss}
-        />
-      )}
+      <SurfaceToggle />
       <HudShell />
       <div
         ref={fadeRef}

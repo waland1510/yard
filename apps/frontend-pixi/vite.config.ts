@@ -9,7 +9,9 @@ export default defineConfig({
   cacheDir: '../../node_modules/.vite/apps/frontend-pixi',
   server: {
     port: 4201,
-    host: 'localhost',
+    // Bind all interfaces so a phone on the same Wi-Fi can reach the dev server (companion
+    // pairing, #1). Open the desktop at http://<LAN-IP>:4201 so the QR encodes that origin.
+    host: true,
   },
   preview: {
     port: 4301,

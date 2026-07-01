@@ -26,6 +26,9 @@ export interface UrlSession {
   /** False when the URL didn't carry an explicit `role=` and we substituted a default.
    *  The caller should show a role-picker before joining the game. */
   roleExplicit: boolean;
+  /** Companion pairing code from `?pair=` — present when a phone opened a pairing link.
+   *  The device joins as the host's fpv-companion instead of picking its own role. */
+  pairCode?: string;
 }
 
 /**
@@ -45,6 +48,8 @@ export function parseUrlSession(pathname: string, search: string): UrlSession | 
   const roleParam = params.get('role');
   const name = params.get('name') ?? '';
   const themeParam = params.get('theme');
+  const pairParam = params.get('pair');
+  const pairCode = pairParam ? pairParam.trim().toUpperCase() : undefined;
 
   const roleExplicit = !!roleParam && VALID_ROLES.has(roleParam as RoleType);
   const role: RoleType = roleExplicit ? (roleParam as RoleType) : 'detective1';
@@ -59,5 +64,6 @@ export function parseUrlSession(pathname: string, search: string): UrlSession | 
     theme,
     isMock: channel.startsWith('mock-'),
     roleExplicit,
+    pairCode,
   };
 }

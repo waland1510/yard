@@ -1,6 +1,14 @@
 import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
-import { getNextRole, Message, Player, RoleType } from '@yard/shared-utils';
+import {
+  getNextRole,
+  Message,
+  Player,
+  RoleType,
+  PairingRegistry,
+  type CompanionDevice,
+  type CompanionSurface,
+} from '@yard/shared-utils';
 import { fastify } from 'fastify';
 import { setTimeout } from 'timers/promises';
 import { app } from './app/app';
@@ -25,8 +33,20 @@ const allowedOrigins = [
   'http://localhost:4200',
   'http://localhost:4201',
 ].filter(Boolean);
+// Dev-permissive origin check: the canonical FRONTEND_URL plus any localhost port and any
+// private-LAN address (10.x / 192.168.x / 172.16–31.x) on any port. The latter is what
+// lets a phone on the same Wi-Fi reach the backend for companion pairing (#1) when the
+// Vite dev server lands on an unexpected port (e.g. 4202).
+const LAN_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
 server.register(cors, {
-  origin: allowedOrigins,
+  origin: (origin, cb) => {
+    // No Origin header → non-browser client / same-origin; allow.
+    if (!origin || allowedOrigins.includes(origin) || LAN_ORIGIN.test(origin)) {
+      cb(null, true);
+      return;
+    }
+    cb(null, false);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });
@@ -34,10 +54,52 @@ server.register(cors, {
 const channels: Record<string, Set<WebSocket>> = {};
 // Per-channel member presence — which role each connection is using. Lets new joiners
 // know who's already claimed a seat. Maintained on joinGame and on socket close.
+// `clientId`/`deviceType`/`surface` (companion pairing, #1) distinguish two devices that
+// share one role: a `map-primary` desktop and an `fpv-companion` phone.
 const channelMembers: Record<
   string,
-  Map<WebSocket, { role: string; username: string }>
+  Map<
+    WebSocket,
+    {
+      role: string;
+      username: string;
+      clientId?: string;
+      deviceType?: CompanionDevice;
+      surface?: CompanionSurface;
+    }
+  >
 > = {};
+
+// Authoritative companion-pairing code registry (#1). Single-use, time-bounded codes.
+const pairing = new PairingRegistry();
+
+function findByClientId(channel: string, clientId: string): WebSocket | null {
+  const members = channelMembers[channel];
+  if (!members) return null;
+  for (const [ws, m] of members) {
+    if (m.clientId === clientId) return ws;
+  }
+  return null;
+}
+
+// The paired peer of `clientId`: the OTHER connection on the same role that holds a
+// companion surface. Used to forward relay / heartbeat (#6/#12) to the right socket.
+function findPeerOf(channel: string, clientId: string): WebSocket | null {
+  const members = channelMembers[channel];
+  if (!members) return null;
+  let mine: { role: string } | null = null;
+  for (const m of members.values()) {
+    if (m.clientId === clientId) {
+      mine = m;
+      break;
+    }
+  }
+  if (!mine) return null;
+  for (const [ws, m] of members) {
+    if (m.clientId !== clientId && m.role === mine.role && m.surface) return ws;
+  }
+  return null;
+}
 
 function broadcastPresence(channel: string) {
   const members = channelMembers[channel];
@@ -146,6 +208,7 @@ server.register(async function (fastify) {
     { websocket: true },
     (connection /* WebSocket */) => {
       let currentChannel: string | null = null;
+      let currentClientId: string | null = null;
 
       connection.on('message', async (message) => {
         const parsedMessage: Message = JSON.parse(message.toString());
@@ -185,11 +248,14 @@ server.register(async function (fastify) {
               channelMembers[currentChannel] = new Map();
             }
             if (parsedMessage.data.role) {
+              currentClientId = parsedMessage.data.clientId ?? currentClientId;
               channelMembers[currentChannel].set(
                 connection as unknown as WebSocket,
                 {
                   role: parsedMessage.data.role,
                   username: parsedMessage.data.username ?? '',
+                  clientId: parsedMessage.data.clientId,
+                  deviceType: parsedMessage.data.deviceType,
                 }
               );
             }
@@ -233,6 +299,119 @@ server.register(async function (fastify) {
               });
             }
             break;
+
+          // Companion pairing (#1): the host (map-primary) requests a code for its role.
+          case 'pairRequest': {
+            if (!currentChannel) break;
+            const me = channelMembers[currentChannel]?.get(
+              connection as unknown as WebSocket
+            );
+            const hostClientId = parsedMessage.data.clientId;
+            if (!me?.role || !hostClientId) break;
+            me.clientId = hostClientId;
+            currentClientId = hostClientId;
+            const { code, expiresAt } = pairing.issue({
+              channel: currentChannel,
+              role: me.role,
+              hostClientId,
+              now: Date.now(),
+            });
+            connection.send(
+              JSON.stringify({ type: 'pairCode', data: { code, expiresAt } })
+            );
+            break;
+          }
+
+          // The companion (phone) redeems the code and joins the host's role as fpv-companion.
+          case 'pairRedeem': {
+            const code = parsedMessage.data.code;
+            const companionClientId = parsedMessage.data.clientId;
+            if (!code || !companionClientId) break;
+            const res = pairing.redeem({ code, now: Date.now() });
+            if (!res.ok) {
+              const reason = 'reason' in res ? res.reason : 'unknown-code';
+              connection.send(
+                JSON.stringify({ type: 'pairError', data: { reason } })
+              );
+              break;
+            }
+            const ch = res.channel;
+            currentChannel = ch;
+            currentClientId = companionClientId;
+            if (!channels[ch]) channels[ch] = new Set();
+            channels[ch].add(connection as unknown as WebSocket);
+            if (!channelMembers[ch]) channelMembers[ch] = new Map();
+            channelMembers[ch].set(connection as unknown as WebSocket, {
+              role: res.role,
+              username: '',
+              clientId: companionClientId,
+              deviceType: parsedMessage.data.deviceType,
+              surface: 'fpv-companion',
+            });
+            // Mark the host as map-primary and notify both sides.
+            const hostWs = findByClientId(ch, res.hostClientId);
+            if (hostWs) {
+              const hostMember = channelMembers[ch].get(hostWs);
+              if (hostMember) hostMember.surface = 'map-primary';
+              hostWs.send(
+                JSON.stringify({
+                  type: 'paired',
+                  data: {
+                    surface: 'map-primary',
+                    peerClientId: companionClientId,
+                    peerSurface: 'fpv-companion',
+                  },
+                })
+              );
+            }
+            connection.send(
+              JSON.stringify({
+                type: 'paired',
+                data: {
+                  surface: 'fpv-companion',
+                  peerClientId: res.hostClientId,
+                  peerSurface: 'map-primary',
+                  // The companion inherits the host's role.
+                  role: res.role as RoleType,
+                },
+              })
+            );
+            broadcastPresence(ch);
+            break;
+          }
+
+          // Companion live coordination (#6/#12): forward transient relay + heartbeat to
+          // the paired peer socket. These never touch GameState.
+          case 'companionRelay':
+          case 'companionPing':
+          case 'companionPong': {
+            if (!currentChannel || !currentClientId) break;
+            const peer = findPeerOf(currentChannel, currentClientId);
+            if (peer && peer.readyState === peer.OPEN) {
+              peer.send(
+                JSON.stringify({ type: parsedMessage.type, data: parsedMessage.data })
+              );
+            }
+            break;
+          }
+
+          // Explicit unpair (#12): clear both surfaces and tell the peer it's solo again.
+          case 'pairUnlink': {
+            if (!currentChannel || !currentClientId) break;
+            const members = channelMembers[currentChannel];
+            const me = members?.get(connection as unknown as WebSocket);
+            if (me) me.surface = undefined;
+            const peer = findPeerOf(currentChannel, currentClientId);
+            if (peer) {
+              const pm = members?.get(peer);
+              if (pm) pm.surface = undefined;
+              if (peer.readyState === peer.OPEN) {
+                peer.send(JSON.stringify({ type: 'paired', data: {} }));
+              }
+            }
+            broadcastPresence(currentChannel);
+            break;
+          }
 
           case 'makeMove':
             if (currentChannel) {
@@ -294,8 +473,28 @@ server.register(async function (fastify) {
 
       connection.on('close', () => {
         if (currentChannel && channels[currentChannel]) {
+          const closing = channelMembers[currentChannel]?.get(
+            connection as unknown as WebSocket
+          );
           channels[currentChannel].delete(connection as unknown as WebSocket);
           channelMembers[currentChannel]?.delete(connection as unknown as WebSocket);
+          // If a paired device dropped, tell its surviving peer (same role) so it can
+          // fall back to solo control (full re-pair UX is #12).
+          if (closing?.surface && closing.role) {
+            const members = channelMembers[currentChannel];
+            if (members) {
+              for (const [ws, m] of members) {
+                if (
+                  m.role === closing.role &&
+                  m.surface &&
+                  m.clientId !== closing.clientId
+                ) {
+                  m.surface = undefined;
+                  ws.send(JSON.stringify({ type: 'paired', data: {} }));
+                }
+              }
+            }
+          }
           if (channels[currentChannel].size === 0) {
             delete channels[currentChannel];
             delete channelMembers[currentChannel];

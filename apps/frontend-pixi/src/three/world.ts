@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { FOG_TINT } from './palette';
+import { createPostProcessing, type QualityTier } from './post-processing';
+import { createWeather } from './weather';
 
 export interface World {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   addTick: (fn: (dt: number, t: number) => void) => () => void;
+  /** Switch the post-processing fidelity tier (#3). */
+  setQuality: (tier: QualityTier) => void;
   destroy: () => void;
 }
 
@@ -121,17 +125,24 @@ export function createWorld(canvas: HTMLCanvasElement): World {
   // Ambient nudge so shadows don't crush to black under the overcast key.
   scene.add(new THREE.AmbientLight(0xffffff, 0.18));
 
+  // Post-processing pipeline (#3) — owns the final render. Defaults to the high tier;
+  // game.tsx sets the device-appropriate tier on mount.
+  const post = createPostProcessing(renderer, scene, camera, 'high');
+  // Procedural weather (#9) — tier-gated rain, toggled by setQuality.
+  const weather = createWeather(scene);
+
   const tickFns: ((dt: number, t: number) => void)[] = [];
   let raf = 0;
   let last = performance.now();
-  let startTime = last;
+  const startTime = last;
 
   function loop(now: number) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const t = (now - startTime) / 1000;
     for (const fn of tickFns) fn(dt, t);
-    renderer.render(scene, camera);
+    weather.tick(dt, t);
+    post.render();
     raf = requestAnimationFrame(loop);
   }
   raf = requestAnimationFrame(loop);
@@ -140,6 +151,7 @@ export function createWorld(canvas: HTMLCanvasElement): World {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    post.setSize(window.innerWidth, window.innerHeight);
   }
   window.addEventListener('resize', onResize);
 
@@ -154,9 +166,15 @@ export function createWorld(canvas: HTMLCanvasElement): World {
         if (i >= 0) tickFns.splice(i, 1);
       };
     },
+    setQuality(tier) {
+      post.setQuality(tier);
+      weather.setEnabled(tier === 'high');
+    },
     destroy() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      weather.dispose();
+      post.dispose();
       skyTexture.dispose();
       pmrem.dispose();
       renderer.dispose();

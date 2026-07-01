@@ -2,7 +2,7 @@
 // Handles connect, reconnect, JSON framing, and dispatch via typed callbacks.
 // Does NOT know about Zustand or game state — callers wire the events.
 
-import type { Message, MessageType, Move, RoleType, GameState } from '@yard/shared-utils';
+import type { Message, MessageType, Move, RoleType, GameState, CompanionDevice } from '@yard/shared-utils';
 
 const RECONNECT_MS = 4000;
 
@@ -23,13 +23,26 @@ export interface WSHandlers {
   onJoinGame?: (payload: { role?: RoleType; username?: string }) => void;
   onImpersonate?: (payload: { role?: RoleType }) => void;
   onPresence?: (payload: { members: Array<{ role: string; username: string }> }) => void;
+  /** Companion-pairing messages (#1) — routed to the CompanionSession. */
+  onPairing?: (type: 'pairCode' | 'paired' | 'pairError', data: Message['data']) => void;
+  /** Companion relay (#6) — transient view/intent from the paired peer. */
+  onCompanionRelay?: (data: { kind: string; payload: unknown }) => void;
+  /** Heartbeat (#12): peer pinged us (respond with a pong) / peer ponged us. */
+  onCompanionPing?: () => void;
+  onCompanionPong?: () => void;
   onError?: (e: unknown) => void;
 }
 
 export interface JoinParams {
   channel: string;
-  role: RoleType;
+  /** Omitted for a companion device, which inherits the host's role via `pairCode`. */
+  role?: RoleType;
   name: string;
+  /** Stable per-device id, surfaced in presence so two devices on one role are distinct. */
+  clientId?: string;
+  deviceType?: CompanionDevice;
+  /** When set, join as a companion by redeeming this code instead of claiming a role. */
+  pairCode?: string;
 }
 
 export interface WebSocketClient {
@@ -98,6 +111,20 @@ export function createWebSocketClient(url?: string): WebSocketClient {
       case 'presence':
         handlers.onPresence?.({ members: data.members ?? [] });
         break;
+      case 'pairCode':
+      case 'paired':
+      case 'pairError':
+        handlers.onPairing?.(type, data);
+        break;
+      case 'companionRelay':
+        handlers.onCompanionRelay?.(data as unknown as { kind: string; payload: unknown });
+        break;
+      case 'companionPing':
+        handlers.onCompanionPing?.();
+        break;
+      case 'companionPong':
+        handlers.onCompanionPong?.();
+        break;
       default:
         break;
     }
@@ -116,13 +143,7 @@ export function createWebSocketClient(url?: string): WebSocketClient {
 
     socket.onopen = () => {
       setStatus('connected');
-      if (join) {
-        sendInternal('joinGame', {
-          channel: join.channel,
-          username: join.name,
-          role: join.role,
-        });
-      }
+      if (join) sendJoinOrPair(join);
     };
     socket.onmessage = (ev) => {
       try {
@@ -158,6 +179,28 @@ export function createWebSocketClient(url?: string): WebSocketClient {
     return true;
   }
 
+  // Companion devices redeem a pairing code instead of claiming a role; everyone else
+  // joins their seat. Both carry clientId/deviceType so presence can tell devices apart.
+  function sendJoinOrPair(j: JoinParams): boolean {
+    if (j.pairCode) {
+      return sendInternal('pairRedeem', {
+        code: j.pairCode,
+        clientId: j.clientId,
+        deviceType: j.deviceType,
+      });
+    }
+    if (j.role) {
+      return sendInternal('joinGame', {
+        channel: j.channel,
+        username: j.name,
+        role: j.role,
+        clientId: j.clientId,
+        deviceType: j.deviceType,
+      });
+    }
+    return false;
+  }
+
   let deferredDisconnect: ReturnType<typeof setTimeout> | null = null;
 
   return {
@@ -171,8 +214,8 @@ export function createWebSocketClient(url?: string): WebSocketClient {
       const sameChannel = join?.channel === params.channel;
       join = params;
       if (socket && socket.readyState === WebSocket.OPEN && sameChannel) {
-        // Already connected to the same channel — just re-send joinGame
-        sendInternal('joinGame', { channel: params.channel, username: params.name, role: params.role });
+        // Already connected to the same channel — just re-send join/pair
+        sendJoinOrPair(params);
       } else if (socket && socket.readyState === WebSocket.CONNECTING && sameChannel) {
         // Connection is still being established — joinGame will fire from onopen
       } else if (!socket) {
