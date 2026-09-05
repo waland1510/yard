@@ -3,6 +3,7 @@
 
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import type { GraphicsQuality } from '../core/device-surface';
+import { SCREEN_MARGIN, pillCompact } from './tokens';
 
 const ORDER: GraphicsQuality[] = ['auto', 'low', 'high'];
 const LABEL: Record<GraphicsQuality, string> = {
@@ -37,22 +38,9 @@ export function GraphicsToggle() {
 }
 
 const btn: React.CSSProperties = {
+  ...pillCompact,
   position: 'fixed',
-  bottom: 18,
-  left: 14,
+  bottom: SCREEN_MARGIN,
+  left: SCREEN_MARGIN,
   zIndex: 30,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '6px 12px',
-  background: 'rgba(18, 20, 26, 0.72)',
-  color: '#f2f4f8',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontSize: 12,
-  fontWeight: 600,
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.18)',
-  boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-  backdropFilter: 'blur(8px)',
-  cursor: 'pointer',
 };

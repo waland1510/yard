@@ -1,4 +1,4 @@
-import { IpInfo, Move } from '@yard/shared-utils';
+import { GameState, IpInfo, Move, Player } from '@yard/shared-utils';
 import { FastifyInstance } from 'fastify';
 import { createGameState } from '../helpers/create-game';
 import { hasActiveGame, updateGame } from '../helpers/db-operations';
@@ -42,7 +42,7 @@ export default async function (fastify: FastifyInstance) {
   });
 
   // Update a game
-  fastify.patch<{ Params: { id: string } }>(
+  fastify.patch<{ Params: { id: string }; Body: Partial<GameState> }>(
     '/games/:id',
     async (request, reply) => {
       const id = parseInt(request.params.id, 10);
@@ -67,7 +67,7 @@ export default async function (fastify: FastifyInstance) {
   );
 
   // Update a player
-  fastify.patch<{ Params: { id: string } }>(
+  fastify.patch<{ Params: { id: string }; Body: Partial<Player> }>(
     '/players/:id',
     async (request, reply) => {
       const id = parseInt(request.params.id, 10);

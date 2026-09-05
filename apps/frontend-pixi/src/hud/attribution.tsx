@@ -50,7 +50,7 @@ const bar: React.CSSProperties = {
   padding: '4px 10px',
   background: 'rgba(0,0,0,0.55)',
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   fontSize: 11,
   borderRadius: 4,
   pointerEvents: 'none',

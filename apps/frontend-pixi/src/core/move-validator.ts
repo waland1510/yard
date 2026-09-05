@@ -4,8 +4,11 @@
 // Locked decision from PRD: detective-detective collision is enforced here, client-side.
 // (Per the trust-the-client posture, this is the authoritative rule check at the client level.)
 
-import type { MoveType, Player, RoleType } from '@yard/shared-utils';
+import type { Move, MoveType, Player, RoleType } from '@yard/shared-utils';
 import { getNode } from './map-data';
+
+/** Mr. X escapes once he has completed this many moves without being caught. */
+export const TOTAL_ROUNDS = 24;
 
 export type ValidationVerdict =
   | { ok: true }
@@ -17,6 +20,7 @@ export type ValidationReason =
   | 'invalid-connection'
   | 'no-ticket'
   | 'detective-collision'
+  | 'node-occupied'
   | 'river-not-allowed'
   | 'secret-not-allowed'
   | 'double-not-allowed'
@@ -34,6 +38,12 @@ export interface ProposedMove {
   transport: MoveType;
   secret?: boolean;
   double?: boolean;
+}
+
+/** The river has no ticket of its own: every ferry ride is paid with a secret ticket,
+ *  exactly as the legacy board client did. */
+export function spendsSecretTicket(transport: MoveType, secret: boolean | undefined): boolean {
+  return transport === 'river' || !!secret;
 }
 
 export function validateMove(move: ProposedMove, ctx: ValidationContext): ValidationVerdict {
@@ -76,18 +86,18 @@ export function validateMove(move: ProposedMove, ctx: ValidationContext): Valida
     }
   }
 
-  // 6. Detective-detective collision (locked PRD decision #1, client-side enforcement)
-  if (!isCulprit) {
-    const others = ctx.players
-      .filter((p) => p.role !== 'culprit' && p.role !== move.role)
-      .map((p) => p.position);
-    if (others.includes(move.targetNodeId)) {
-      return { ok: false, reason: 'detective-collision' };
-    }
+  // 6. Nobody may end a move on a detective's node. For a detective that is the
+  //    locked PRD collision rule; for Mr. X it is what stops him walking into a
+  //    detective and having the server score it as a capture.
+  const detectivePositions = ctx.players
+    .filter((p) => p.role !== 'culprit' && p.role !== move.role)
+    .map((p) => p.position);
+  if (detectivePositions.includes(move.targetNodeId)) {
+    return { ok: false, reason: isCulprit ? 'node-occupied' : 'detective-collision' };
   }
 
-  // 7. Transport ticket availability (river is free for culprit)
-  if (move.secret) {
+  // 7. Ticket availability
+  if (spendsSecretTicket(move.transport, move.secret)) {
     if ((me.secretTickets ?? 0) <= 0) return { ok: false, reason: 'no-secret-tickets' };
   } else if (move.transport === 'taxi') {
     if (me.taxiTickets <= 0) return { ok: false, reason: 'no-ticket' };
@@ -96,7 +106,6 @@ export function validateMove(move: ProposedMove, ctx: ValidationContext): Valida
   } else if (move.transport === 'underground') {
     if (me.undergroundTickets <= 0) return { ok: false, reason: 'no-ticket' };
   }
-  // River for culprit: no ticket cost
 
   // 8. Double-move resource
   if (move.double) {
@@ -140,14 +149,43 @@ export function legalDestinations(
     candidates = node[transport] ?? [];
   }
 
-  if (isCulprit) return candidates;
-
   const others = new Set(
     ctx.players
       .filter((p) => p.role !== 'culprit' && p.role !== role)
       .map((p) => p.position)
   );
   return candidates.filter((n) => !others.has(n));
+}
+
+export function culpritMoveCount(moves: readonly Move[]): number {
+  return moves.filter((m) => m.role === 'culprit').length;
+}
+
+/** Mr. X wins by surviving TOTAL_ROUNDS moves. */
+export function culpritEscaped(moves: readonly Move[]): boolean {
+  return culpritMoveCount(moves) >= TOTAL_ROUNDS;
+}
+
+/**
+ * Resolve who won a finished game. The server only ever says "detectives" or
+ * "culprit"; we turn that into the concrete role for the victory card by finding the
+ * detective standing on Mr. X. With no hint, fall back to the board state.
+ */
+export function deriveWinner(
+  hint: string | undefined,
+  players: readonly Player[],
+  moves: readonly Move[]
+): RoleType | null {
+  const culprit = players.find((p) => p.role === 'culprit');
+  const captor = culprit
+    ? players.find((p) => p.role !== 'culprit' && p.position === culprit.position)
+    : undefined;
+  if (hint === 'culprit') return 'culprit';
+  if (hint === 'detectives') return captor?.role ?? null;
+  if (hint && players.some((p) => p.role === hint)) return hint as RoleType;
+  if (captor) return captor.role;
+  if (culpritEscaped(moves)) return 'culprit';
+  return null;
 }
 
 /**

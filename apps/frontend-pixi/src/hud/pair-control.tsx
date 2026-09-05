@@ -8,6 +8,7 @@ import QRCode from 'qrcode';
 import { useRunnerStore } from '../stores/runner-store';
 import { getCompanionSession } from '../net/companion-session';
 import { notifications } from '../core/notification-service';
+import { COLOR, FONT, RADIUS, SCREEN_MARGIN, SHADOW, pillLight } from './tokens';
 
 function pairingLink(code: string): string {
   const url = new URL(window.location.href);
@@ -149,37 +150,27 @@ export function PairControl() {
 
 const panelBase: React.CSSProperties = {
   position: 'fixed',
-  top: 14,
-  left: 14,
+  top: SCREEN_MARGIN,
+  right: SCREEN_MARGIN,
   zIndex: 30,
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  color: '#f2f4f8',
+  fontFamily: FONT.ui,
+  color: COLOR.fg,
 };
 
 const pairBtn: React.CSSProperties = {
+  ...pillLight,
   ...panelBase,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '8px 14px',
-  background: 'rgba(18, 20, 26, 0.72)',
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 22,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  backdropFilter: 'blur(8px)',
+  color: '#333',
 };
 
 const panel: React.CSSProperties = {
   ...panelBase,
   width: 280,
   padding: 16,
-  background: 'rgba(18, 20, 26, 0.92)',
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 14,
-  boxShadow: '0 8px 28px rgba(0,0,0,0.5)',
-  backdropFilter: 'blur(8px)',
+  background: COLOR.panel,
+  border: `1px solid ${COLOR.hairline}`,
+  borderRadius: RADIUS.dock,
+  boxShadow: SHADOW.dock,
 };
 
 const panelTitle: React.CSSProperties = {
@@ -259,16 +250,17 @@ const badge: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 7,
-  padding: '7px 13px',
-  background: 'rgba(46, 155, 79, 0.85)',
-  borderRadius: 20,
-  fontSize: 12,
-  fontWeight: 600,
+  padding: '8px 14px',
+  background: COLOR.green,
+  borderRadius: RADIUS.pill,
+  font: `600 12.5px ${FONT.ui}`,
+  boxShadow: SHADOW.pillDark,
+  color: '#fff',
 };
 
 const badgeWarn: React.CSSProperties = {
   ...badge,
-  background: 'rgba(226, 133, 51, 0.9)',
+  background: '#d89a4f',
 };
 
 const unpairBtn: React.CSSProperties = {

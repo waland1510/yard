@@ -1,5 +1,5 @@
 import { AIPlayerService } from './ai-player';
-import { GameState, Player, Role } from '@yard/shared-utils';
+import { GameState, MoveType, Player, Role } from '@yard/shared-utils';
 import axios from 'axios';
 
 jest.mock('axios');
@@ -99,7 +99,7 @@ describe('AIPlayerService', () => {
       expect(['taxi', 'bus', 'underground']).toContain(move.type);
 
       // Adjust expected positions based on the move type
-      const expectedPositions = {
+      const expectedPositions: Partial<Record<MoveType, number[]>> = {
         taxi: [51, 66, 68, 84],
         bus: [23, 52, 82, 102],
         underground: [13, 79, 89, 111],
@@ -116,7 +116,7 @@ describe('AIPlayerService', () => {
       expect(move).toBeDefined();
       expect(['taxi', 'bus', 'underground']).toContain(move.type);
       // Adjust expected positions based on the move type
-      const expectedPositions = {
+      const expectedPositions: Partial<Record<MoveType, number[]>> = {
         taxi: [51, 66, 68, 84],
         bus: [23, 52, 82, 102],
         underground: [13, 79, 89, 111],
@@ -137,7 +137,7 @@ describe('AIPlayerService', () => {
       expect(move).toBeDefined();
       expect(move.role).toBe(mockPlayer.role);
       // Position should be one of the valid connections from node 67
-      const expectedPositions = {
+      const expectedPositions: Partial<Record<MoveType, number[]>> = {
         taxi: [51, 66, 68, 84],
         bus: [23, 52, 82, 102],
         underground: [13, 79, 89, 111],
@@ -150,7 +150,7 @@ describe('AIPlayerService', () => {
     });
 
     it('should handle the culprit role differently', async () => {
-      const culpritPlayer = mockGameState.players.find(p => p.role === Role.culprit);
+      const culpritPlayer = mockGameState.players.find(p => p.role === Role.culprit)!;
       const move = await aiService.calculateMove(mockGameState, culpritPlayer);
 
       expect(move).toBeDefined();

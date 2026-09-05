@@ -3,7 +3,12 @@ import { eq, sql } from 'drizzle-orm';
 import { gamesTable, playersTable, movesTable } from '../helpers/pg-tables';
 import { GameState } from '@yard/shared-utils';
 
-const db = drizzle(process.env.DATABASE_URL, {
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+const db = drizzle(databaseUrl, {
   casing: 'snake_case',
 });
 
@@ -15,20 +20,22 @@ export async function hasActiveGame(channel: string): Promise<GameState | null> 
       .where(eq(gamesTable.channel, channel))
       .execute() as GameState[];
 
-    if (!game) {
+    if (!game || game.id === undefined) {
       return null;
     }
+
+    const gameId = game.id;
 
     const players = await db
       .select()
       .from(playersTable)
-      .where(eq(playersTable.gameId, game.id))
+      .where(eq(playersTable.gameId, gameId))
       .execute() as GameState['players'];
 
     const moves = await db
       .select()
       .from(movesTable)
-      .where(eq(movesTable.gameId, game.id))
+      .where(eq(movesTable.gameId, gameId))
       .execute() as GameState['moves'];
 
     return { ...game, players, moves };

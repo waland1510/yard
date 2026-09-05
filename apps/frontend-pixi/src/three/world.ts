@@ -17,9 +17,9 @@ export interface World {
 // Stylized London sky palette. Cream-grey horizon dissolving into a soft
 // overcast blue zenith. The middle band matches FOG_TINT so distant
 // procedural buildings melt cleanly into the sky.
-const SKY_ZENITH = new THREE.Color(0x9fb4c8);
+const SKY_ZENITH = new THREE.Color(0x7ea3cf);
 const SKY_HORIZON = new THREE.Color(FOG_TINT);
-const SKY_GROUND = new THREE.Color(0xe6dfd0);
+const SKY_GROUND = new THREE.Color(0xead9c3);
 
 /**
  * Procedural equirectangular sky gradient. Painted into a tall, narrow canvas
@@ -63,10 +63,10 @@ export function createWorld(canvas: HTMLCanvasElement): World {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
 
   const scene = new THREE.Scene();
 
@@ -80,7 +80,7 @@ export function createWorld(canvas: HTMLCanvasElement): World {
   // Fog so distant procedural geometry (buildings, road arms) melts into the
   // horizon band rather than popping at the far clip plane.
   const fogColor = new THREE.Color(FOG_TINT);
-  scene.fog = new THREE.Fog(fogColor, 60, 280);
+  scene.fog = new THREE.Fog(fogColor, 45, 170);
   renderer.setClearColor(fogColor, 1);
 
   // HDRI is loaded ONLY into scene.environment for plausible PBR reflections
@@ -92,38 +92,40 @@ export function createWorld(canvas: HTMLCanvasElement): World {
     hdr.mapping = THREE.EquirectangularReflectionMapping;
     const envRT = pmrem.fromEquirectangular(hdr);
     scene.environment = envRT.texture;
+    // The HDRI is a bright open-sky capture; at full intensity its irradiance alone pushes
+    // sunlit diffuse past 1.0 and washes the street out. Keep it for reflections only.
+    scene.environmentIntensity = 0.3;
     hdr.dispose();
   });
 
   const camera = new THREE.PerspectiveCamera(
-    72,
+    66,
     window.innerWidth / window.innerHeight,
     0.05,
     400
   );
   camera.position.set(0, 1.7, 0);
 
-  // Sun (warm key light, low-ish angle for moody feel)
-  const sun = new THREE.DirectionalLight(0xfff3d6, 1.4);
-  sun.position.set(-30, 45, 22);
+  // Late-morning sun: high enough that the street between the terraces stays lit and
+  // buildings throw short shadows across the pavement rather than blacking out the road.
+  const sun = new THREE.DirectionalLight(0xffe4bd, 2.6);
+  sun.position.set(22, 58, 30);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -60;
-  sun.shadow.camera.right = 60;
-  sun.shadow.camera.top = 60;
-  sun.shadow.camera.bottom = -60;
+  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.camera.left = -55;
+  sun.shadow.camera.right = 55;
+  sun.shadow.camera.top = 55;
+  sun.shadow.camera.bottom = -55;
   sun.shadow.camera.near = 0.5;
   sun.shadow.camera.far = 180;
-  sun.shadow.bias = -0.0005;
+  sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.03;
   scene.add(sun);
 
-  // Sky/ground hemisphere fill — bumped up since the procedural sky doesn't
-  // contribute diffuse lighting the way the HDRI background used to.
-  const hemi = new THREE.HemisphereLight(0xcfdbe6, 0x3a3328, 0.45);
+  // Cool sky fill kept low so sun shadows keep their contrast.
+  const hemi = new THREE.HemisphereLight(0x9fbde0, 0x6a5a48, 0.65);
   scene.add(hemi);
-
-  // Ambient nudge so shadows don't crush to black under the overcast key.
-  scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.06));
 
   // Post-processing pipeline (#3) — owns the final render. Defaults to the high tier;
   // game.tsx sets the device-appropriate tier on mount.

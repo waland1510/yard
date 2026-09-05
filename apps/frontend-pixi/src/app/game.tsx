@@ -5,6 +5,7 @@ import type { Move, MoveType } from '@yard/shared-utils';
 import { createWorld, type World } from '../three/world';
 import {
   buildIntersection,
+  DIRECTION_FORWARD,
   Direction,
   IntersectionBuild,
 } from '../three/intersection';
@@ -18,7 +19,7 @@ import {
 } from '../three/vehicles';
 import { createPovControls, PovControls } from '../three/controls';
 import { createTouchControls } from '../three/touch-controls';
-import { playRide } from '../three/ride';
+import { playRide, type ArrivalAnchor } from '../three/ride';
 import { Hud } from '../hud/hud';
 import { Crosshair } from '../hud/crosshair';
 import { Intro } from '../hud/intro';
@@ -27,9 +28,8 @@ import { VehicleLabels } from '../hud/vehicle-labels';
 import { HudShell } from '../hud/hud-shell';
 import { JoinOverlay } from '../hud/join-overlay';
 import { MapSurface } from '../hud/map-surface';
-import { SurfaceToggle } from '../hud/surface-toggle';
-import { getConnections, getActiveDirections, getRiverDirections, type Connection } from '../game/connections';
-import { nodeDisplayName } from '../core/map-data';
+import { getConnections, getActiveDirections, getRiverDirections, getNode, type Connection } from '../game/connections';
+import { compassFromDelta, nodeDisplayName, isRevealRound } from '../core/map-data';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import { detectDeviceProfile, deviceTypeFromProfile, isTouchPrimary, resolveQualityTier } from '../core/device-surface';
@@ -40,7 +40,13 @@ import { LivenessMonitor } from '../net/liveness-monitor';
 import { MoveAuthority } from '../net/move-authority';
 import { getGame } from '../net/rest-client';
 import type { SurfaceRole } from '../core/device-surface';
-import { validateMove, isCapture } from '../core/move-validator';
+import {
+  validateMove,
+  isCapture,
+  culpritEscaped,
+  culpritMoveCount,
+  deriveWinner,
+} from '../core/move-validator';
 import { notifications } from '../core/notification-service';
 import { replay, useReplay } from '../core/replay-singleton';
 import { play as playSfx, setMuted as setAudioMuted } from '../core/audio-bus';
@@ -97,7 +103,7 @@ export function Game() {
   const mapOpen = useRunnerStore((s) => s.mapOpen);
   const setMapOpen = useRunnerStore((s) => s.setMapOpen);
   // Which surface this device shows by default (#2): desktop → strategic map,
-  // phone → immersive FPV; overridable via the SurfaceToggle.
+  // phone → immersive FPV; overridable via the surface switch in <TopPills/>.
   const activeSurface = useRunnerStore(selectActiveSurface);
   const graphicsQuality = useRunnerStore((s) => s.graphicsQuality);
   const deviceType = useRunnerStore((s) => s.deviceType);
@@ -152,10 +158,9 @@ export function Game() {
       taxi: tickets.taxi,
       bus: tickets.bus,
       underground: tickets.underground,
-      // River is free for Mr. X — model as ∞ so the marker stays enabled.
-      river: Infinity,
+      river: tickets.secret,
     }),
-    [tickets.taxi, tickets.bus, tickets.underground]
+    [tickets.taxi, tickets.bus, tickets.underground, tickets.secret]
   );
 
   // Keep refs to avoid stale closures in the long-lived useEffect
@@ -327,9 +332,14 @@ export function Game() {
           store.decrementTickets(m.role, m.type, m.secret, m.double);
           if (m.double) store.setIsDoubleMove(true);
           if (m.currentTurn) store.setCurrentTurn(m.currentTurn);
+          if (m.role === 'culprit' && culpritEscaped(useGameStateStore.getState().moves)) {
+            useGameStateStore.getState().setFinished('culprit');
+            notifications.push('capture', 'Mr. X escaped the city');
+          }
         },
         onEndGame: (payload) => {
-          useGameStateStore.getState().setFinished();
+          const s = useGameStateStore.getState();
+          s.setFinished(deriveWinner(payload.winner, s.players, s.moves));
           notifications.push('capture', payload.winner ? `${payload.winner} wins` : 'Game over');
         },
         onPresence: ({ members }) => {
@@ -486,9 +496,10 @@ export function Game() {
         vehicles.push(v);
       }
 
-      // Face forward at eye height for the new node. PointerLockControls own the
-      // camera in FPV mode; this resets yaw/pitch so framing is consistent across nodes.
-      if (controls) controls.resetView();
+      // Face the busiest road arm at eye height for the new node — never a wall-building
+      // sealing a dead arm. PointerLockControls own the camera in FPV mode; this resets
+      // yaw/pitch so framing is consistent across nodes.
+      if (controls) controls.resetView(spawnYaw(connections));
 
       lastBuiltForNode = nodeId;
       vehiclesRef.current = vehicles;
@@ -496,6 +507,30 @@ export function Game() {
     }
 
     let controls: PovControls;
+
+    // The arrival ride comes in at the stop that leads back where we came from; if the
+    // graph is asymmetric, fall back to the compass arm pointing at the previous node.
+    function arrivalAnchor(fromNode: number | null, toNode: number, kind: VehicleKind): ArrivalAnchor | undefined {
+      if (fromNode == null) return undefined;
+      const back =
+        vehicles.find((h) => h.targetNodeId === fromNode && h.kind === kind) ??
+        vehicles.find((h) => h.targetNodeId === fromNode);
+      if (back) {
+        const position = new THREE.Vector3();
+        back.group.getWorldPosition(position);
+        const forward = back.rideForwardLocal.clone().applyQuaternion(back.group.quaternion).negate();
+        return { kind: back.kind, position, forward, hide: back.kind === 'underground' ? undefined : back.group };
+      }
+      const from = getNode(fromNode);
+      const to = getNode(toNode);
+      if (!from || !to) return undefined;
+      const arm = DIRECTION_FORWARD[compassFromDelta(from.x - to.x, from.y - to.y)];
+      return {
+        kind: kind === 'underground' ? 'taxi' : kind,
+        position: arm.clone().multiplyScalar(11),
+        forward: arm.clone().negate(),
+      };
+    }
 
     async function onVehicleClick(v: VehicleHandle) {
       if (mapOpenRef.current) return;
@@ -532,7 +567,7 @@ export function Game() {
         }
       }
 
-      const useSecret = runner.pendingSecret && role === 'culprit';
+      const useSecret = role === 'culprit' && (runner.pendingSecret || v.kind === 'river');
       const useDouble = runner.pendingDouble && role === 'culprit';
       const isCulpritMidDouble = useGameStateStore.getState().isDoubleMove && role === 'culprit';
       // Only the FIRST leg of a double move carries the `double` flag — the backend's
@@ -568,9 +603,11 @@ export function Game() {
       const target = v.targetNodeId;
       const kind = v.kind as MoveType;
 
+      const fromNode = lastBuiltForNode;
       try {
         await playRide(world, v, overlay, () => {
           rebuildScene(target);
+          return arrivalAnchor(fromNode, target, v.kind);
         });
 
         const move: Move = {
@@ -593,14 +630,10 @@ export function Game() {
         const store = useGameStateStore.getState();
         store.appendMove(move);
         store.setPosition(role, target);
-        // River is free; everything else decrements normally. Secret deducts 1 secret
-        // ticket AND the transport ticket (per board rules) — pass secret flag so the
-        // store's reducer can handle it.
-        if (kind !== 'river') {
-          store.decrementTickets(role, kind, useSecret);
-          playSfx('ticket-spent');
-          // Low-ticket warning: peek the new count after the decrement
-          const me = store.players.find((p) => p.role === role);
+        store.decrementTickets(role, kind, useSecret);
+        playSfx('ticket-spent');
+        if (!useSecret) {
+          const me = useGameStateStore.getState().players.find((p) => p.role === role);
           if (me) {
             const newCount =
               kind === 'taxi'
@@ -610,31 +643,26 @@ export function Game() {
                 : me.undergroundTickets;
             if (newCount > 0 && newCount <= 2) playSfx('low-ticket-warning');
           }
-        } else if (useSecret) {
-          // River + secret is technically possible (secret hides any transport); deduct
-          // only the secret ticket, not a transport ticket.
-          store.decrementTickets(role, kind, true);
-          playSfx('ticket-spent');
         }
 
-        // Reveal SFX: this culprit move just landed on a reveal round
-        if (role === 'culprit') {
-          const culpritCount = store.moves.filter((m) => m.role === 'culprit').length;
-          if (culpritCount === 3 || culpritCount === 8 || culpritCount === 13 || culpritCount === 18 || culpritCount === 24) {
-            playSfx('reveal');
-          }
+        const movesNow = useGameStateStore.getState().moves;
+        if (role === 'culprit' && isRevealRound(culpritMoveCount(movesNow))) {
+          playSfx('reveal');
         }
 
-        // Capture check (detective lands on culprit)
         if (
           isCapture(
             { role, targetNodeId: target, transport: kind },
-            { currentTurn: store.currentTurn, players: store.players }
+            { currentTurn: store.currentTurn, players: useGameStateStore.getState().players }
           )
         ) {
-          store.setFinished();
+          store.setFinished(role);
           playSfx('capture');
           notifications.push('capture', 'Mr. X captured!');
+        } else if (role === 'culprit' && culpritEscaped(movesNow)) {
+          store.setFinished('culprit');
+          wsClient?.send('endGame', { winner: 'culprit' });
+          notifications.push('capture', 'Mr. X escaped the city');
         } else if (!wsClient) {
           // Mock mode turn advancement, with double-move bookkeeping
           if (useDouble) {
@@ -694,7 +722,8 @@ export function Game() {
           setHoveredInfo(null);
           return;
         }
-        const remaining = (ticketsRef.current as Record<string, number>)[v.kind] ?? 0;
+        const remaining =
+          v.kind === 'river' ? ticketsRef.current.secret : ticketsRef.current[v.kind];
         setHoveredInfo({
           kind: v.kind,
           destinationNodeId: v.targetNodeId,
@@ -900,7 +929,6 @@ export function Game() {
           <span style={mockSub}>· AI disabled · backend offline</span>
         </div>
       )}
-      <SurfaceToggle />
       <HudShell />
       <div
         ref={fadeRef}
@@ -919,8 +947,8 @@ export function Game() {
 
 const mockBadge: React.CSSProperties = {
   position: 'fixed',
-  top: 12,
-  right: 12,
+  top: 16,
+  right: 140,
   zIndex: 6,
   display: 'flex',
   alignItems: 'center',
@@ -928,7 +956,7 @@ const mockBadge: React.CSSProperties = {
   padding: '6px 12px',
   background: 'rgba(226, 85, 85, 0.95)',
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: 1.5,
@@ -989,6 +1017,23 @@ function placeVehicle(
     return;
   }
 
+  // Underground: a station house in the corner building of the quadrant beside this arm,
+  // portal facing the middle of the junction. CORNER_DISTANCE puts the front just behind
+  // the corner pavement (ROAD_HALF + SIDEWALK in intersection.ts) along the diagonal.
+  if (handle.kind === 'underground') {
+    const CORNER_DISTANCE = 10.6;
+    const forward = directionVector(dir);
+    const right = lateralVector(dir);
+    const side = slotIndex % 2 === 0 ? 1 : -1;
+    const diagonal = forward.clone().add(right.clone().multiplyScalar(side)).normalize();
+    handle.group.position.copy(diagonal.clone().multiplyScalar(CORNER_DISTANCE));
+    // Face the junction, turned part-way toward this arm's carriageway so the house
+    // sits closer to square with the building fronts than a flat 45° would.
+    const facing = forward.clone().multiplyScalar(0.45).add(right.clone().multiplyScalar(side)).negate();
+    handle.group.rotation.y = Math.atan2(facing.x, facing.z);
+    return;
+  }
+
   // Road vehicles: two-lane × multi-row packing keyed off the road centerline (so we
   // ignore the anchor's curbside lateral bias). Lanes at ±LANE_OFFSET keep all vehicles
   // within the ±ROAD_HALF=5 road bed. Rows spaced by ROW_DEPTH keep adjacent rows from
@@ -996,6 +1041,7 @@ function placeVehicle(
   // leaves a 1.5m air gap).
   const LANE_OFFSET = 2.4;
   const ROW_DEPTH = 9;
+  const ROW_BASE = 4;
   const row = Math.floor(slotIndex / 2);
   const lane = slotIndex % 2 === 0 ? 1 : -1; // alternate curb sides
 
@@ -1004,27 +1050,11 @@ function placeVehicle(
   // Centerline anchor — strip the curbside bias the intersection-builder applied
   const centerline = centerlineFromAnchor(anchor, dir);
   const pos = centerline.clone();
-  pos.add(forward.clone().multiplyScalar(row * ROW_DEPTH));
+  pos.add(forward.clone().multiplyScalar(ROW_BASE + row * ROW_DEPTH));
   pos.add(right.clone().multiplyScalar(lane * LANE_OFFSET));
   handle.group.position.copy(pos);
 
-  const isUnderground = handle.rideForwardLocal.z < 0;
-  let yaw = 0;
-  switch (dir) {
-    case 'north':
-      yaw = isUnderground ? 0 : Math.PI;
-      break;
-    case 'south':
-      yaw = isUnderground ? Math.PI : 0;
-      break;
-    case 'east':
-      yaw = isUnderground ? -Math.PI / 2 : Math.PI / 2;
-      break;
-    case 'west':
-      yaw = isUnderground ? Math.PI / 2 : -Math.PI / 2;
-      break;
-  }
-  handle.group.rotation.y = yaw;
+  handle.group.rotation.y = Math.atan2(forward.x, forward.z);
 }
 
 function centerlineFromAnchor(anchor: THREE.Vector3, dir: Direction): THREE.Vector3 {
@@ -1038,6 +1068,23 @@ function centerlineFromAnchor(anchor: THREE.Vector3, dir: Direction): THREE.Vect
     case 'west':
       return new THREE.Vector3(anchor.x, anchor.y, 0);
   }
+}
+
+const DIRECTION_YAW: Record<Direction, number> = {
+  north: 0,
+  east: -Math.PI / 2,
+  south: Math.PI,
+  west: Math.PI / 2,
+};
+
+function spawnYaw(connections: Connection[]): number {
+  const counts: Record<Direction, number> = { north: 0, east: 0, south: 0, west: 0 };
+  for (const c of connections) counts[c.direction] += c.kind === 'river' ? 0.5 : 1;
+  let best: Direction = 'north';
+  for (const dir of ['north', 'east', 'south', 'west'] as const) {
+    if (counts[dir] > counts[best]) best = dir;
+  }
+  return DIRECTION_YAW[best];
 }
 
 function directionVector(dir: Direction): THREE.Vector3 {
@@ -1106,6 +1153,8 @@ function reasonLabel(reason: string): string {
       return "It's not your turn";
     case 'no-secret-tickets':
       return 'No secret tickets';
+    case 'node-occupied':
+      return 'A detective is standing there';
     case 'no-double-tickets':
       return 'No double tickets';
     case 'river-not-allowed':

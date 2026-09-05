@@ -33,7 +33,7 @@ function findShortestPath(
   }];
 
   while (queue.length > 0) {
-    const { path, taxi, bus, underground } = queue.shift();
+    const { path, taxi, bus, underground } = queue.shift()!;
     const current = path[path.length - 1];
 
     if (targets.includes(current)) return path;
@@ -76,7 +76,7 @@ function bfsHopDistance(
   const queue: { node: number; hops: number }[] = [{ node: from, hops: 0 }];
 
   while (queue.length > 0) {
-    const { node: current, hops } = queue.shift();
+    const { node: current, hops } = queue.shift()!;
     if (visited.has(current)) continue;
     visited.add(current);
 

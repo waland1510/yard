@@ -151,7 +151,10 @@ describe('Enhanced AI Detective System', () => {
         expect(enhancedPositions[0]).toHaveProperty('type');
         
         // Probabilities should sum to reasonable values
-        const totalProbability = enhancedPositions.reduce((sum, pos) => sum + pos.probability, 0);
+        const totalProbability = enhancedPositions.reduce(
+          (sum: number, pos: { probability: number }) => sum + pos.probability,
+          0
+        );
         expect(totalProbability).toBeGreaterThan(0);
         expect(totalProbability).toBeLessThanOrEqual(1.1); // Allow small rounding errors
       }

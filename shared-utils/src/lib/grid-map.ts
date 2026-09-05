@@ -1375,14 +1375,17 @@ export const mapData = {
 export function areMovesBidirectional(): boolean {
   const nodeMap = new Map(mapData.nodes.map(node => [node.id, node]));
 
+  const transports = ['taxi', 'bus', 'underground', 'river'] as const;
+
   for (const node of mapData.nodes) {
-    for (const [transport, connections] of Object.entries(node)) {
-      if (['taxi', 'bus', 'underground', 'river'].includes(transport) && Array.isArray(connections)) {
-        for (const connectedNodeId of connections) {
-          const connectedNode = nodeMap.get(connectedNodeId);
-          if (!connectedNode || !connectedNode[transport]?.includes(node.id)) {
-            return false; // Reverse connection is missing
-          }
+    for (const transport of transports) {
+      const connections = node[transport];
+      if (!Array.isArray(connections)) continue;
+
+      for (const connectedNodeId of connections) {
+        const connectedNode = nodeMap.get(connectedNodeId);
+        if (!connectedNode || !connectedNode[transport]?.includes(node.id)) {
+          return false; // Reverse connection is missing
         }
       }
     }

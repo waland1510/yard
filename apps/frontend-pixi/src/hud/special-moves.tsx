@@ -6,9 +6,11 @@ import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme } from '../core/theme-registry';
 import { play as playSfx } from '../core/audio-bus';
+import { selectActiveSurface } from '../stores/runner-store';
+import { COLOR, FONT, SCREEN_MARGIN, centeredX, pillDark } from './tokens';
 
-const SECRET_COLOR = '#a06bd8';
-const DOUBLE_COLOR = '#4e88c2';
+const SECRET_COLOR = '#c9a0e8';
+const DOUBLE_COLOR = '#8db8e8';
 
 export function SpecialMoves() {
   const myRole = useRunnerStore((s) => s.myRole);
@@ -21,6 +23,7 @@ export function SpecialMoves() {
   const pendingDouble = useRunnerStore((s) => s.pendingDouble);
   const setPendingSecret = useRunnerStore((s) => s.setPendingSecret);
   const setPendingDouble = useRunnerStore((s) => s.setPendingDouble);
+  const onMap = useRunnerStore(selectActiveSurface) === 'map';
 
   if (myRole !== 'culprit') return null;
   if (status === 'finished') return null;
@@ -38,9 +41,10 @@ export function SpecialMoves() {
   const doubleDisabled = !isMyTurn || isDoubleMove || (doubleTickets <= 0 && !pendingDouble);
 
   return (
-    <div style={container}>
+    <div style={{ ...container, bottom: onMap ? SCREEN_MARGIN : 92 }}>
       <button
         type="button"
+        className={pendingSecret ? 'hud-pill-gold' : 'hud-pill-dark'}
         style={toggleButton(pendingSecret, SECRET_COLOR, secretDisabled)}
         disabled={secretDisabled}
         onClick={() => {
@@ -57,6 +61,7 @@ export function SpecialMoves() {
       </button>
       <button
         type="button"
+        className={pendingDouble || isDoubleMove ? 'hud-pill-gold' : 'hud-pill-dark'}
         style={toggleButton(pendingDouble || isDoubleMove, DOUBLE_COLOR, doubleDisabled)}
         disabled={doubleDisabled}
         onClick={() => {
@@ -82,61 +87,46 @@ export function SpecialMoves() {
 
 const container: React.CSSProperties = {
   position: 'fixed',
-  bottom: 92,
-  left: '50%',
-  transform: 'translateX(-50%)',
+  ...centeredX(),
   display: 'flex',
   gap: 10,
-  zIndex: 5,
+  zIndex: 30,
   pointerEvents: 'auto',
+  transition: `left .28s cubic-bezier(.5,0,.2,1), bottom .28s cubic-bezier(.5,0,.2,1)`,
 };
 
 function toggleButton(active: boolean, color: string, disabled: boolean): React.CSSProperties {
   return {
+    ...pillDark,
     position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 14px',
-    background: active ? `${color}22` : 'rgba(10, 12, 16, 0.78)',
-    border: `1.5px solid ${active ? color : disabled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)'}`,
-    borderRadius: 10,
-    color: '#fff',
-    fontFamily: 'inherit',
-    fontSize: 12,
-    fontWeight: 600,
+    background: active ? COLOR.gold : COLOR.pill,
+    color: active ? COLOR.onGold : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.5 : 1,
-    transition: 'all 160ms ease',
-    backdropFilter: 'blur(6px)',
-    boxShadow: active ? `0 0 16px ${color}55` : 'none',
+    opacity: disabled ? 0.55 : 1,
+    boxShadow: active ? `0 3px 18px ${color}55` : pillDark.boxShadow,
   };
 }
 
 const iconStyle: React.CSSProperties = {
   fontSize: 16,
+  lineHeight: 1,
 };
 
-const labelStyle: React.CSSProperties = {
-  letterSpacing: 1.2,
-  textTransform: 'uppercase',
-  fontSize: 11,
-};
+const labelStyle: React.CSSProperties = {};
 
 function countStyle(dim: boolean): React.CSSProperties {
   return {
-    color: dim ? 'rgba(255,255,255,0.4)' : '#fff',
-    fontWeight: 700,
-    fontFamily: 'ui-monospace, monospace',
-    fontSize: 11,
+    font: `600 12px ${FONT.mono}`,
+    color: dim ? 'rgba(255,255,255,0.45)' : 'inherit',
+    opacity: dim ? 1 : 0.85,
   };
 }
 
 function armedDot(color: string): React.CSSProperties {
   return {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -3,
+    right: 2,
     color,
     fontSize: 14,
     textShadow: `0 0 8px ${color}`,
@@ -145,7 +135,7 @@ function armedDot(color: string): React.CSSProperties {
 
 const midDoubleHint: React.CSSProperties = {
   position: 'absolute',
-  top: -28,
+  top: -26,
   left: '50%',
   transform: 'translateX(-50%)',
   whiteSpace: 'nowrap',

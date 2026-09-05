@@ -67,6 +67,25 @@ function curbAnchor(dir: Direction, side: 1 | -1, alongOffset: number): THREE.Ve
     .add(right.multiplyScalar(side * CURB_OFFSET));
 }
 
+// Stop groups are yawed so local +Z points down the arm, away from the player. A textured
+// plane facing +Z therefore shows the player its back, with the text mirrored. Signs are
+// built as two front-facing planes back to back so both approaches read correctly.
+function addTwoSidedSign(
+  parent: THREE.Object3D,
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  position: THREE.Vector3,
+  yaw = 0
+) {
+  material.side = THREE.FrontSide;
+  for (const flip of [0, Math.PI]) {
+    const face = new THREE.Mesh(geometry, material);
+    face.position.copy(position);
+    face.rotation.y = yaw + flip;
+    parent.add(face);
+  }
+}
+
 function trackTexture(ctx: StopBuildCtx, tex: THREE.Texture) {
   ctx.textures.push(tex);
   return tex;
@@ -105,17 +124,12 @@ export function buildTaxiStop(ctx: StopBuildCtx): THREE.Group {
       side: THREE.DoubleSide,
     })
   );
-  const sign = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(0.9, 0.45)), signMat);
-  sign.position.y = 2.5;
-  sign.position.z = 0.03;
-  group.add(sign);
+  addTwoSidedSign(group, addGeo(new THREE.PlaneGeometry(0.9, 0.45)), signMat, new THREE.Vector3(0, 2.5, 0.03));
 
   // Chequered band beneath the sign
   const chequerTex = trackTexture(ctx, makeChequerTexture(24, 2, '#1a1a1c', `#${TAXI_YELLOW.toString(16).padStart(6, '0')}`));
   const chequerMat = addMat(new THREE.MeshStandardMaterial({ map: chequerTex, side: THREE.DoubleSide }));
-  const chequer = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(0.9, 0.1)), chequerMat);
-  chequer.position.set(0, 2.22, 0.03);
-  group.add(chequer);
+  addTwoSidedSign(group, addGeo(new THREE.PlaneGeometry(0.9, 0.1)), chequerMat, new THREE.Vector3(0, 2.22, 0.03));
 
   // Kerb bollard
   const bollard = new THREE.Mesh(addGeo(new THREE.CylinderGeometry(0.12, 0.14, 0.7, 8)), blackMat);
@@ -154,19 +168,14 @@ export function buildBusStop(ctx: StopBuildCtx): THREE.Group {
   const roundelMat = addMat(
     new THREE.MeshStandardMaterial({ map: roundelTex, transparent: true, side: THREE.DoubleSide })
   );
-  const roundel = new THREE.Mesh(addGeo(new THREE.CircleGeometry(0.45, 32)), roundelMat);
-  roundel.position.set(0, 3.0, 0.04);
-  group.add(roundel);
+  addTwoSidedSign(group, addGeo(new THREE.CircleGeometry(0.45, 32)), roundelMat, new THREE.Vector3(0, 3.0, 0.04));
 
   // Route-number flag plate (perpendicular to roundel — sticks out sideways so the
   // FPV from the road catches it at an angle)
   const routes = [pickInt(rng, 10, 99), pickInt(rng, 100, 299), pickInt(rng, 10, 99)];
   const flagTex = trackTexture(ctx, makeRouteFlagTexture(routes));
   const flagMat = addMat(new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide }));
-  const flag = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(0.55, 0.7)), flagMat);
-  flag.position.set(0.32, 2.3, 0);
-  flag.rotation.y = Math.PI / 2;
-  group.add(flag);
+  addTwoSidedSign(group, addGeo(new THREE.PlaneGeometry(0.55, 0.7)), flagMat, new THREE.Vector3(0.32, 2.3, 0), Math.PI / 2);
 
   // ~50% chance of a small shelter
   if (rng() < 0.5) {
@@ -252,9 +261,7 @@ export function buildUndergroundStop(ctx: StopBuildCtx): THREE.Group {
       side: THREE.DoubleSide,
     })
   );
-  const roundel = new THREE.Mesh(addGeo(new THREE.CircleGeometry(0.7, 48)), roundelMat);
-  roundel.position.set(0, 3.7, 0.05);
-  group.add(roundel);
+  addTwoSidedSign(group, addGeo(new THREE.CircleGeometry(0.7, 48)), roundelMat, new THREE.Vector3(0, 3.7, 0.05));
 
   // Brick arch hint — 5 voussoir blocks spanning a semicircle, lintel band underneath
   const archR = 1.4;
@@ -384,9 +391,7 @@ export function buildRiverPier(ctx: StopBuildCtx): THREE.Group {
   const pierName = pickFrom(rng, PIER_NAMES);
   const signTex = trackTexture(ctx, makePierSignTexture(pierName));
   const signMat = addMat(new THREE.MeshStandardMaterial({ map: signTex, side: THREE.DoubleSide }));
-  const sign = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(1.6, 0.55)), signMat);
-  sign.position.set(0, 1.7, 0.55);
-  group.add(sign);
+  addTwoSidedSign(group, addGeo(new THREE.PlaneGeometry(1.6, 0.55)), signMat, new THREE.Vector3(0, 1.7, 0.55));
   for (const sx of [-0.7, 0.7]) {
     const post = new THREE.Mesh(
       addGeo(new THREE.CylinderGeometry(0.04, 0.04, 1.5, 8)),
@@ -412,7 +417,11 @@ export function buildRiverPier(ctx: StopBuildCtx): THREE.Group {
     group.add(stub);
   }
 
-  // Orient along the river arm: deck length runs FORWARD from the shore.
+  // Sit on the water beside the channel centre (the ferry berths mid-channel), deck
+  // running FORWARD from the shore line at the mouth of the river arm.
+  const fwd = DIRECTION_FORWARD[ctx.dir];
+  const right = new THREE.Vector3(0, 1, 0).cross(fwd).normalize();
+  group.position.copy(fwd.clone().multiplyScalar(ROAD_HALF + 0.6)).add(right.multiplyScalar(6.0));
   applyDirection(group, ctx.dir);
   return group;
 }

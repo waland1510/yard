@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useGameStateStore } from '../stores/game-state-store';
 import { notifications } from '../core/notification-service';
+import { COLOR, FONT, SCREEN_MARGIN, pillCompact } from './tokens';
 
 export function InviteButton() {
   const channel = useGameStateStore((s) => s.channel);
@@ -30,13 +31,12 @@ export function InviteButton() {
       type="button"
       style={{
         ...container,
-        background: copied ? 'rgba(16, 185, 129, 0.85)' : 'rgba(10, 12, 16, 0.78)',
-        borderColor: copied ? '#10b981' : 'rgba(255,255,255,0.18)',
+        background: copied ? COLOR.green : COLOR.pill,
       }}
       onClick={copy}
       title="Share this link so others can join the same game"
     >
-      <span style={{ fontSize: 14 }}>{copied ? '✓' : '🔗'}</span>
+      <span style={{ fontSize: 13, lineHeight: 1 }}>{copied ? '✓' : '🔗'}</span>
       <span style={label}>{copied ? 'Copied' : 'Invite'}</span>
       <span style={chip}>{channel}</span>
     </button>
@@ -44,36 +44,18 @@ export function InviteButton() {
 }
 
 const container: React.CSSProperties = {
+  ...pillCompact,
   position: 'fixed',
-  bottom: 22,
-  left: 22,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '8px 14px',
-  border: '1px solid',
-  borderRadius: 8,
-  color: '#fff',
-  cursor: 'pointer',
-  zIndex: 6,
-  backdropFilter: 'blur(6px)',
-  fontFamily: 'inherit',
-  fontSize: 12,
-  transition: 'all 160ms ease',
+  bottom: SCREEN_MARGIN,
+  right: SCREEN_MARGIN + 36 * 2 + 6 + 8,
+  height: 36,
+  zIndex: 30,
 };
 
-const label: React.CSSProperties = {
-  letterSpacing: 1.4,
-  textTransform: 'uppercase',
-  fontWeight: 700,
-};
+const label: React.CSSProperties = {};
 
 const chip: React.CSSProperties = {
-  padding: '2px 6px',
-  background: 'rgba(255,255,255,0.1)',
-  borderRadius: 4,
-  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-  fontSize: 11,
-  letterSpacing: 1,
-  color: 'rgba(255,255,255,0.85)',
+  font: `600 11px ${FONT.mono}`,
+  letterSpacing: '.06em',
+  color: COLOR.gold,
 };

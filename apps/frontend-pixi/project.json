@@ -4,5 +4,18 @@
   "sourceRoot": "apps/frontend-pixi/src",
   "projectType": "application",
   "tags": [],
-  "targets": {}
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default"
+      ],
+      "options": {
+        "command": "node_modules/typescript-7/bin/tsc --noEmit -p apps/frontend-pixi/tsconfig.app.json",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
 }

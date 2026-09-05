@@ -5,6 +5,7 @@ import { replay, useReplay } from '../core/replay-singleton';
 import { useGameStateStore } from '../stores/game-state-store';
 import { getTheme } from '../core/theme-registry';
 import { nodeDisplayName } from '../core/map-data';
+import { COLOR, FONT, RADIUS, SCREEN_MARGIN, SHADOW, centeredX, pillDark } from './tokens';
 
 export function ReplayControls() {
   const { isActive, currentTurn, totalTurns, culpritActualPosition } = useReplay();
@@ -72,22 +73,20 @@ export function ReplayControls() {
 
 const banner: React.CSSProperties = {
   position: 'fixed',
-  top: 18,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  background: 'rgba(10, 12, 16, 0.92)',
-  border: '1px solid rgba(255, 107, 53, 0.5)',
-  borderRadius: 8,
-  padding: '8px 18px',
+  top: SCREEN_MARGIN,
+  ...centeredX(),
+  background: COLOR.pill,
+  borderRadius: RADIUS.pill,
+  padding: '9px 18px',
   display: 'flex',
   alignItems: 'center',
   gap: 12,
   zIndex: 13,
   pointerEvents: 'none',
-  backdropFilter: 'blur(8px)',
-  boxShadow: '0 6px 24px rgba(0,0,0,0.5)',
+  boxShadow: SHADOW.pillDark,
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: FONT.ui,
+  whiteSpace: 'nowrap',
 };
 
 const bannerDot: React.CSSProperties = {
@@ -112,33 +111,30 @@ const bannerMeta: React.CSSProperties = {
 
 const controls: React.CSSProperties = {
   position: 'fixed',
-  bottom: 24,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  background: 'rgba(10, 12, 16, 0.92)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 12,
-  padding: '12px 18px',
+  bottom: SCREEN_MARGIN,
+  ...centeredX(),
+  background: COLOR.panel,
+  border: `1px solid ${COLOR.hairline}`,
+  borderRadius: RADIUS.pill,
+  padding: '10px 14px',
   display: 'flex',
   alignItems: 'center',
   gap: 12,
   zIndex: 13,
-  backdropFilter: 'blur(8px)',
-  boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+  boxShadow: SHADOW.dock,
 };
 
 function iconButton(disabled: boolean): React.CSSProperties {
   return {
     width: 40,
     height: 40,
-    border: '1px solid rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    background: 'rgba(255,255,255,0.04)',
+    border: 0,
+    borderRadius: '50%',
+    background: COLOR.pill,
     color: disabled ? 'rgba(255,255,255,0.3)' : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 14,
     fontFamily: 'inherit',
-    transition: 'all 160ms ease',
   };
 }
 
@@ -150,17 +146,13 @@ const slider: React.CSSProperties = {
 
 function exitButton(accent: string): React.CSSProperties {
   return {
-    marginLeft: 8,
-    padding: '8px 16px',
-    background: 'transparent',
-    border: `1px solid ${accent}`,
-    borderRadius: 8,
-    color: accent,
-    fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: 1.6,
-    cursor: 'pointer',
+    ...pillDark,
+    marginLeft: 4,
+    padding: '10px 18px',
+    background: accent,
+    color: COLOR.onGold,
+    font: `700 12px ${FONT.ui}`,
+    letterSpacing: '.12em',
     textTransform: 'uppercase',
-    fontFamily: 'inherit',
   };
 }

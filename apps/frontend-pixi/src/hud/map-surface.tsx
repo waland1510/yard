@@ -1,6 +1,6 @@
 // The strategic map as a PRIMARY full-screen surface (the desktop default, #2).
 // Unlike <PaperMap/> — which is a dismissable modal peek over the FPV — this owns the
-// whole viewport. Switching back to street view is done via the <SurfaceToggle/>, so
+// whole viewport. Switching back to street view is done via the <TopPills/> surface switch, so
 // there is no close button or backdrop here.
 
 import type { Player, RoleType } from '@yard/shared-utils';

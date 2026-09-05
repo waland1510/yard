@@ -33,6 +33,7 @@ import {
   TFL_RED,
 } from './palette';
 import { makeRng, pickFloat, pickInt, pickFrom } from './rng';
+import { makeAsphaltTexture, makeFacadeTexture, makeGrassTexture, makePavingTexture } from './canvas-textures';
 
 export interface IntersectionBuild {
   group: THREE.Group;
@@ -51,8 +52,8 @@ export const DIRECTION_FORWARD: Record<Direction, THREE.Vector3> = {
 
 const ROAD_HALF = 5;
 const SIDEWALK = 2.5;
-const ARM_LENGTH = 40;
-const GROUND_HALF = ARM_LENGTH;
+const ARM_LENGTH = 90;
+const GROUND_HALF = ARM_LENGTH + 12;
 const LANE_DASH_LENGTH = 2.2;
 const LANE_GAP = 2;
 const CROSSWALK_STRIPES = 5;
@@ -127,6 +128,14 @@ export function buildIntersection(
     textures.push(t);
     return t;
   };
+  // Surface textures tile in metres; PlaneGeometry UVs span 0..1, so stretch them to the
+  // plane's size divided by the tile size.
+  const scaleUv = <T extends THREE.BufferGeometry>(g: T, sx: number, sy: number): T => {
+    const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy);
+    uv.needsUpdate = true;
+    return g;
+  };
 
   const active: ReadonlySet<Direction> = activeDirections ?? new Set(ALL_DIRS);
   const rivers: ReadonlySet<Direction> = riverDirections ?? new Set<Direction>();
@@ -138,14 +147,10 @@ export function buildIntersection(
   // tarmac strips read as "on top". Receives shadows.
   // ---------------------------------------------------------------------------
   const groundMat = addMat(
-    new THREE.MeshStandardMaterial({
-      color: 0x5a5852,
-      roughness: 0.98,
-      metalness: 0,
-    })
+    new THREE.MeshStandardMaterial({ map: makeAsphaltTexture(), color: 0x9c9c98, roughness: 0.98 })
   );
   const ground = new THREE.Mesh(
-    addGeo(new THREE.PlaneGeometry(GROUND_HALF * 2, GROUND_HALF * 2)),
+    scaleUv(addGeo(new THREE.PlaneGeometry(GROUND_HALF * 2, GROUND_HALF * 2)), (GROUND_HALF * 2) / 8, (GROUND_HALF * 2) / 8),
     groundMat
   );
   ground.rotation.x = -Math.PI / 2;
@@ -154,12 +159,9 @@ export function buildIntersection(
   group.add(ground);
 
   // Shared materials for repeated props ---------------------------------------
-  const tarmacMat = addMat(
-    new THREE.MeshStandardMaterial({ color: 0x2e3034, roughness: 0.95 })
-  );
-  const sidewalkMat = addMat(
-    new THREE.MeshStandardMaterial({ color: 0x6e6862, roughness: 0.9 })
-  );
+  const tarmacMat = addMat(new THREE.MeshStandardMaterial({ map: makeAsphaltTexture(), roughness: 0.95 }));
+  const sidewalkMat = addMat(new THREE.MeshStandardMaterial({ map: makePavingTexture(), roughness: 0.9 }));
+  const grassMat = addMat(new THREE.MeshStandardMaterial({ map: makeGrassTexture(), roughness: 1 }));
   const curbMat = addMat(
     new THREE.MeshStandardMaterial({ color: STONE_KERB, roughness: 0.85 })
   );
@@ -200,7 +202,7 @@ export function buildIntersection(
     new THREE.MeshStandardMaterial({
       color: 0xfff1c2,
       emissive: 0xffe09a,
-      emissiveIntensity: 1.2,
+      emissiveIntensity: 3.2,
       roughness: 0.4,
     })
   );
@@ -216,57 +218,56 @@ export function buildIntersection(
   // HELPERS — small, scoped builders that close over the local material set.
   // ---------------------------------------------------------------------------
 
+  const roofMat = addMat(new THREE.MeshStandardMaterial({ color: 0x46464b, roughness: 0.95 }));
+  const corniceMat = addMat(new THREE.MeshStandardMaterial({ color: 0xd6cdb8, roughness: 0.85 }));
+  const chimneyMat = addMat(new THREE.MeshStandardMaterial({ color: 0x6b4a3a, roughness: 0.95 }));
+  const GROUND_FLOOR_H = 3.6;
+  const FLOOR_H = 3.0;
+  const WINDOW_SPACING = 1.8;
+
   function makeBuilding(width: number, depth: number, height: number, color: number): THREE.Group {
     const g = new THREE.Group();
-    const wallMat = addMat(new THREE.MeshStandardMaterial({ color, roughness: 0.92 }));
-    const body = new THREE.Mesh(addGeo(new THREE.BoxGeometry(width, height, depth)), wallMat);
-    body.position.y = height / 2;
+    const floors = Math.max(1, Math.round((height - GROUND_FLOOR_H) / FLOOR_H));
+    const h = GROUND_FLOOR_H + floors * FLOOR_H;
+    const colsW = Math.max(1, Math.round(width / WINDOW_SPACING));
+    const colsD = Math.max(1, Math.round(depth / WINDOW_SPACING));
+    const wallHex = `#${color.toString(16).padStart(6, '0')}`;
+    const variant = pickInt(rng, 0, 5);
+    const faceW = addMat(
+      new THREE.MeshStandardMaterial({ map: makeFacadeTexture(colsW, floors, wallHex, variant), roughness: 0.9 })
+    );
+    const faceD = addMat(
+      new THREE.MeshStandardMaterial({ map: makeFacadeTexture(colsD, floors, wallHex, variant), roughness: 0.9 })
+    );
+    const body = new THREE.Mesh(addGeo(new THREE.BoxGeometry(width, h, depth)), [
+      faceD,
+      faceD,
+      roofMat,
+      roofMat,
+      faceW,
+      faceW,
+    ]);
+    body.position.y = h / 2;
     body.castShadow = true;
     body.receiveShadow = true;
     g.add(body);
 
-    // Cornice cap (slightly wider)
-    const corniceMat = addMat(
-      new THREE.MeshStandardMaterial({ color: 0xd6cdb8, roughness: 0.85 })
-    );
-    const cornice = new THREE.Mesh(
-      addGeo(new THREE.BoxGeometry(width + 0.25, 0.2, depth + 0.25)),
-      corniceMat
-    );
-    cornice.position.y = height + 0.05;
-    g.add(cornice);
+    const parapet = new THREE.Mesh(addGeo(new THREE.BoxGeometry(width + 0.3, 0.25, depth + 0.3)), corniceMat);
+    parapet.position.y = h + 0.05;
+    g.add(parapet);
 
-    // Window grid suggestion — emissive dots on the long sides, so windows glow in fog
-    const winMat = addMat(
-      new THREE.MeshStandardMaterial({
-        color: 0x2a2e36,
-        emissive: 0xfff0b8,
-        emissiveIntensity: 0.45,
-        roughness: 0.6,
-      })
-    );
-    const floors = Math.max(1, Math.floor((height - 0.6) / 1.2));
-    const colsW = Math.max(1, Math.floor(width / 1.1));
-    const colsD = Math.max(1, Math.floor(depth / 1.1));
-    for (let f = 0; f < floors; f++) {
-      const y = 0.8 + f * 1.2;
-      for (let c = 0; c < colsW; c++) {
-        const x = -width / 2 + (c + 0.5) * (width / colsW);
-        for (const sz of [1, -1] as const) {
-          const w = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(0.55, 0.7)), winMat);
-          w.position.set(x, y, sz * (depth / 2 + 0.012));
-          w.rotation.y = sz === 1 ? 0 : Math.PI;
-          g.add(w);
-        }
-      }
-      for (let c = 0; c < colsD; c++) {
-        const z = -depth / 2 + (c + 0.5) * (depth / colsD);
-        for (const sx of [1, -1] as const) {
-          const w = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(0.55, 0.7)), winMat);
-          w.position.set(sx * (width / 2 + 0.012), y, z);
-          w.rotation.y = sx === 1 ? Math.PI / 2 : -Math.PI / 2;
-          g.add(w);
-        }
+    const stacks = pickInt(rng, 1, 3);
+    for (let i = 0; i < stacks; i++) {
+      const sx = pickFloat(rng, -width / 2 + 0.6, width / 2 - 0.6);
+      const sz = pickFloat(rng, -depth / 2 + 0.5, depth / 2 - 0.5);
+      const stack = new THREE.Mesh(addGeo(new THREE.BoxGeometry(0.6, 0.9, 0.45)), chimneyMat);
+      stack.position.set(sx, h + 0.55, sz);
+      stack.castShadow = true;
+      g.add(stack);
+      for (const px of [-0.15, 0.15]) {
+        const pot = new THREE.Mesh(addGeo(new THREE.CylinderGeometry(0.08, 0.1, 0.35, 8)), chimneyMat);
+        pot.position.set(sx + px, h + 1.15, sz);
+        g.add(pot);
       }
     }
     return g;
@@ -293,7 +294,7 @@ export function buildIntersection(
     return g;
   }
 
-  function makeStreetLamp(): THREE.Group {
+  function makeStreetLamp(withLight = true): THREE.Group {
     const g = new THREE.Group();
     const pole = new THREE.Mesh(
       addGeo(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 10)),
@@ -308,9 +309,11 @@ export function buildIntersection(
     const head = new THREE.Mesh(addGeo(new THREE.SphereGeometry(0.18, 12, 10)), lampHeadMat);
     head.position.set(0.9, 4.0, 0);
     g.add(head);
-    const pt = new THREE.PointLight(0xffe09a, 0.6, 8, 1.7);
-    pt.position.set(0.9, 4.0, 0);
-    g.add(pt);
+    if (withLight) {
+      const pt = new THREE.PointLight(0xffe09a, 0.6, 8, 1.7);
+      pt.position.set(0.9, 4.0, 0);
+      g.add(pt);
+    }
     return g;
   }
 
@@ -327,7 +330,7 @@ export function buildIntersection(
     // (forward direction = +z after rotation, because rotYForDirection places
     // DIRECTION_FORWARD vectors along the arm's +z axis).
     const tarmac = new THREE.Mesh(
-      addGeo(new THREE.PlaneGeometry(ROAD_HALF * 2, ARM_LENGTH - ROAD_HALF)),
+      scaleUv(addGeo(new THREE.PlaneGeometry(ROAD_HALF * 2, ARM_LENGTH - ROAD_HALF)), (ROAD_HALF * 2) / 8, (ARM_LENGTH - ROAD_HALF) / 8),
       tarmacMat
     );
     tarmac.rotation.x = -Math.PI / 2;
@@ -348,7 +351,7 @@ export function buildIntersection(
     // Sidewalks — light gray strips outside the curbs
     for (const sx of [-1, 1] as const) {
       const sw = new THREE.Mesh(
-        addGeo(new THREE.PlaneGeometry(SIDEWALK, ARM_LENGTH - ROAD_HALF)),
+        scaleUv(addGeo(new THREE.PlaneGeometry(SIDEWALK, ARM_LENGTH - ROAD_HALF)), SIDEWALK / 4, (ARM_LENGTH - ROAD_HALF) / 4),
         sidewalkMat
       );
       sw.rotation.x = -Math.PI / 2;
@@ -399,6 +402,30 @@ export function buildIntersection(
     }
     // Memo: where the crosswalk ends along z
     void cwTotal;
+
+    // Terraces line the street beyond the corner blocks, with lamps between them, so
+    // the road runs off into the haze instead of stopping against the sky.
+    for (const sx of [-1, 1] as const) {
+      let z = ROAD_HALF + SIDEWALK + 17;
+      while (z < ARM_LENGTH - 4) {
+        const w = pickFloat(rng, 6, 10);
+        const d = pickFloat(rng, 6, 9);
+        const b = makeBuilding(w, d, pickFloat(rng, 9, 16), pickFrom(rng, BUILDING_COLORS));
+        b.position.set(sx * (ROAD_HALF + SIDEWALK + 0.6 + d / 2), 0, z + w / 2);
+        b.rotation.y = Math.PI / 2;
+        armGroup.add(b);
+        z += w + pickFloat(rng, 0.6, 2.2);
+      }
+      for (let lz = ROAD_HALF + 16; lz < ARM_LENGTH - 6; lz += 14) {
+        const lamp = makeStreetLamp(false);
+        lamp.position.set(sx * (ROAD_HALF + SIDEWALK - 0.4), 0, lz);
+        lamp.rotation.y = sx === 1 ? Math.PI : 0;
+        armGroup.add(lamp);
+      }
+    }
+    const endTerrace = makeBuilding((ROAD_HALF + SIDEWALK) * 2 + 14, 9, pickFloat(rng, 12, 17), pickFrom(rng, BUILDING_COLORS));
+    endTerrace.position.set(0, 0, ARM_LENGTH + 5);
+    armGroup.add(endTerrace);
 
     return armGroup;
   }
@@ -489,25 +516,93 @@ export function buildIntersection(
   }
 
   // ---------------------------------------------------------------------------
-  // WALL-BUILDINGS sealing inactive arms — a building face spanning the arm
-  // mouth so the player can't see through where a road would otherwise be.
+  // DEAD ARMS — no road leaves this way, so instead of a wall in the player's face
+  // the mouth opens onto a railed garden square with a terrace set well back.
   // ---------------------------------------------------------------------------
-  function placeWallBuildings() {
-    for (const dir of ALL_DIRS) {
-      if (active.has(dir)) continue;
-      const fwd = DIRECTION_FORWARD[dir];
-      const dist = ROAD_HALF + 2;
-      const width = (ROAD_HALF + SIDEWALK) * 2 + 1;
-      const height = pickFloat(rng, 6, 11);
-      const color = pickFrom(rng, BUILDING_COLORS);
-      const b = makeBuilding(width, 3, height, color);
-      // Place perpendicular to the dead arm
-      b.position.set(fwd.x * dist, 0, fwd.z * dist);
-      b.rotation.y = rotYForDirection(dir);
-      group.add(b);
+  function placeDeadEnd(dir: Direction) {
+    const armGroup = new THREE.Group();
+    armGroup.name = `dead-end-${dir}`;
+    armGroup.rotation.y = rotYForDirection(dir);
+    const halfW = ROAD_HALF + SIDEWALK + 0.3;
+
+    const walk = new THREE.Mesh(
+      scaleUv(addGeo(new THREE.PlaneGeometry(halfW * 2, SIDEWALK)), (halfW * 2) / 4, SIDEWALK / 4),
+      sidewalkMat
+    );
+    walk.rotation.x = -Math.PI / 2;
+    walk.position.set(0, SIDEWALK_Y + 0.004, ROAD_HALF + 0.3 + SIDEWALK / 2);
+    walk.receiveShadow = true;
+    armGroup.add(walk);
+    const curb = new THREE.Mesh(addGeo(new THREE.BoxGeometry(halfW * 2, CURB_HEIGHT, 0.3)), curbMat);
+    curb.position.set(0, CURB_HEIGHT / 2, ROAD_HALF + 0.15);
+    armGroup.add(curb);
+
+    const lawnDepth = 14;
+    const lawnZ0 = ROAD_HALF + 0.3 + SIDEWALK;
+    const lawn = new THREE.Mesh(
+      scaleUv(addGeo(new THREE.PlaneGeometry(halfW * 2, lawnDepth)), (halfW * 2) / 6, lawnDepth / 6),
+      grassMat
+    );
+    lawn.rotation.x = -Math.PI / 2;
+    lawn.position.set(0, 0.03, lawnZ0 + lawnDepth / 2);
+    lawn.receiveShadow = true;
+    armGroup.add(lawn);
+
+    const railZ = lawnZ0 + 0.2;
+    const gateHalf = 1.1;
+    for (const sx of [-1, 1] as const) {
+      const span = halfW - gateHalf;
+      const rail = new THREE.Mesh(addGeo(new THREE.BoxGeometry(span, 0.05, 0.05)), railingMat);
+      rail.position.set(sx * (gateHalf + span / 2), 1.1, railZ);
+      armGroup.add(rail);
+      const lowRail = rail.clone();
+      lowRail.position.y = 0.35;
+      armGroup.add(lowRail);
+      const posts = Math.floor(span / 0.5);
+      for (let i = 0; i <= posts; i++) {
+        const baluster = new THREE.Mesh(addGeo(new THREE.CylinderGeometry(0.02, 0.02, 1.15, 6)), railingMat);
+        baluster.position.set(sx * (gateHalf + i * 0.5), 0.58, railZ);
+        armGroup.add(baluster);
+      }
+      const pier = new THREE.Mesh(addGeo(new THREE.BoxGeometry(0.45, 1.5, 0.45)), curbMat);
+      pier.position.set(sx * gateHalf, 0.75, railZ);
+      pier.castShadow = true;
+      armGroup.add(pier);
     }
+    const path = new THREE.Mesh(
+      scaleUv(addGeo(new THREE.PlaneGeometry(2, lawnDepth)), 0.5, lawnDepth / 4),
+      sidewalkMat
+    );
+    path.rotation.x = -Math.PI / 2;
+    path.position.set(0, 0.04, lawnZ0 + lawnDepth / 2);
+    armGroup.add(path);
+
+    const treeCount = pickInt(rng, 4, 7);
+    for (let i = 0; i < treeCount; i++) {
+      const t = makeTree(pickFloat(rng, 1.3, 1.9));
+      const side = i % 2 === 0 ? 1 : -1;
+      t.position.set(side * pickFloat(rng, 2, halfW - 1.5), 0, lawnZ0 + pickFloat(rng, 1.5, lawnDepth - 1));
+      t.rotation.y = pickFloat(rng, 0, Math.PI * 2);
+      armGroup.add(t);
+    }
+
+    const farWalk = new THREE.Mesh(
+      scaleUv(addGeo(new THREE.PlaneGeometry(halfW * 2 + 2, SIDEWALK)), (halfW * 2 + 2) / 4, SIDEWALK / 4),
+      sidewalkMat
+    );
+    farWalk.rotation.x = -Math.PI / 2;
+    farWalk.position.set(0, SIDEWALK_Y, lawnZ0 + lawnDepth + SIDEWALK / 2);
+    farWalk.receiveShadow = true;
+    armGroup.add(farWalk);
+    const terrace = makeBuilding(halfW * 2 + 2, 7, pickFloat(rng, 12, 16), pickFrom(rng, BUILDING_COLORS));
+    terrace.position.set(0, 0, lawnZ0 + lawnDepth + SIDEWALK + 3.5);
+    armGroup.add(terrace);
+
+    group.add(armGroup);
   }
-  placeWallBuildings();
+  for (const dir of ALL_DIRS) {
+    if (!active.has(dir)) placeDeadEnd(dir);
+  }
 
   // ---------------------------------------------------------------------------
   // QUADRANT CONTENT — for each (NE/NW/SE/SW) quadrant, evaluate the two
@@ -519,7 +614,7 @@ export function buildIntersection(
     const cx = sx * (ROAD_HALF + 0.3 + SIDEWALK / 2);
     const cz = sz * (ROAD_HALF + 0.3 + SIDEWALK / 2);
     const filler = new THREE.Mesh(
-      addGeo(new THREE.PlaneGeometry(SIDEWALK, SIDEWALK)),
+      scaleUv(addGeo(new THREE.PlaneGeometry(SIDEWALK, SIDEWALK)), SIDEWALK / 4, SIDEWALK / 4),
       sidewalkMat
     );
     filler.rotation.x = -Math.PI / 2;
@@ -551,7 +646,7 @@ export function buildIntersection(
     for (let i = 0; i < rowCount; i++) {
       const w = pickFloat(rng, 3.5, 6);
       const d = pickFloat(rng, 3.5, 6);
-      const h = pickFloat(rng, 5, 12);
+      const h = pickFloat(rng, 8, 15);
       const color = pickFrom(rng, BUILDING_COLORS);
       const b = makeBuilding(w, d, h, color);
       let bx = innerX;
@@ -576,8 +671,8 @@ export function buildIntersection(
     const { sx, sz } = quadrantSign(q);
     const treeCount = pickInt(rng, 2, 5);
     for (let i = 0; i < treeCount; i++) {
-      const tx = sx * pickFloat(rng, ROAD_HALF + SIDEWALK + 0.6, GROUND_HALF - 2);
-      const tz = sz * pickFloat(rng, ROAD_HALF + SIDEWALK + 0.6, GROUND_HALF - 2);
+      const tx = sx * pickFloat(rng, ROAD_HALF + SIDEWALK + 0.6, 30);
+      const tz = sz * pickFloat(rng, ROAD_HALF + SIDEWALK + 0.6, 30);
       // Reject if too close to the road axis where a building probably lives
       if (Math.abs(tx) < ROAD_HALF + SIDEWALK + 1.2 && Math.abs(tz) < ROAD_HALF + SIDEWALK + 1.2) {
         continue;

@@ -152,8 +152,8 @@ function Section({ title }: { title: string }) {
 
 const panel: React.CSSProperties = {
   position: 'fixed',
-  top: 60,
-  right: 22,
+  top: 110,
+  right: 16,
   width: 380,
   maxHeight: 'calc(100vh - 100px)',
   overflowY: 'auto',
@@ -162,7 +162,7 @@ const panel: React.CSSProperties = {
   borderRadius: 10,
   padding: '14px 16px',
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   fontSize: 11,
   zIndex: 20,
   backdropFilter: 'blur(8px)',

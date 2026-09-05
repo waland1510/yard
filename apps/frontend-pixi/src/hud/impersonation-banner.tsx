@@ -4,6 +4,7 @@
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme, characterFor } from '../core/theme-registry';
+import { COLOR, FONT, RADIUS, SHADOW, centeredX } from './tokens';
 
 export function ImpersonationBanner() {
   const myRole = useRunnerStore((s) => s.myRole);
@@ -46,30 +47,28 @@ export function ImpersonationBanner() {
 
 const container: React.CSSProperties = {
   position: 'fixed',
-  top: 60,
-  left: '50%',
-  transform: 'translateX(-50%)',
+  top: 108,
+  ...centeredX(),
   display: 'flex',
   alignItems: 'center',
   gap: 12,
-  padding: '10px 16px 10px 12px',
-  background: 'rgba(94, 141, 222, 0.18)',
-  border: '1.5px solid #5a8dde',
-  borderRadius: 10,
+  padding: '8px 10px 8px 8px',
+  background: COLOR.panel,
+  border: `1px solid ${COLOR.blue}`,
+  borderRadius: RADIUS.pill,
   zIndex: 11,
-  backdropFilter: 'blur(8px)',
-  boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-  color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  boxShadow: SHADOW.dock,
+  color: COLOR.fg,
+  fontFamily: FONT.ui,
 };
 
 const avatar: React.CSSProperties = {
   width: 36,
   height: 36,
   borderRadius: '50%',
-  border: '2px solid #5a8dde',
+  border: `2px solid ${COLOR.blue}`,
   objectFit: 'cover',
-  background: '#1a1a1a',
+  background: COLOR.avatarBg,
 };
 
 const text: React.CSSProperties = {
@@ -81,7 +80,7 @@ const text: React.CSSProperties = {
 const kicker: React.CSSProperties = {
   fontSize: 9,
   letterSpacing: 2,
-  color: '#5a8dde',
+  color: COLOR.blueTint,
   fontWeight: 700,
 };
 
@@ -97,11 +96,11 @@ const subRole: React.CSSProperties = {
 
 const returnButton: React.CSSProperties = {
   marginLeft: 6,
-  padding: '6px 12px',
-  background: 'transparent',
-  border: '1px solid #5a8dde',
-  borderRadius: 6,
-  color: '#5a8dde',
+  padding: '7px 14px',
+  background: COLOR.blue,
+  border: 0,
+  borderRadius: RADIUS.pill,
+  color: '#fff',
   fontSize: 11,
   fontWeight: 700,
   letterSpacing: 1.4,

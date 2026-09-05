@@ -41,8 +41,8 @@ export function createTouchControls({
     camera.quaternion.setFromEuler(euler);
   }
 
-  function resetView() {
-    yaw = 0;
+  function resetView(startYaw = 0) {
+    yaw = startYaw;
     pitch = 0;
     camera.position.set(0, EYE_HEIGHT, 0);
     applyOrientation();

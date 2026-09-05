@@ -7,13 +7,29 @@
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "options": {
         "outputPath": "dist/shared-utils",
         "tsConfig": "shared-utils/tsconfig.lib.json",
         "packageJson": "shared-utils/package.json",
         "main": "shared-utils/src/index.ts",
-        "assets": ["shared-utils/*.md"]
+        "assets": [
+          "shared-utils/*.md"
+        ]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^default"
+      ],
+      "options": {
+        "command": "node_modules/typescript-7/bin/tsc --noEmit -p shared-utils/tsconfig.lib.json",
+        "cwd": "{workspaceRoot}"
       }
     }
   }

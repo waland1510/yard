@@ -140,7 +140,7 @@ const backdrop: React.CSSProperties = {
   justifyContent: 'center',
   zIndex: 25,
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   backdropFilter: 'blur(6px)',
 };
 

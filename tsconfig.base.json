@@ -4,7 +4,7 @@
     "rootDir": ".",
     "sourceMap": true,
     "declaration": false,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
@@ -14,9 +14,8 @@
     "lib": ["es2020", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
-    "baseUrl": ".",
     "paths": {
-      "@yard/shared-utils": ["shared-utils/src/index.ts"]
+      "@yard/shared-utils": ["./shared-utils/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

@@ -100,6 +100,15 @@ export function getConnections(nodeId: number, includeRiver = false): Connection
     for (const m of moved) byDir[sibling].push({ ...m, direction: sibling });
   }
 
+  // Crowded junctions: when the natural arms can't seat every vehicle at
+  // TARGET_PER_DIRECTION, open extra arms instead of parking rows deep.
+  const needed = Math.min(4, Math.ceil(roadConns.length / TARGET_PER_DIRECTION));
+  for (const dir of ['north', 'east', 'south', 'west'] as const) {
+    if (roadActiveDirections.length >= needed) break;
+    if (roadActiveDirections.includes(dir) || riverDirSet.has(dir)) continue;
+    roadActiveDirections.push(dir);
+  }
+
   // Rebalance road connections: cap each road direction at TARGET_PER_DIRECTION.
   let moved = true;
   while (moved) {

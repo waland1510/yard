@@ -9,7 +9,7 @@ export const IRON_GREEN = 0x1e3f2c;
 export const CREAM = 0xf4efe2;
 export const BRICK_WARM = 0x8a4b3e;
 export const BELISHA_AMBER = 0xf6a920;
-export const FOG_TINT = 0xc6cdd5;
+export const FOG_TINT = 0xd9d5cc;
 export const STONE_KERB = 0x817a6f;
 export const PHONEBOX_RED = 0xb01818;
 

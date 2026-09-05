@@ -7,6 +7,7 @@ import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme } from '../core/theme-registry';
 import { play as playSfx } from '../core/audio-bus';
+import { COLOR, FONT, MOTION, RADIUS, SHADOW, centeredX } from './tokens';
 
 const HOLD_MS = 1600;
 
@@ -54,6 +55,7 @@ export function TurnBanner() {
         ...container,
         opacity: visible ? 1 : 0,
         transform: visible ? 'translate(-50%, 0)' : 'translate(-50%, -40px)',
+        transition: `opacity 240ms ease, transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4), left ${MOTION}`,
       }}
       aria-hidden={!visible}
     >
@@ -66,26 +68,22 @@ export function TurnBanner() {
 
 const container: React.CSSProperties = {
   position: 'fixed',
-  top: 80,
-  left: '50%',
-  transform: 'translate(-50%, -40px)',
+  top: 118,
+  ...centeredX(),
   zIndex: 12,
   pointerEvents: 'none',
-  transition: 'opacity 240ms ease, transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4)',
 };
 
 const inner: React.CSSProperties = {
-  padding: '14px 32px',
-  background: 'rgba(10, 12, 16, 0.85)',
-  border: '2px solid',
-  borderRadius: 8,
-  backdropFilter: 'blur(8px)',
-  boxShadow: '0 10px 40px rgba(0,0,0,0.6), 0 0 24px rgba(255, 107, 53, 0.2)',
+  padding: '12px 28px',
+  background: COLOR.panel,
+  border: '1.5px solid',
+  borderRadius: RADIUS.pill,
+  boxShadow: SHADOW.dock,
 };
 
 const title: React.CSSProperties = {
-  fontSize: 18,
-  fontWeight: 800,
-  letterSpacing: 4,
+  font: `800 16px ${FONT.ui}`,
+  letterSpacing: '.18em',
   textTransform: 'uppercase',
 };

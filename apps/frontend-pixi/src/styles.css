@@ -4,6 +4,22 @@
   padding: 0;
 }
 
+:root {
+  --font-ui: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --panel: #17191e;
+  --panel2: #1f222a;
+  --line: rgba(255, 255, 255, 0.08);
+  --fg: #f0ede6;
+  --fg2: #9aa0ab;
+  --gold: #e8b64c;
+  --red: #e05545;
+  /* Published by the dock: half the width it occupies, so centered overlays float
+     over the free map area instead of the window. 0 when no dock is mounted. */
+  --hud-shift: 0px;
+  --dock-w: 0px;
+}
+
 html,
 body,
 #root {
@@ -12,7 +28,7 @@ body,
   overflow: hidden;
   background: #000;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
 }
 
 canvas {
@@ -22,6 +38,16 @@ canvas {
 @keyframes sy-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes sy-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
   }
 }
 
@@ -42,11 +68,36 @@ button:disabled {
 }
 
 button {
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform 120ms ease, opacity 120ms ease, background 150ms ease, color 150ms ease;
 }
 button:not(:disabled):hover {
   transform: translateY(-1px);
 }
 button:not(:disabled):active {
   transform: translateY(0);
+}
+
+.hud-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+.hud-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.hud-scroll::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 99px;
+}
+
+.hud-pill-dark:not(:disabled):hover {
+  background: #353945 !important;
+}
+.hud-pill-gold:not(:disabled):hover {
+  background: #f2c563 !important;
+}
+.hud-collapse:hover {
+  color: var(--fg) !important;
+}
+.hud-card:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.03);
 }

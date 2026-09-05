@@ -75,6 +75,16 @@ const CONFIGS: Record<VehicleKind, RideConfig> = {
   },
 };
 
+/** Where the player arrives at the new node: the stop that leads back to the node they
+ *  came from. `forward` is the world-space travel direction on arrival (toward the junction). */
+export interface ArrivalAnchor {
+  kind: VehicleKind;
+  position: THREE.Vector3;
+  forward: THREE.Vector3;
+  /** The vehicle the player is riding in — hidden until they step out of it. */
+  hide?: THREE.Object3D;
+}
+
 export interface RideOverlay {
   setFade: (alpha: number) => void;
   setBlur: (px: number) => void;
@@ -85,7 +95,7 @@ export async function playRide(
   world: World,
   vehicle: VehicleHandle,
   overlay: RideOverlay,
-  swapScene: () => void
+  swapScene: () => ArrivalAnchor | undefined
 ): Promise<void> {
   const cfg = CONFIGS[vehicle.kind];
   const camera = world.camera;
@@ -156,19 +166,108 @@ export async function playRide(
     await playRoadRide(camera, seatPos, rideForward, rideRight, finalQuat, cfg, overlay);
   }
 
-  // ---- Phase 3: blackout, swap scene, fade back ----
+  // ---- Phase 3: blackout, swap scene, arrive at the new node ----
   overlay.setFade(1);
   overlay.setBlur(8);
-  swapScene();
+  const anchor = swapScene();
+  // rebuildScene parks the camera at the node's default view; that is where we step out to.
+  const restPos = camera.position.clone();
+  const restQuat = camera.quaternion.clone();
 
   await wait(120);
 
-  await tween(cfg.fadeInMs, (t) => {
-    overlay.setFade(1 - t);
-    overlay.setBlur(8 * (1 - t));
-  });
+  if (anchor) {
+    await playArrival(camera, anchor, cfg, overlay, restPos, restQuat);
+  } else {
+    await tween(cfg.fadeInMs, (t) => {
+      overlay.setFade(1 - t);
+      overlay.setBlur(8 * (1 - t));
+    });
+  }
   overlay.setFade(0);
   overlay.setBlur(0);
+}
+
+/**
+ * Arrival leg: ride in along the arm toward the junction (or climb the station stairs),
+ * brake to a stop at the anchor, then step out to eye height at the default view.
+ */
+async function playArrival(
+  camera: THREE.PerspectiveCamera,
+  anchor: ArrivalAnchor,
+  cfg: RideConfig,
+  overlay: RideOverlay,
+  restPos: THREE.Vector3,
+  restQuat: THREE.Quaternion
+) {
+  const forward = anchor.forward.clone().setY(0).normalize();
+  const right = new THREE.Vector3(0, 1, 0).cross(forward).normalize();
+  const underground = anchor.kind === 'underground';
+  if (anchor.hide) anchor.hide.visible = false;
+
+  const start = anchor.position.clone();
+  const end = anchor.position.clone();
+  if (underground) {
+    start.add(forward.clone().multiplyScalar(-2.8));
+    start.y = -0.8;
+    end.add(forward.clone().multiplyScalar(0.9));
+    end.y = 1.6;
+  } else {
+    start.add(forward.clone().multiplyScalar(-24));
+    start.y = cfg.cameraY;
+    end.add(forward.clone().multiplyScalar(1.0));
+    end.y = cfg.cameraY;
+  }
+  // Road arrivals run down the centreline — clear of both parking lanes and whatever
+  // is parked further along — and only swing into the stop's lane at the end.
+  const laneOffset = underground ? 0 : anchor.position.dot(right);
+  start.add(right.clone().multiplyScalar(-laneOffset));
+
+  const arriveMs = underground ? 1300 : 1500;
+  await tween(arriveMs, (t) => {
+    const e = easeArrive(t);
+    const elapsed = (t * arriveMs) / 1000;
+    const pos = start.clone().lerp(end, e);
+    const swing = THREE.MathUtils.smoothstep(e, 0.55, 1.0);
+    pos.add(right.clone().multiplyScalar(laneOffset * (swing - e)));
+    let pitch = 0;
+    if (underground) {
+      pitch = 0.22 * (1 - e);
+    } else {
+      pos.y += Math.sin(elapsed * cfg.bobHz * Math.PI * 2) * cfg.bobAmp * (1 - e);
+      pos.add(right.clone().multiplyScalar(Math.sin(elapsed * cfg.swayHz * Math.PI * 2) * cfg.swayAmp * (1 - e)));
+      pitch = -0.05 * Math.max(0, 1 - Math.abs(t - 0.85) / 0.15);
+    }
+    camera.position.copy(pos);
+    camera.quaternion.copy(quatLookAlong(forward, pitch));
+
+    const fadeT = Math.min(1, (t * arriveMs) / cfg.fadeInMs);
+    overlay.setFade(1 - fadeT);
+    overlay.setBlur(8 * (1 - fadeT));
+  });
+
+  const alightFrom = camera.position.clone();
+  const alightQuat = camera.quaternion.clone();
+  await tween(700, (t) => {
+    const e = ease(t);
+    camera.position.lerpVectors(alightFrom, restPos, e);
+    camera.quaternion.copy(alightQuat).slerp(restQuat, e);
+    if (anchor.hide && t > 0.35) anchor.hide.visible = true;
+  });
+  if (anchor.hide) anchor.hide.visible = true;
+}
+
+const UP = new THREE.Vector3(0, 1, 0);
+const ORIGIN = new THREE.Vector3();
+
+function quatLookAlong(forward: THREE.Vector3, pitch: number): THREE.Quaternion {
+  const m = new THREE.Matrix4().lookAt(ORIGIN, forward, UP);
+  const q = new THREE.Quaternion().setFromRotationMatrix(m);
+  return q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, 0, 0)));
+}
+
+function easeArrive(t: number): number {
+  return 1 - Math.pow(1 - t, 2.4);
 }
 
 async function playRoadRide(

@@ -108,11 +108,18 @@ export async function saveIpInfo(ipInfo: IpInfo) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id, createdAt, ...ipInfoValues } = ipInfo;
+    const { id, createdAt, loc, ...ipInfoValues } = ipInfo;
+
+    // `loc` is a Postgres point column: accept either "lat,lng" or an already-parsed tuple.
+    const coords = (Array.isArray(loc) ? loc : String(loc).split(',').map(Number)) as [
+      number,
+      number
+    ];
+
     const [savedIpInfo] = await db.transaction(async (trx) => {
       return await trx
         .insert(ipInfoTable)
-        .values(ipInfoValues)
+        .values({ ...ipInfoValues, loc: coords })
         .returning();
     });
 

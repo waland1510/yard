@@ -115,7 +115,7 @@ export function spawnTrailDot(map: google.maps.Map, center: LatLng, color: strin
     fromOpacity: 0.55,
     toOpacity: 0,
     durationMs: 1400,
-    zIndex: 3,
+    zIndex: 10,
   });
 }
 
@@ -131,6 +131,6 @@ export function spawnPulse(map: google.maps.Map, center: LatLng, color: string):
     durationMs: 1100,
     loop: true,
     stroke: true,
-    zIndex: 9,
+    zIndex: 11,
   });
 }

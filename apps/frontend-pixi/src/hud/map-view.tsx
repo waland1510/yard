@@ -1,8 +1,8 @@
 // Google Maps 2D top-down view, styled black-and-white, with the entire Scotland
 // Yard graph projected onto real London:
 //   - All 200+ numbered node circles, always visible
-//   - All transport edges (yellow taxi / green bus / red-dashed underground / cyan
-//     river) drawn at startup
+//   - All transport edges drawn board-style (yellow taxi / green bus / red-dashed
+//     underground / blue-dashed river), thick and zoom-scaled — see map-edges.ts
 //   - Current player position highlighted with a thick orange ring
 //   - Reachable destinations highlighted with their transport color, click to ride,
 //     right-click for Street View
@@ -14,20 +14,17 @@
 // Uses classic google.maps.Marker (not AdvancedMarkerElement) because inline
 // `styles` array doesn't work with a mapId, and we need the desaturated base map.
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 import type { Player, RoleType } from '@yard/shared-utils';
 import type { Connection, TransportKind } from '../game/connections';
-import {
-  coordsForNode,
-  ALL_NODE_IDS,
-  ALL_EDGES,
-  type LondonCoord,
-} from '../game/london-coords';
+import { coordsForNode, ALL_NODE_IDS } from '../game/london-coords';
 import { nodeDisplayName } from '../core/map-data';
 import { useGameStateStore } from '../stores/game-state-store';
 import { getTheme, characterFor } from '../core/theme-registry';
 import { spawnSpotlight, spawnTrailDot, spawnPulse, type EffectHandle } from './map-effects';
+import { KIND_COLOR, drawEdge, boardDash, mountBoardEdges, nodeRingColor } from './map-edges';
 
 export interface MapViewProps {
   currentNodeId: number;
@@ -42,16 +39,17 @@ export interface MapViewProps {
   /** Move count for the culprit so we can reveal Mr. X on rounds 3/8/13/18/24. */
   culpritMoveCount: number;
   ticketsByKind: Partial<Record<TransportKind, number>>;
-  /** Post-game replay (#11): show the REPLAY badge and disable interaction. */
+  /** Post-game replay (#11). The REPLAY banner lives in <ReplayControls/>; the map only
+   *  needs `interactive` to be false. Accepted for prop parity with <MapSurface/>. */
   isReplay?: boolean;
   onConnectionClick: (conn: Connection) => void;
 }
 
-const KIND_COLOR: Record<TransportKind, string> = {
-  taxi: '#f6c945',
-  bus: '#2e9b4f',
-  underground: '#d63a3a',
-  river: '#3a86c7',
+const HIGHLIGHT_WEIGHT: Record<TransportKind, number> = {
+  taxi: 7,
+  bus: 10,
+  underground: 12,
+  river: 10,
 };
 
 const KIND_ICON: Record<TransportKind, string> = {
@@ -230,27 +228,6 @@ function loadPlayerAvatar(themeId: string, role: string): Promise<google.maps.Ic
   return promise;
 }
 
-function makePolylineOpts(kind: TransportKind, weight: number, opacity: number) {
-  const opts: google.maps.PolylineOptions = {
-    strokeColor: KIND_COLOR[kind],
-    clickable: false,
-  };
-  if (kind === 'underground') {
-    opts.strokeOpacity = 0;
-    opts.icons = [
-      {
-        icon: { path: 'M 0,-1 0,1', strokeOpacity: opacity, strokeWeight: weight, scale: 3 },
-        offset: '0',
-        repeat: '14px',
-      },
-    ];
-  } else {
-    opts.strokeOpacity = opacity;
-    opts.strokeWeight = weight;
-  }
-  return opts;
-}
-
 export function MapView({
   currentNodeId,
   connections,
@@ -261,7 +238,6 @@ export function MapView({
   players,
   culpritMoveCount,
   ticketsByKind,
-  isReplay = false,
   onConnectionClick,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -270,7 +246,7 @@ export function MapView({
   const streetViewRef = useRef<google.maps.StreetViewPanorama | null>(null);
 
   const baseNodeMarkersRef = useRef<google.maps.Marker[]>([]);
-  const baseEdgePolylinesRef = useRef<google.maps.Polyline[]>([]);
+  const disposeBaseEdgesRef = useRef<(() => void) | null>(null);
   const highlightMarkersRef = useRef<google.maps.Marker[]>([]);
   const highlightEdgesRef = useRef<google.maps.Polyline[]>([]);
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
@@ -374,35 +350,20 @@ export function MapView({
     };
   }, []);
 
-  // Build the static graph once: every node + every edge, drawn subtly.
+  // Build the static graph once: every node + every edge, drawn board-style.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    // Edges (deduped, all transports)
-    for (const edge of ALL_EDGES) {
-      const a = coordsForNode(edge.a);
-      const b = coordsForNode(edge.b);
-      const opts = makePolylineOpts(
-        edge.kind,
-        edge.kind === 'underground' ? 2.5 : edge.kind === 'bus' ? 3 : 2,
-        0.35
-      );
-      opts.path = [a, b];
-      opts.zIndex = 0;
-      const line = new google.maps.Polyline(opts);
-      line.setMap(map);
-      baseEdgePolylinesRef.current.push(line);
-    }
+    disposeBaseEdgesRef.current = mountBoardEdges(map);
 
-    // Nodes (small numbered circles)
     for (const id of ALL_NODE_IDS) {
       const pos = coordsForNode(id);
       const marker = new google.maps.Marker({
         position: pos,
         map,
-        icon: makeNodeIcon(String(id), '#888', 18, 9),
-        zIndex: 1,
+        icon: makeNodeIcon(String(id), nodeRingColor(id), 20, 9),
+        zIndex: 20,
         title: nodeDisplayName(id),
       });
       marker.addListener('rightclick', () => {
@@ -413,9 +374,9 @@ export function MapView({
 
     return () => {
       for (const m of baseNodeMarkersRef.current) m?.setMap(null);
-      for (const e of baseEdgePolylinesRef.current) e?.setMap(null);
       baseNodeMarkersRef.current = [];
-      baseEdgePolylinesRef.current = [];
+      disposeBaseEdgesRef.current?.();
+      disposeBaseEdgesRef.current = null;
     };
   }, [mapReady]);
 
@@ -459,15 +420,19 @@ export function MapView({
     for (const conn of connections) {
       const target = coordsForNode(conn.targetNodeId);
       const tickets = ticketsByKind[conn.kind] ?? 0;
-      const empty = conn.kind !== 'river' && tickets <= 0;
+      const empty = tickets <= 0;
       const ringColor = empty ? '#999' : KIND_COLOR[conn.kind];
 
-      const opts = makePolylineOpts(conn.kind, conn.kind === 'bus' ? 6 : 5, 0.9);
-      opts.path = [here, target];
-      opts.zIndex = 10;
-      const line = new google.maps.Polyline(opts);
-      line.setMap(map);
-      highlightEdgesRef.current.push(line);
+      highlightEdgesRef.current.push(
+        ...drawEdge(map, conn.kind, [here, target], {
+          weight: HIGHLIGHT_WEIGHT[conn.kind],
+          opacity: 1,
+          zIndex: 50,
+          casingColor: '#fff',
+          casingExtra: 5,
+          dash: boardDash(conn.kind),
+        })
+      );
 
       const dest = new google.maps.Marker({
         position: target,
@@ -478,7 +443,7 @@ export function MapView({
           empty
             ? 'no ticket'
             : conn.kind === 'river'
-            ? `free ${KIND_LABEL[conn.kind].toLowerCase()}`
+            ? `${KIND_LABEL[conn.kind]} · uses a secret ticket · ${tickets - 1} left after`
             : `${KIND_LABEL[conn.kind]} · ${tickets - 1} left after`
         }`,
         cursor: empty || !interactive ? 'not-allowed' : 'pointer',
@@ -500,7 +465,7 @@ export function MapView({
       // Valid-move pulse (#4): looping aura under each affordable destination. A low
       // ticket count (1–2) warms the colour as a soft scarcity warning.
       if (!empty && interactive) {
-        const lowTicket = conn.kind !== 'river' && tickets > 0 && tickets <= 2;
+        const lowTicket = tickets > 0 && tickets <= 2;
         pulseHandlesRef.current.push(
           spawnPulse(map, target, lowTicket ? '#ff9f43' : KIND_COLOR[conn.kind])
         );
@@ -768,23 +733,6 @@ export function MapView({
       .catch((err) => console.error('Street View: getPanorama failed', err));
   }, [streetViewLocation]);
 
-  const turnText = useMemo(
-    () =>
-      isMyTurn
-        ? 'Your turn — click a destination'
-        : `Waiting for ${ROLE_LABEL[currentTurnRole] ?? currentTurnRole}…`,
-    [isMyTurn, currentTurnRole]
-  );
-
-  // Reveal countdown / indicator (#4).
-  const revealText = useMemo(() => {
-    if (isCulpritOnRevealRound) return `👁 Mr. X revealed · round ${culpritMoveCount}`;
-    const next = REVEAL_ROUNDS.find((r) => r > culpritMoveCount);
-    if (next == null) return null;
-    const inN = next - culpritMoveCount;
-    return `Mr. X reveal in ${inN} ${inN === 1 ? 'round' : 'rounds'}`;
-  }, [isCulpritOnRevealRound, culpritMoveCount]);
-
   const here = coordsForNode(currentNodeId);
 
   return (
@@ -801,11 +749,6 @@ export function MapView({
           background: '#1a1a1a',
         }}
       />
-      {!isReplay && <div style={turnBanner(isMyTurn)}>{turnText}</div>}
-      {!isReplay && revealText && (
-        <div style={revealBanner(isCulpritOnRevealRound)}>{revealText}</div>
-      )}
-      {isReplay && <div style={replayBadge}>● REPLAY</div>}
       <div style={topRightButtons}>
         <button
           type="button"
@@ -847,9 +790,8 @@ export function MapView({
             <span
               style={{
                 ...legendSwatch,
-                background: k === 'underground' ? 'transparent' : KIND_COLOR[k],
-                borderTop:
-                  k === 'underground' ? `3px dashed ${KIND_COLOR[k]}` : 'none',
+                background: boardDash(k) ? 'transparent' : KIND_COLOR[k],
+                borderTop: boardDash(k) ? `3px dashed ${KIND_COLOR[k]}` : 'none',
               }}
             />
             <span style={{ fontSize: 12 }}>{KIND_ICON[k]}</span>
@@ -860,8 +802,9 @@ export function MapView({
         ))}
         <div style={legendHint}>Right-click any node for Street View</div>
       </div>
-      {streetViewLocation && (
-        <div style={streetViewOverlay}>
+      {streetViewLocation &&
+        createPortal(
+          <div style={streetViewOverlay}>
           <div ref={streetViewContainerRef} style={streetViewPanel} />
           <div style={streetViewHeader}>
             <div>
@@ -902,78 +845,17 @@ export function MapView({
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
 
-function turnBanner(isMyTurn: boolean): React.CSSProperties {
-  return {
-    position: 'fixed',
-    top: 12,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 5,
-    padding: '8px 18px',
-    background: isMyTurn ? 'rgba(255, 107, 53, 0.95)' : 'rgba(10, 12, 16, 0.85)',
-    color: '#fff',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fontSize: 13,
-    fontWeight: 600,
-    letterSpacing: '0.3px',
-    borderRadius: 22,
-    border: `1px solid ${isMyTurn ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.18)'}`,
-    boxShadow: '0 6px 22px rgba(0,0,0,0.45)',
-    pointerEvents: 'none',
-  };
-}
-
-const replayBadge: React.CSSProperties = {
-  position: 'fixed',
-  top: 12,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  zIndex: 5,
-  padding: '6px 16px',
-  background: 'rgba(124, 58, 237, 0.92)',
-  color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  fontSize: 12,
-  fontWeight: 700,
-  letterSpacing: 1.5,
-  textTransform: 'uppercase',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.4)',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.45)',
-  pointerEvents: 'none',
-};
-
-function revealBanner(active: boolean): React.CSSProperties {
-  return {
-    position: 'fixed',
-    top: 52,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 5,
-    padding: '5px 14px',
-    background: active ? 'rgba(214, 31, 31, 0.92)' : 'rgba(10, 12, 16, 0.8)',
-    color: '#fff',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    fontSize: 12,
-    fontWeight: 600,
-    letterSpacing: 0.3,
-    borderRadius: 18,
-    border: `1px solid ${active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)'}`,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-    pointerEvents: 'none',
-  };
-}
-
 const topRightButtons: React.CSSProperties = {
   position: 'fixed',
-  top: 12,
-  right: 12,
+  top: 62,
+  right: 16,
   zIndex: 5,
   display: 'flex',
   flexDirection: 'column',
@@ -983,11 +865,11 @@ const topRightButtons: React.CSSProperties = {
 
 const lookHereBtn: React.CSSProperties = {
   padding: '8px 14px',
-  background: 'rgba(10, 12, 16, 0.92)',
-  border: '1px solid rgba(255,255,255,0.25)',
-  borderRadius: 22,
+  background: '#2b2e36',
+  border: 0,
+  borderRadius: 999,
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   fontSize: 12,
   fontWeight: 600,
   letterSpacing: '0.3px',
@@ -997,9 +879,9 @@ const lookHereBtn: React.CSSProperties = {
 
 const tourButtonGroup: React.CSSProperties = {
   display: 'flex',
-  background: 'rgba(10, 12, 16, 0.92)',
-  border: '1px solid rgba(255,255,255,0.25)',
-  borderRadius: 22,
+  background: '#2b2e36',
+  border: 0,
+  borderRadius: 999,
   overflow: 'hidden',
   boxShadow: '0 6px 22px rgba(0,0,0,0.45)',
 };
@@ -1009,7 +891,7 @@ const tourBtn: React.CSSProperties = {
   background: 'transparent',
   border: 'none',
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   fontSize: 12,
   fontWeight: 600,
   letterSpacing: '0.3px',
@@ -1018,15 +900,15 @@ const tourBtn: React.CSSProperties = {
 
 const legendBox: React.CSSProperties = {
   position: 'fixed',
-  left: 12,
-  bottom: 36,
+  right: 16,
+  bottom: 64,
   zIndex: 5,
   padding: '10px 12px',
-  background: 'rgba(10, 12, 16, 0.88)',
-  border: '1px solid rgba(255,255,255,0.15)',
-  borderRadius: 10,
+  background: '#17191e',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 12,
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   display: 'flex',
   flexDirection: 'column',
   gap: 6,
@@ -1064,13 +946,16 @@ const legendHint: React.CSSProperties = {
   fontStyle: 'italic',
 };
 
+// Portalled to <body> and layered above the dock / pills (z 30–40) so the panel and its
+// Prev / Next / Close controls are never covered by HUD chrome.
 const streetViewOverlay: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
-  zIndex: 20,
-  background: 'rgba(0,0,0,0.65)',
+  zIndex: 60,
+  background: 'rgba(0,0,0,0.7)',
   backdropFilter: 'blur(4px)',
-  padding: '60px 5vw',
+  padding: '72px 16px 16px',
+  fontFamily: 'var(--font-ui)',
 };
 
 const streetViewPanel: React.CSSProperties = {
@@ -1084,18 +969,19 @@ const streetViewPanel: React.CSSProperties = {
 
 const streetViewHeader: React.CSSProperties = {
   position: 'absolute',
-  top: 12,
-  left: '5vw',
-  right: '5vw',
-  padding: '8px 16px',
-  background: 'rgba(10, 12, 16, 0.85)',
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 8,
+  top: 16,
+  left: 16,
+  right: 16,
+  padding: '8px 8px 8px 18px',
+  background: '#17191e',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 999,
+  boxShadow: '0 8px 40px rgba(0,0,0,.35)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   pointerEvents: 'auto',
 };
 
@@ -1113,10 +999,10 @@ const streetViewTitle: React.CSSProperties = {
 };
 
 const streetViewClose: React.CSSProperties = {
-  padding: '6px 14px',
-  background: 'transparent',
-  border: '1px solid rgba(255,255,255,0.35)',
-  borderRadius: 6,
+  padding: '8px 14px',
+  background: '#2b2e36',
+  border: 0,
+  borderRadius: 999,
   color: '#fff',
   fontFamily: 'inherit',
   fontSize: 12,

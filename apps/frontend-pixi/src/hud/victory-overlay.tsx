@@ -9,10 +9,14 @@ import { getTheme, characterFor } from '../core/theme-registry';
 import type { RoleType } from '@yard/shared-utils';
 import { ROLE_PALETTE } from '../core/map-data';
 import { replay, useReplay } from '../core/replay-singleton';
+import { deriveWinner } from '../core/move-validator';
 
 export function VictoryOverlay() {
   const status = useGameStateStore((s) => s.status);
   const currentTurn = useGameStateStore((s) => s.currentTurn);
+  const storedWinner = useGameStateStore((s) => s.winner);
+  const players = useGameStateStore((s) => s.players);
+  const moves = useGameStateStore((s) => s.moves);
   const themeId = useGameStateStore((s) => s.theme);
   const myRole = useRunnerStore((s) => s.myRole);
   const replayView = useReplay();
@@ -36,8 +40,7 @@ export function VictoryOverlay() {
   if (status !== 'finished') return null;
   if (replayView.isActive) return null; // hidden while user is watching the replay
 
-  // Winner = the role that holds currentTurn at game-end
-  const winner = currentTurn as RoleType;
+  const winner: RoleType = storedWinner ?? deriveWinner(undefined, players, moves) ?? currentTurn;
   const winnerIsCulprit = winner === 'culprit';
   const youWon = winner === myRole || (!winnerIsCulprit && myRole !== 'culprit') || (winnerIsCulprit && myRole === 'culprit');
   const character = characterFor(theme, winner);
@@ -117,7 +120,7 @@ const backdrop: React.CSSProperties = {
   justifyContent: 'center',
   zIndex: 30,
   color: '#fff',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  fontFamily: 'var(--font-ui)',
   backdropFilter: 'blur(6px)',
   overflow: 'hidden',
 };

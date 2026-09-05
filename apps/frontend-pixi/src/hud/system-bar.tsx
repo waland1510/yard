@@ -2,6 +2,7 @@
 // is enabled in preferences).
 
 import { useRunnerStore } from '../stores/runner-store';
+import { COLOR, SCREEN_MARGIN, iconSquare } from './tokens';
 
 export function SystemBar() {
   const muted = useRunnerStore((s) => s.muted);
@@ -22,8 +23,8 @@ export function SystemBar() {
       <button
         style={{
           ...iconButton,
-          opacity: debugEnabled ? 1 : 0.5,
-          color: debugEnabled ? '#5a8dde' : '#fff',
+          opacity: debugEnabled ? 1 : 0.6,
+          color: debugEnabled ? COLOR.blueTint : COLOR.fg2,
         }}
         onClick={() => setDebugEnabled(!debugEnabled)}
         title="Toggle debug overlay (Ctrl+D)"
@@ -37,23 +38,16 @@ export function SystemBar() {
 
 const container: React.CSSProperties = {
   position: 'fixed',
-  bottom: 22,
-  right: 22,
+  bottom: SCREEN_MARGIN,
+  right: SCREEN_MARGIN,
   display: 'flex',
   gap: 6,
-  zIndex: 5,
+  zIndex: 30,
 };
 
 const iconButton: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 8,
-  background: 'rgba(10, 12, 16, 0.78)',
+  ...iconSquare,
+  background: COLOR.pill,
+  border: 0,
   color: '#fff',
-  cursor: 'pointer',
-  fontSize: 16,
-  backdropFilter: 'blur(6px)',
-  transition: 'all 160ms ease',
-  fontFamily: 'inherit',
 };

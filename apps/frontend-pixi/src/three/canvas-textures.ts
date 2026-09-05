@@ -216,3 +216,210 @@ export function makeStationLintelTexture(name: string): THREE.CanvasTexture {
   ctx.fillText(name, w / 2, h / 2 + 8);
   return finalize(c);
 }
+
+// ---------------------------------------------------------------------------
+// Surface textures. Shared across rebuilds (module cache) — never pushed into a
+// per-intersection dispose list.
+// ---------------------------------------------------------------------------
+
+const surfaceCache = new Map<string, THREE.CanvasTexture>();
+
+function cachedSurface(key: string, make: () => HTMLCanvasElement, anisotropy = 8): THREE.CanvasTexture {
+  const hit = surfaceCache.get(key);
+  if (hit) return hit;
+  const tex = finalize(make(), anisotropy);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  surfaceCache.set(key, tex);
+  return tex;
+}
+
+function seeded(seed: number): () => number {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+function speckle(ctx: CanvasRenderingContext2D, w: number, h: number, count: number, rng: () => number, alpha: number, size = 2) {
+  for (let i = 0; i < count; i++) {
+    const v = rng();
+    ctx.fillStyle = v < 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+    ctx.fillRect(rng() * w, rng() * h, size * (0.5 + rng()), size * (0.5 + rng()));
+  }
+}
+
+/** Worn asphalt: one tile spans ~8 m. */
+export function makeAsphaltTexture(): THREE.CanvasTexture {
+  return cachedSurface('asphalt', () => {
+    const size = 512;
+    const c = makeCanvas(size, size);
+    const ctx = c.getContext('2d')!;
+    const rng = seeded(1234);
+    ctx.fillStyle = '#3e4147';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 24; i++) {
+      ctx.fillStyle = rng() < 0.5 ? 'rgba(20,22,26,0.18)' : 'rgba(90,94,100,0.12)';
+      ctx.beginPath();
+      ctx.ellipse(rng() * size, rng() * size, 40 + rng() * 120, 20 + rng() * 60, rng() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    speckle(ctx, size, size, 9000, rng, 0.08, 2);
+    speckle(ctx, size, size, 1500, rng, 0.16, 1);
+    return c;
+  });
+}
+
+/** York-stone paving slabs: one tile spans ~4 m (slabs ~0.66 m). */
+export function makePavingTexture(): THREE.CanvasTexture {
+  return cachedSurface('paving', () => {
+    const size = 512;
+    const c = makeCanvas(size, size);
+    const ctx = c.getContext('2d')!;
+    const rng = seeded(777);
+    const cols = 6;
+    const rows = 6;
+    const cw = size / cols;
+    const rh = size / rows;
+    for (let r = 0; r < rows; r++) {
+      const offset = (r % 2) * (cw / 2);
+      for (let col = -1; col < cols + 1; col++) {
+        const tone = 128 + Math.floor((rng() - 0.5) * 26);
+        ctx.fillStyle = `rgb(${tone + 6},${tone},${tone - 10})`;
+        ctx.fillRect(col * cw + offset, r * rh, cw, rh);
+      }
+    }
+    ctx.strokeStyle = 'rgba(40,36,30,0.55)';
+    ctx.lineWidth = 3;
+    for (let r = 0; r <= rows; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, r * rh);
+      ctx.lineTo(size, r * rh);
+      ctx.stroke();
+      const offset = (r % 2) * (cw / 2);
+      for (let col = 0; col <= cols; col++) {
+        ctx.beginPath();
+        ctx.moveTo(col * cw + offset, r * rh);
+        ctx.lineTo(col * cw + offset, (r + 1) * rh);
+        ctx.stroke();
+      }
+    }
+    speckle(ctx, size, size, 5000, rng, 0.07, 2);
+    return c;
+  });
+}
+
+/** Mown lawn: one tile spans ~6 m. */
+export function makeGrassTexture(): THREE.CanvasTexture {
+  return cachedSurface('grass', () => {
+    const size = 256;
+    const c = makeCanvas(size, size);
+    const ctx = c.getContext('2d')!;
+    const rng = seeded(4242);
+    ctx.fillStyle = '#4c7a37';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 2400; i++) {
+      ctx.fillStyle = rng() < 0.5 ? 'rgba(112,160,70,0.35)' : 'rgba(40,74,30,0.35)';
+      ctx.fillRect(rng() * size, rng() * size, 2, 4 + rng() * 6);
+    }
+    return c;
+  });
+}
+
+const FASCIA_COLORS = ['#1f4d3a', '#5a1f24', '#1e2f57', '#2b2b2e', '#6a3d1f'];
+
+function shade(hexColor: string, amount: number): string {
+  const n = parseInt(hexColor.slice(1), 16);
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const r = ch(((n >> 16) & 255) * amount);
+  const g = ch(((n >> 8) & 255) * amount);
+  const b = ch((n & 255) * amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+/**
+ * A terraced-house facade: ground floor with shopfront + fascia, `floors` upper storeys
+ * of sash windows (some lit), string courses, cornice. Sized so that one texture maps to
+ * exactly one building face — `cols` windows across, `floors` storeys up.
+ */
+export function makeFacadeTexture(cols: number, floors: number, wallHex: string, variant: number): THREE.CanvasTexture {
+  const key = `facade-${cols}-${floors}-${wallHex}-${variant}`;
+  return cachedSurface(key, () => {
+    const cellW = 128;
+    const groundH = 160;
+    const floorH = 128;
+    const w = Math.max(1, cols) * cellW;
+    const h = groundH + Math.max(0, floors) * floorH;
+    const c = makeCanvas(w, h);
+    const ctx = c.getContext('2d')!;
+    const rng = seeded(cols * 7919 + floors * 104729 + variant * 31 + wallHex.length);
+
+    ctx.fillStyle = wallHex;
+    ctx.fillRect(0, 0, w, h);
+    speckle(ctx, w, h, Math.floor((w * h) / 90), rng, 0.05, 3);
+
+    // Cornice + parapet band at the very top
+    ctx.fillStyle = shade(wallHex, 1.25);
+    ctx.fillRect(0, 0, w, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(0, 14, w, 4);
+
+    // Upper storeys (drawn top-down; row 0 is the top floor)
+    for (let f = 0; f < floors; f++) {
+      const y0 = 18 + f * floorH;
+      ctx.fillStyle = 'rgba(0,0,0,0.10)';
+      ctx.fillRect(0, y0 + floorH - 3, w, 3);
+      for (let col = 0; col < cols; col++) {
+        const x0 = col * cellW;
+        const wx = x0 + 34;
+        const wy = y0 + 26;
+        const ww = 60;
+        const wh = 82;
+        ctx.fillStyle = shade(wallHex, 1.35);
+        ctx.fillRect(wx - 6, wy - 6, ww + 12, wh + 12);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(wx - 6, wy + wh + 6, ww + 12, 5);
+        const lit = rng() < 0.16;
+        const g = ctx.createLinearGradient(0, wy, 0, wy + wh);
+        if (lit) {
+          g.addColorStop(0, '#f6dc9c');
+          g.addColorStop(1, '#d9b070');
+        } else {
+          g.addColorStop(0, '#5b6b80');
+          g.addColorStop(0.5, '#2e3644');
+          g.addColorStop(1, '#232a36');
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(wx, wy, ww, wh);
+        ctx.fillStyle = shade(wallHex, 1.5);
+        ctx.fillRect(wx + ww / 2 - 2, wy, 4, wh);
+        ctx.fillRect(wx, wy + wh / 2 - 2, ww, 4);
+      }
+    }
+
+    // Ground floor: plinth, shopfront glazing, fascia sign
+    const gy = h - groundH;
+    ctx.fillStyle = shade(wallHex, 0.8);
+    ctx.fillRect(0, gy, w, groundH);
+    ctx.fillStyle = FASCIA_COLORS[variant % FASCIA_COLORS.length];
+    ctx.fillRect(0, gy + 6, w, 30);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(0, gy + 34, w, 3);
+    for (let col = 0; col < cols; col++) {
+      const x0 = col * cellW;
+      const isDoor = cols > 1 && col === Math.floor(cols / 2) && variant % 2 === 0;
+      const g = ctx.createLinearGradient(0, gy + 44, 0, h - 14);
+      g.addColorStop(0, isDoor ? '#3a2a1e' : '#6c7f96');
+      g.addColorStop(1, isDoor ? '#241a12' : '#2c3542');
+      ctx.fillStyle = g;
+      ctx.fillRect(x0 + 16, gy + 44, cellW - 32, groundH - 58);
+      ctx.fillStyle = shade(wallHex, 0.55);
+      ctx.fillRect(x0 + 10, gy + 40, 6, groundH - 50);
+      ctx.fillRect(x0 + cellW - 16, gy + 40, 6, groundH - 50);
+    }
+    ctx.fillStyle = '#3a3a3c';
+    ctx.fillRect(0, h - 14, w, 14);
+    return c;
+  });
+}

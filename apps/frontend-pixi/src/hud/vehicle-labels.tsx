@@ -49,7 +49,7 @@ export function VehicleLabels({ world, sceneVersion, getVehicles, hidden, onVehi
     taxi: myPlayer?.taxiTickets ?? 0,
     bus: myPlayer?.busTickets ?? 0,
     underground: myPlayer?.undergroundTickets ?? 0,
-    river: Infinity, // river is free for the culprit
+    river: myPlayer?.secretTickets ?? 0,
   };
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export function VehicleLabels({ world, sceneVersion, getVehicles, hidden, onVehi
         padding: '6px 10px',
         fontSize: '12px',
         color: '#fff',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontFamily: 'var(--font-ui)',
         // Labels are the primary click target in aerial view — the 3D vehicles can be
         // tiny in screen space, but the label pill is always readable and clickable.
         pointerEvents: onVehicleClick && !empty ? 'auto' : 'none',

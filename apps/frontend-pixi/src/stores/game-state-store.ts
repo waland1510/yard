@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import type { Player, RoleType, Move, MoveType, Status, GameState } from '@yard/shared-utils';
 import type { ConnectionStatus } from '../net/websocket-client';
 import type { ThemeName } from '../core/theme-registry';
+import { deriveWinner } from '../core/move-validator';
 
 export interface GameSession {
   /** Server channel for this game (URL slug). */
@@ -20,6 +21,8 @@ export interface GameSession {
   currentTurn: RoleType;
   /** Active vs finished. */
   status: Status;
+  /** Who won, once finished. Null while active or when it cannot be determined. */
+  winner: RoleType | null;
   /** Server tells us when Mr. X is mid-double. */
   isDoubleMove: boolean;
   /** Current websocket connection status. */
@@ -42,8 +45,8 @@ export interface GameStateStore extends GameSession {
   setCurrentTurn(role: RoleType): void;
   /** Toggle mid-double-move flag. */
   setIsDoubleMove(v: boolean): void;
-  /** Move to finished + record winner reason. */
-  setFinished(): void;
+  /** Move to finished and record the winning role (null if unknown). */
+  setFinished(winner?: RoleType | null): void;
   /** Set the channel (called on first connect). */
   setChannel(channel: string): void;
   /** Set the theme (locked at game create). */
@@ -63,6 +66,7 @@ const INITIAL: GameSession = {
   moves: [],
   currentTurn: 'culprit',
   status: 'active',
+  winner: null,
   isDoubleMove: false,
   connection: 'idle',
   occupiedRoles: new Set<string>(),
@@ -72,15 +76,22 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
   ...INITIAL,
 
   applyServerState(snapshot) {
-    set((s) => ({
-      players: snapshot.players ?? s.players,
-      moves: snapshot.moves ?? s.moves,
-      currentTurn: snapshot.currentTurn ?? s.currentTurn,
-      status: snapshot.status ?? s.status,
+    set((s) => {
+      const players = snapshot.players ?? s.players;
+      const moves = snapshot.moves ?? s.moves;
+      const status = snapshot.status ?? s.status;
+      return {
+        players,
+        moves,
+        status,
+        winner:
+          s.winner ?? (status === 'finished' ? deriveWinner(undefined, players, moves) : null),
+        currentTurn: snapshot.currentTurn ?? s.currentTurn,
       isDoubleMove: snapshot.isDoubleMove ?? s.isDoubleMove,
-      theme: (snapshot.theme as ThemeName | undefined) ?? s.theme,
-      channel: snapshot.channel ?? s.channel,
-    }));
+        theme: (snapshot.theme as ThemeName | undefined) ?? s.theme,
+        channel: snapshot.channel ?? s.channel,
+      };
+    });
   },
 
   appendMove(move) {
@@ -125,8 +136,8 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
     set({ isDoubleMove: v });
   },
 
-  setFinished() {
-    set({ status: 'finished' });
+  setFinished(winner = null) {
+    set({ status: 'finished', winner });
   },
 
   setChannel(channel) {

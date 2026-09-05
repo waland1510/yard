@@ -33,7 +33,7 @@ export function buildBelishaBeacon(
     addMat(new THREE.MeshStandardMaterial({
       color: BELISHA_AMBER,
       emissive: BELISHA_AMBER,
-      emissiveIntensity: 1.2,
+      emissiveIntensity: 3.4,
       roughness: 0.4,
     }))
   );
@@ -151,7 +151,7 @@ export function buildTrafficLightPole(
   group.add(head);
   // Three lights — red lit, others dim
   const lights: Array<{ y: number; color: number; emissive: number; intensity: number }> = [
-    { y: 4.75, color: 0xc73a3a, emissive: 0xc73a3a, intensity: 1.4 },
+    { y: 4.75, color: 0xc73a3a, emissive: 0xc73a3a, intensity: 3.4 },
     { y: 4.4, color: 0xc7a13a, emissive: 0xc7a13a, intensity: 0.05 },
     { y: 4.05, color: 0x3ac76a, emissive: 0x3ac76a, intensity: 0.05 },
   ];

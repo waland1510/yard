@@ -68,7 +68,7 @@ export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo, mapHint }: 
             <span style={destNumber}>· #{hoveredInfo.destinationNodeId}</span>
           </div>
           <div style={actionMeta}>
-            uses 1 {labelFor(hoveredInfo.kind).toLowerCase()} ticket · {hoveredInfo.ticketsRemaining - 1} left after
+            uses 1 {hoveredInfo.kind === 'river' ? 'secret' : labelFor(hoveredInfo.kind).toLowerCase()} ticket · {hoveredInfo.ticketsRemaining - 1} left after
           </div>
         </div>
       )}
@@ -103,7 +103,7 @@ function Ticket({ label, count, color, icon }: { label: string; count: number; c
 
 const topBar: React.CSSProperties = {
   position: 'fixed',
-  top: 18,
+  top: 108,
   left: '50%',
   transform: 'translateX(-50%)',
   display: 'flex',

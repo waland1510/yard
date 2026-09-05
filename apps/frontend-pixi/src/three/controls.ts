@@ -37,10 +37,11 @@ export interface PovControls {
   disable: () => void;
   detach: () => void;
   setEnabled: (b: boolean) => void;
-  /** Re-park the camera at the default forward-facing orientation (called on node
-   *  change / after a ride completes). Does not auto-request pointer lock — the
-   *  caller owns lock acquisition via user-gesture handlers. */
-  resetView: () => void;
+  /** Re-park the camera at eye height facing `yaw` radians around world Y (0 = north,
+   *  -PI/2 = east). Called on node change / after a ride completes. Does not
+   *  auto-request pointer lock — the caller owns lock acquisition via user-gesture
+   *  handlers. */
+  resetView: (yaw?: number) => void;
   /** True while document.pointerLockElement === canvas. The game.tsx
    *  pointerlockchange listener mirrors this into React state. */
   isPointerLocked: () => boolean;
@@ -73,8 +74,8 @@ export function createPovControls({
     camera.quaternion.setFromEuler(euler);
   }
 
-  function resetView() {
-    yaw = 0;
+  function resetView(startYaw = 0) {
+    yaw = startYaw;
     pitch = 0;
     camera.position.set(0, EYE_HEIGHT, 0);
     applyOrientation();
