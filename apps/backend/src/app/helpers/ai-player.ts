@@ -11,6 +11,7 @@ import {
   VALID_STARTING_NODES,
 } from '@yard/shared-utils';
 import { decideLocalMove } from './local-move-decision';
+import { DetectiveDecision, DetectiveDecisionArbiter } from './ai-decision-arbiter';
 
 type NodeConnections = {
   taxi?: number[];
@@ -242,13 +243,48 @@ function shouldUseDouble(culprit: Player, targetPosition: number, detectives: Pl
 }
 
 export class AIPlayerService {
+  constructor(private readonly arbiter = new DetectiveDecisionArbiter()) {}
+
+  /** Detective turn with the full two-policy comparison record. Returns null when the
+   *  detective has no legal move (stranded) and the turn should be passed. */
+  async calculateDetectiveDecision(
+    gameState: GameState,
+    detective: Player
+  ): Promise<DetectiveDecision | null> {
+    try {
+      return await this.arbiter.decide(gameState, detective);
+    } catch (error) {
+      console.error(`[AI Error] ${detective.role}:`, (error as Error).message);
+      try {
+        const move = calculateDetectiveMove(gameState, detective);
+        return {
+          move,
+          source: 'heuristic',
+          comparison: {
+            role: detective.role,
+            moveIndex: gameState.moves.length,
+            chosen: 'heuristic',
+            agree: false,
+            jevEnabled: false,
+            heuristic: { move, rankInJev: null },
+            jev: null,
+            jevError: (error as Error).message,
+          },
+        };
+      } catch {
+        return null;
+      }
+    }
+  }
+
   async calculateMove(gameState: GameState, player: Player): Promise<Move> {
     try {
       if (player.role === 'culprit') {
         return calculateCulpritMove(gameState, player);
-      } else {
-        return calculateDetectiveMove(gameState, player);
       }
+      const decision = await this.calculateDetectiveDecision(gameState, player);
+      if (decision) return decision.move;
+      return calculateDetectiveMove(gameState, player);
     } catch (error) {
       console.error(`[AI Error] ${player.role}:`, (error as Error).message);
       return decideLocalMove(gameState, player);

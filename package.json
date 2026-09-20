@@ -19,6 +19,7 @@
     "@googlemaps/js-api-loader": "^2.0.2",
     "@neondatabase/serverless": "^0.10.4",
     "@types/three": "^0.184.1",
+    "@typesafe-ai/sdk": "^0.6.0",
     "axios": "^1.6.0",
     "drizzle-orm": "^0.38.4",
     "fastify": "^5.2.0",

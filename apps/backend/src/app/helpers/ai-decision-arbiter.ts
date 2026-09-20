@@ -1,0 +1,129 @@
+import {
+  AiDecisionComparison,
+  GAME_GRAPH,
+  GameState,
+  Move,
+  Player,
+  RoleType,
+  buildDetectivesByTurn,
+  computePossiblePositions,
+  VALID_STARTING_NODES,
+} from '@yard/shared-utils';
+import { TacticalPicture } from './detective-policy';
+import { HeuristicDetectivePolicy } from './heuristic-detective-policy';
+import { JevDetectivePolicy, JevPolicyResult } from './jev-detective-policy';
+import { jevEnabled } from './jev-client';
+import { ENV } from './env';
+import { buildTacticalPicture } from './move-candidates';
+
+export interface DetectiveDecision {
+  move: Move;
+  source: 'jev' | 'heuristic';
+  comparison: AiDecisionComparison;
+}
+
+function sameMove(a: Move, b: Move): boolean {
+  return a.position === b.position && a.type === b.type;
+}
+
+export function deductionFor(gameState: GameState) {
+  const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
+
+  if (culpritMoves.length === 0) {
+    const possible = new Set(VALID_STARTING_NODES);
+    const uniform = 1 / (possible.size || 1);
+    return {
+      possible,
+      weights: new Map([...possible].map(n => [n, uniform])),
+    };
+  }
+
+  const detectiveStartPositions = new Set(
+    gameState.players.filter(p => p.role !== 'culprit').map(p => p.position)
+  );
+  const detectivesByTurn = buildDetectivesByTurn(gameState.moves, gameState.players);
+
+  return computePossiblePositions(
+    culpritMoves,
+    GAME_GRAPH,
+    detectivesByTurn,
+    detectiveStartPositions
+  );
+}
+
+export class DetectiveDecisionArbiter {
+  constructor(
+    private readonly heuristic = new HeuristicDetectivePolicy(),
+    private readonly jev = new JevDetectivePolicy()
+  ) {}
+
+  async decide(gameState: GameState, detective: Player): Promise<DetectiveDecision | null> {
+    const { possible, weights } = deductionFor(gameState);
+    const picture: TacticalPicture = buildTacticalPicture({
+      gameState,
+      detective,
+      possible,
+      weights,
+    });
+
+    const enabled = jevEnabled();
+
+    const [heuristicResult, jevOutcome] = await Promise.all([
+      this.heuristic.decide(gameState, detective, picture),
+      enabled
+        ? this.jev
+            .decide(gameState, detective, picture)
+            .then(result => ({ result, error: undefined as string | undefined }))
+            .catch(error => ({
+              result: null as JevPolicyResult | null,
+              error: (error as Error).message,
+            }))
+        : Promise.resolve({ result: null as JevPolicyResult | null, error: undefined }),
+    ]);
+
+    const jevResult = jevOutcome.result;
+    const jevUsable =
+      jevResult !== null && jevResult.details.confidence >= ENV.JEV_MIN_CONFIDENCE;
+
+    if (!heuristicResult && !jevUsable) return null;
+
+    const source: 'jev' | 'heuristic' = jevUsable ? 'jev' : 'heuristic';
+    const move = jevUsable ? jevResult!.move : heuristicResult!.move;
+
+    const heuristicMove = heuristicResult?.move ?? move;
+    const rankInJev = jevResult
+      ? (() => {
+          const index = jevResult.ranked.findIndex(key => {
+            const candidate = picture.candidates.find(c => c.key === key);
+            return candidate ? sameMove(candidate.move, heuristicMove) : false;
+          });
+          return index === -1 ? null : index;
+        })()
+      : null;
+
+    const comparison: AiDecisionComparison = {
+      role: detective.role as RoleType,
+      moveIndex: gameState.moves.length,
+      chosen: source,
+      agree: jevResult ? sameMove(jevResult.move, heuristicMove) : false,
+      jevEnabled: enabled,
+      heuristic: { move: heuristicMove, rankInJev },
+      jev: jevResult
+        ? {
+            move: jevResult.move,
+            confidence: jevResult.details.confidence,
+            model: jevResult.details.model,
+            latencyMs: jevResult.details.latencyMs,
+            top: jevResult.ranked.slice(0, 5).map(key => ({
+              key,
+              move: picture.candidates.find(c => c.key === key)!.move,
+              probability: jevResult.details.probabilities[key] ?? 0,
+            })),
+          }
+        : null,
+      ...(jevOutcome.error ? { jevError: jevOutcome.error } : {}),
+    };
+
+    return { move, source, comparison };
+  }
+}

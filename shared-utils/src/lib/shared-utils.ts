@@ -117,6 +117,35 @@ export interface Move {
 
 export type MoveType = 'taxi' | 'bus' | 'underground' | 'river';
 
+export interface AiDecisionCandidate {
+  key: string;
+  move: Move;
+  probability: number;
+}
+
+/** Side-by-side record of the two detective deciders for one AI move. Debug/telemetry
+ *  only — never an input to game rules. Absent when the mover was human. */
+export interface AiDecisionComparison {
+  role: RoleType;
+  moveIndex: number;
+  chosen: 'jev' | 'heuristic';
+  agree: boolean;
+  jevEnabled: boolean;
+  heuristic: {
+    move: Move;
+    /** Index of the heuristic pick inside Jev's ranking, or null when Jev did not answer. */
+    rankInJev: number | null;
+  };
+  jev: {
+    move: Move;
+    confidence: number;
+    model: string;
+    latencyMs: number;
+    top: AiDecisionCandidate[];
+  } | null;
+  jevError?: string;
+}
+
 export type MessageType =
   | 'startGame'
   | 'joinGame'
@@ -163,6 +192,7 @@ export interface Message {
     secret?: boolean;
     double?: boolean;
     isAI?: boolean;
+    aiDecision?: AiDecisionComparison;
     gameState?: GameState;
     player?: Player;
     players?: Player[];
