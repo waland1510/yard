@@ -1,5 +1,5 @@
 import { IpInfo, Move } from '@yard/shared-utils';
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { gamesTable, ipInfoTable, movesTable, playersTable } from '../helpers/pg-tables';
 import { ENV } from './env';
@@ -40,6 +40,7 @@ export async function createGame(channel: string, players: any[], currentTurn: s
         .select()
         .from(playersTable)
         .where(eq(playersTable.gameId, gameId))
+        .orderBy(asc(playersTable.id))
         .execute();
 
       return { ...game, players: insertedPlayers };

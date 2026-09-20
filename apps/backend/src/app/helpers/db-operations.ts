@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { gamesTable, playersTable, movesTable } from '../helpers/pg-tables';
 import { GameState } from '@yard/shared-utils';
 
@@ -30,12 +30,16 @@ export async function hasActiveGame(channel: string): Promise<GameState | null> 
       .select()
       .from(playersTable)
       .where(eq(playersTable.gameId, gameId))
+      .orderBy(asc(playersTable.id))
       .execute() as GameState['players'];
 
+    // The deduction engine replays this log positionally, so chronological order is a
+    // correctness requirement, not a nicety. Postgres gives no order without ORDER BY.
     const moves = await db
       .select()
       .from(movesTable)
       .where(eq(movesTable.gameId, gameId))
+      .orderBy(asc(movesTable.id))
       .execute() as GameState['moves'];
 
     return { ...game, players, moves };

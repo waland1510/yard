@@ -26,29 +26,35 @@ function sameMove(a: Move, b: Move): boolean {
   return a.position === b.position && a.type === b.type;
 }
 
+function uniformOverStartingNodes() {
+  const possible = new Set(VALID_STARTING_NODES);
+  const uniform = 1 / (possible.size || 1);
+  return { possible, weights: new Map([...possible].map(n => [n, uniform])) };
+}
+
+/** Possible Mr. X positions, or a uniform prior when the log cannot be replayed.
+ *  The engine is a planning aid: a violated invariant degrades the AI's targeting,
+ *  it must never abort the turn. */
 export function deductionFor(gameState: GameState) {
   const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
-
-  if (culpritMoves.length === 0) {
-    const possible = new Set(VALID_STARTING_NODES);
-    const uniform = 1 / (possible.size || 1);
-    return {
-      possible,
-      weights: new Map([...possible].map(n => [n, uniform])),
-    };
-  }
+  if (culpritMoves.length === 0) return uniformOverStartingNodes();
 
   const detectiveStartPositions = new Set(
     gameState.players.filter(p => p.role !== 'culprit').map(p => p.position)
   );
   const detectivesByTurn = buildDetectivesByTurn(gameState.moves, gameState.players);
 
-  return computePossiblePositions(
-    culpritMoves,
-    GAME_GRAPH,
-    detectivesByTurn,
-    detectiveStartPositions
-  );
+  try {
+    return computePossiblePositions(
+      culpritMoves,
+      GAME_GRAPH,
+      detectivesByTurn,
+      detectiveStartPositions
+    );
+  } catch (error) {
+    console.warn(`[Deduction] falling back to uniform prior: ${(error as Error).message}`);
+    return uniformOverStartingNodes();
+  }
 }
 
 export class DetectiveDecisionArbiter {
