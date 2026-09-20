@@ -9,7 +9,7 @@ import {
   computePossiblePositions,
   VALID_STARTING_NODES,
 } from '@yard/shared-utils';
-import { TacticalPicture } from './detective-policy';
+import { PolicyResult, TacticalPicture } from './detective-policy';
 import { HeuristicDetectivePolicy } from './heuristic-detective-policy';
 import { JevDetectivePolicy, JevPolicyResult } from './jev-detective-policy';
 import { jevEnabled } from './jev-client';
@@ -85,10 +85,11 @@ export class DetectiveDecisionArbiter {
     const jevUsable =
       jevResult !== null && jevResult.details.confidence >= ENV.JEV_MIN_CONFIDENCE;
 
-    if (!heuristicResult && !jevUsable) return null;
+    const usableJev = jevUsable ? jevResult : null;
+    if (!heuristicResult && !usableJev) return null;
 
-    const source: 'jev' | 'heuristic' = jevUsable ? 'jev' : 'heuristic';
-    const move = jevUsable ? jevResult!.move : heuristicResult!.move;
+    const source: 'jev' | 'heuristic' = usableJev ? 'jev' : 'heuristic';
+    const move = usableJev ? usableJev.move : (heuristicResult as PolicyResult).move;
 
     const heuristicMove = heuristicResult?.move ?? move;
     const rankInJev = jevResult
@@ -114,11 +115,19 @@ export class DetectiveDecisionArbiter {
             confidence: jevResult.details.confidence,
             model: jevResult.details.model,
             latencyMs: jevResult.details.latencyMs,
-            top: jevResult.ranked.slice(0, 5).map(key => ({
-              key,
-              move: picture.candidates.find(c => c.key === key)!.move,
-              probability: jevResult.details.probabilities[key] ?? 0,
-            })),
+            top: jevResult.ranked
+              .slice(0, 5)
+              .flatMap(key => {
+                const candidate = picture.candidates.find(c => c.key === key);
+                if (!candidate) return [];
+                return [
+                  {
+                    key,
+                    move: candidate.move,
+                    probability: jevResult.details.probabilities[key] ?? 0,
+                  },
+                ];
+              }),
           }
         : null,
       ...(jevOutcome.error ? { jevError: jevOutcome.error } : {}),

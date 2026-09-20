@@ -32,12 +32,26 @@
 ## Environment Variables
 
 ```
-DATABASE_URL      PostgreSQL connection string (Neon)
-OPENROUTER_API_KEY AI API key
-FRONTEND_URL      Allowed CORS origin
-HOST              Server host (default: 0.0.0.0)
-PORT              Server port (default: 3000)
+DATABASE_URL         PostgreSQL connection string (Neon)
+OPENROUTER_API_KEY   AI API key
+GEMINI_API_KEY       AI API key (alternate provider)
+TYPESAFE_API_KEY     Jev decision model key. Absent → Jev disabled, heuristic only.
+AI_DETECTIVE_POLICY  jev | heuristic (default: jev when a key is present)
+JEV_MODEL            Jev model id (default: jev-latest)
+JEV_TIMEOUT_MS       Per-attempt timeout for a Jev call (default: 4000)
+JEV_MIN_CONFIDENCE   Below this Jev confidence, fall back to the heuristic (default: 0)
+FRONTEND_URL         Allowed CORS origin
+HOST                 Server host (default: 0.0.0.0)
+PORT                 Server port (default: 3000)
 ```
+
+## Detective AI
+
+Two policies decide detective moves. The heuristic always runs. When
+`TYPESAFE_API_KEY` is set, a Jev policy runs concurrently and is preferred; on
+error, timeout, or low confidence the heuristic's move is used instead. Both
+picks travel to the client as `aiDecision` on the `makeMove` broadcast and
+render in the Ctrl+D debug overlay. Never log the API key.
 
 ## Commands
 

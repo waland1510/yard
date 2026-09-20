@@ -21,7 +21,7 @@ Promote `apps/frontend-pixi` to a complete game by building 24 deep modules, org
 3. **3D world** (Three.js) — `world-scene`, `intersection-builder`, `vehicle-spawner`, `ride-controller`, `pov-controls`. The first-person rendering, vehicle placement and signage, cinematic rides, mouse-look + raycast picking. Reads game state through `game-state-store`/`runner-store` selectors; never makes game decisions itself.
 4. **HUD / React** — `hud-shell`, `move-board-overlay`, `victory-overlay`, `debug-overlay`, `setup-flow`. Setup flow runs before the game. The hud-shell mounts drawers, banners, ticket selector, confirm button, magnify toggle, and notifications. The move-board-overlay is the diegetic paper-map TAB view. The victory and debug overlays are full-screen mounted on game-end or `Ctrl+D`.
 
-The backend stays fully unchanged. Today's broadcasts include Mr. X's actual position in every message (detectives could read it from the network panel), but in practice players don't inspect network traffic during a browser game — so the deduction engine doesn't need to be an *information gate*. It's a **planning aid**: it powers the heatmap, hover-preview ("how would this move narrow my suspect set?"), replay visualization, and the AI's strategic scoring. Players see the deduction surface in the UI but, in theory, can technically peek under the hood; we accept that trade-off in exchange for zero backend churn.
+The backend may change when a feature calls for it (constraint lifted 2026-06-13). Today's broadcasts include Mr. X's actual position in every message (detectives could read it from the network panel), but in practice players don't inspect network traffic during a browser game — so the deduction engine doesn't need to be an *information gate*. It's a **planning aid**: it powers the heatmap, hover-preview ("how would this move narrow my suspect set?"), replay visualization, and the AI's strategic scoring. Players see the deduction surface in the UI but, in theory, can technically peek under the hood; we accept that trade-off.
 
 Visually, the player stays in first-person 99% of the time. The crosshair tells them what they're about to do. In-world labels above each visible vehicle tell them where it goes and what it costs. The HUD shows ticket counts and round/reveal state. TAB opens the diegetic A-Z paper map — a hand-drawn-feeling overlay (camera "tilts down to look at the map in your hands" feel) — with the full London graph, current position, available destinations marked, detective tokens, and the deduction heatmap for the detective. Press TAB again to dismiss and you're back in first-person at the same spot.
 
@@ -216,7 +216,7 @@ A long, deliberately exhaustive list. Organized by phase, not priority. Numbered
 
 - **Layered pipeline**: WebSocket message → `websocket-client` → `game-state-store` (canonical state) → `runner-store` (local-only view state) → pure-logic modules compute derived state → 3D world + HUD subscribe via selectors. Nothing past the store mutates game state.
 - **Pure-logic core is testable without React or Three.js**: `move-validator`, `deduction-engine`, `theme-registry`, `replay-controller`, and `map-data`. Each has a small public surface; each internalizes a lot of rules.
-- **Backend left fully unchanged.** Today's broadcasts include Mr. X's actual position to all clients; the deduction engine is a *planning aid* on top of public information (move log + reveal rounds + ticket history), not an information gate that hides Mr. X from determined network-snoopers. We accept this trade-off — players don't inspect network responses — in exchange for zero backend churn.
+- **Backend is in scope** (the original "untouched" constraint was lifted 2026-06-13). Today's broadcasts include Mr. X's actual position to all clients; the deduction engine is a *planning aid* on top of public information (move log + reveal rounds + ticket history), not an information gate that hides Mr. X from determined network-snoopers. We accept this trade-off — players don't inspect network responses.
 - **WebSocket protocol unchanged**: `joinGame`, `makeMove`, `updateGameState`, `endGame`, `impersonate` continue to use the existing message shapes from `apps/frontend`. `frontend-pixi` re-implements the *client* side fresh; the server treats it as just another client.
 - **Server is the sole authority for valid moves**: the client validator runs to power UX (gray out unaffordable transports, preview heatmap deltas), but the server is the truth.
 - **Stack**: React 18 + Three.js (v0.184) + Zustand 5 + GSAP + react-i18next (existing locales: en, fr, ja, pl, ua) + Chakra UI for HUD chrome (existing dep). No new state library, no new router (single-route app inside `frontend-pixi`).
@@ -225,7 +225,7 @@ A long, deliberately exhaustive list. Organized by phase, not priority. Numbered
 
 ### Locked design decisions
 
-1. **Detective-detective collision is enforced in `move-validator` (client-side).** The validator grays the destination on the paper map, refuses the click in FPV, and shows a red flash + audio cue if attempted. The server is *not* changed (no backend churn — see architecture note above); the same trust-the-client trade-off applies as for the deduction engine. Today humans can ignore the rule because only the AI's heuristic enforces it; the client validator closes that gap for normal play.
+1. **Detective-detective collision is enforced in `move-validator` (client-side).** The validator grays the destination on the paper map, refuses the click in FPV, and shows a red flash + audio cue if attempted. The server is not changed for this rule today; move it server-side if a feature benefits. Today humans can ignore the rule because only the AI's heuristic enforces it; the client validator closes that gap for normal play.
 
 ### Decisions left open (the PRD does not lock these; implementation pass will)
 
@@ -246,7 +246,7 @@ A long, deliberately exhaustive list. Organized by phase, not priority. Numbered
 
 ### Backend changes
 
-None. The backend is left fully untouched. See the trust-the-client trade-off discussed above.
+Allowed when a feature calls for it (AI decisions, presence, companion pairing, persistence). Coordinate `shared-utils` and WebSocket-protocol changes across frontend and backend.
 
 ### Schema (no DB changes)
 
@@ -272,7 +272,6 @@ When the test bar rises in a later PRD, the recommended ordering is: `move-valid
 
 ## Out of Scope
 
-- **Backend changes of any kind**: backend is fully untouched. AI logic, persistence, REST endpoints, game-creation flow, channel allocation, broadcast shape — all unchanged.
 - **AI Culprit**: deferred to v2. The legacy "AI plays Culprit" option remains disabled.
 - **AI detective pursuit fix**: the known broken behavior (detectives flee instead of pursuing) is *not* fixed in this PRD. Tracked as a separate backend issue (see existing memory `project_deduction_engine`).
 - **New themes**: only classic London 1983 + Harry Potter ship at launch.
@@ -311,7 +310,7 @@ Each step ships in isolation; the FPV remains playable (in degraded form) betwee
 ### Known broken things to be aware of
 
 - **Backend AI detective pursuit**: detectives currently flee rather than pursue. See `project_deduction_engine` memory. Out of scope but will be visible during multi-AI play.
-- **Backend leaks Mr. X position in every broadcast**: known and explicitly accepted (see Solution + Architecture). The deduction engine is a planning aid, not an information gate — players in practice don't sniff the network panel. Backend stays untouched.
+- **Backend leaks Mr. X position in every broadcast**: known and explicitly accepted (see Solution + Architecture). The deduction engine is a planning aid, not an information gate — players in practice don't sniff the network panel.
 - **Detective collision is client-only enforced**: same trust-the-client trade-off. A determined player could bypass the validator; in practice they won't.
 - **Impersonate has no auth**: a client can claim any role today. Open decision; default is to keep open semantics with a UI warning.
 - **No idle/disconnect timeout**: games will hang on a disconnected player's turn. Out of scope.

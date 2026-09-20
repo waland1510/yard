@@ -3,10 +3,20 @@
 // no I/O, no Three.js, no React (the store is hookable from React but not React-specific).
 
 import { create } from 'zustand';
-import type { Player, RoleType, Move, MoveType, Status, GameState } from '@yard/shared-utils';
+import type {
+  AiDecisionComparison,
+  Player,
+  RoleType,
+  Move,
+  MoveType,
+  Status,
+  GameState,
+} from '@yard/shared-utils';
 import type { ConnectionStatus } from '../net/websocket-client';
 import type { ThemeName } from '../core/theme-registry';
 import { deriveWinner } from '../core/move-validator';
+
+const MAX_AI_DECISIONS = 20;
 
 export interface GameSession {
   /** Server channel for this game (URL slug). */
@@ -30,11 +40,15 @@ export interface GameSession {
   /** Roles currently held by a connected client in this channel (presence broadcast
    *  from the backend). Used by the JoinOverlay to disable already-taken seats. */
   occupiedRoles: ReadonlySet<string>;
+
+  /** Debug-only ring buffer of AI decider comparisons (last MAX_AI_DECISIONS). */
+  aiDecisions: AiDecisionComparison[];
 }
 
 export interface GameStateStore extends GameSession {
   /** Apply a full server-broadcast snapshot. Idempotent. */
   applyServerState(snapshot: Partial<GameState>): void;
+  recordAiDecision(decision: AiDecisionComparison): void;
   /** Append a move (server-confirmed or optimistic). */
   appendMove(move: Move): void;
   /** Update a player's position (used after a move). */
@@ -70,6 +84,7 @@ const INITIAL: GameSession = {
   isDoubleMove: false,
   connection: 'idle',
   occupiedRoles: new Set<string>(),
+  aiDecisions: [],
 };
 
 export const useGameStateStore = create<GameStateStore>((set) => ({
@@ -154,6 +169,12 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
 
   setOccupiedRoles(roles) {
     set({ occupiedRoles: roles });
+  },
+
+  recordAiDecision(decision) {
+    set((state) => ({
+      aiDecisions: [...state.aiDecisions, decision].slice(-MAX_AI_DECISIONS),
+    }));
   },
 
   reset() {

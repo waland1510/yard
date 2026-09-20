@@ -20,6 +20,7 @@ export function DebugOverlay() {
   const isDoubleMove = useGameStateStore((s) => s.isDoubleMove);
   const connection = useGameStateStore((s) => s.connection);
   const myRole = useRunnerStore((s) => s.myRole);
+  const aiDecisions = useGameStateStore((s) => s.aiDecisions);
 
   // Ctrl+D toggle
   useEffect(() => {
@@ -39,6 +40,13 @@ export function DebugOverlay() {
     if (players.length === 0) return null;
     return runDeduction(moves, players);
   }, [moves, players]);
+
+  const aiAgreement = useMemo(() => {
+    const compared = aiDecisions.filter((d) => d.jev !== null);
+    return { agreed: compared.filter((d) => d.agree).length, total: compared.length };
+  }, [aiDecisions]);
+
+  const latestDecision = aiDecisions[aiDecisions.length - 1] ?? null;
 
   const topWeights = useMemo(() => {
     if (!deduction) return [];
@@ -117,6 +125,66 @@ export function DebugOverlay() {
             value={`${nodeDisplayName(p.position)} (#${p.position}) · taxi ${p.taxiTickets}/bus ${p.busTickets}/und ${p.undergroundTickets}`}
           />
         ))}
+
+      <Section title="AI decision" />
+      {latestDecision ? (
+        <>
+          <Row label="Detective" value={latestDecision.role} />
+          <Row
+            label="Chose"
+            value={
+              latestDecision.chosen === 'jev'
+                ? `Jev${latestDecision.jev ? ` (${(latestDecision.jev.confidence * 100).toFixed(0)}% conf, ${latestDecision.jev.latencyMs}ms)` : ''}`
+                : 'heuristic'
+            }
+            highlight={latestDecision.chosen === 'jev'}
+          />
+          <Row
+            label="Verdict"
+            value={
+              latestDecision.jev === null
+                ? latestDecision.jevEnabled
+                  ? 'Jev unavailable'
+                  : 'Jev off'
+                : latestDecision.agree
+                  ? 'AGREE'
+                  : `DISAGREE (heuristic ranked ${latestDecision.heuristic.rankInJev ?? '—'})`
+            }
+          />
+          {latestDecision.jevError && <Row label="Jev error" value={latestDecision.jevError} />}
+          <Row label="Agreement" value={`${aiAgreement.agreed} / ${aiAgreement.total}`} />
+          {latestDecision.jev && (
+            <div style={{ marginTop: 4 }}>
+              {latestDecision.jev.top.slice(0, 3).map((candidate) => {
+                const isHeuristicPick =
+                  candidate.move.position === latestDecision.heuristic.move.position &&
+                  candidate.move.type === latestDecision.heuristic.move.type;
+                return (
+                  <div key={candidate.key} style={weightRow}>
+                    <span style={weightNode}>
+                      {candidate.move.type} → {nodeDisplayName(candidate.move.position)}
+                      {isHeuristicPick && (
+                        <span style={{ color: '#ffb547' }}> ◄ heuristic</span>
+                      )}
+                    </span>
+                    <span style={weightBar}>
+                      <span
+                        style={{
+                          ...weightBarFill,
+                          width: `${Math.round(candidate.probability * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <span style={weightPct}>{(candidate.probability * 100).toFixed(1)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <Row label="—" value="no AI move yet" />
+      )}
 
       <Section title="Last 6 moves" />
       <div style={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', color: 'rgba(255,255,255,0.7)' }}>

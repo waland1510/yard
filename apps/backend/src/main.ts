@@ -139,14 +139,34 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
   try {
     const nextPlayer = game.players.find(p => p.role === currentTurn);
     if (nextPlayer?.isAI) {
-      console.log('AI player found:', nextPlayer);
       const moveCountBefore = game.moves.length;
-      const aiMove = await aiService.calculateMove(
-        game,
-        nextPlayer as Player
-      );
+      const isCulprit = nextPlayer.role === 'culprit';
 
-      await setTimeout(2000);
+      // The deliberate "AI thinking" beat runs concurrently with the decision so a
+      // remote Jev call costs no extra wall-clock in the common case.
+      const [decision] = await Promise.all([
+        isCulprit
+          ? aiService.calculateMove(game, nextPlayer as Player).then(move => ({
+              move,
+              comparison: null,
+            }))
+          : aiService.calculateDetectiveDecision(game, nextPlayer as Player),
+        setTimeout(2000),
+      ]);
+
+      if (!decision) {
+        server.log.warn(
+          { role: currentTurn, channel: currentChannel },
+          'ai-move-skipped: no legal move'
+        );
+        aiMoveInProgress.delete(lockKey);
+        return;
+      }
+
+      const aiMove = decision.move;
+      if (decision.comparison) {
+        server.log.info({ aiDecision: decision.comparison }, 'ai-decision');
+      }
 
       // Re-check: if a move was already added during the delay, abort
       game = await hasActiveGame(currentChannel);
@@ -184,6 +204,7 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
         data: {
           ...aiMove,
           currentTurn: nextTurn,
+          ...(decision.comparison ? { aiDecision: decision.comparison } : {}),
         },
       });
 

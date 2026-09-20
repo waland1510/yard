@@ -305,6 +305,7 @@ export function Game() {
         },
         onMakeMove: (m) => {
           const store = useGameStateStore.getState();
+          if (m.aiDecision) store.recordAiDecision(m.aiDecision);
           // Server echoes the sender's own moves. If the last move in our log already
           // matches this broadcast, we applied it optimistically — skip the duplicate
           // append and only sync the turn/double-move flags.

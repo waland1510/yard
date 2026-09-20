@@ -2,7 +2,15 @@
 // Handles connect, reconnect, JSON framing, and dispatch via typed callbacks.
 // Does NOT know about Zustand or game state — callers wire the events.
 
-import type { Message, MessageType, Move, RoleType, GameState, CompanionDevice } from '@yard/shared-utils';
+import type {
+  AiDecisionComparison,
+  Message,
+  MessageType,
+  Move,
+  RoleType,
+  GameState,
+  CompanionDevice,
+} from '@yard/shared-utils';
 
 const RECONNECT_MS = 4000;
 
@@ -18,6 +26,7 @@ export interface WSHandlers {
     secret?: boolean;
     double?: boolean;
     currentTurn?: RoleType;
+    aiDecision?: AiDecisionComparison;
   }) => void;
   onEndGame?: (payload: { winner?: string; reason?: string }) => void;
   onJoinGame?: (payload: { role?: RoleType; username?: string }) => void;
@@ -97,6 +106,7 @@ export function createWebSocketClient(url?: string): WebSocketClient {
           secret: data.secret,
           double: data.double,
           currentTurn: data.currentTurn,
+          aiDecision: data.aiDecision,
         });
         break;
       case 'endGame':
