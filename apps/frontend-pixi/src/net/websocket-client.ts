@@ -4,6 +4,7 @@
 
 import type {
   AiDecisionComparison,
+  AiProposal,
   Message,
   MessageType,
   Move,
@@ -29,6 +30,8 @@ export interface WSHandlers {
     aiDecision?: AiDecisionComparison;
   }) => void;
   onEndGame?: (payload: { winner?: string; reason?: string }) => void;
+  /** Both AI deciders disagreed; the server wants a human to pick. */
+  onAiProposal?: (proposal: AiProposal) => void;
   onJoinGame?: (payload: { role?: RoleType; username?: string }) => void;
   onImpersonate?: (payload: { role?: RoleType }) => void;
   onPresence?: (payload: { members: Array<{ role: string; username: string }> }) => void;
@@ -111,6 +114,9 @@ export function createWebSocketClient(url?: string): WebSocketClient {
         break;
       case 'endGame':
         handlers.onEndGame?.({ winner: data.winner, reason: data.reason });
+        break;
+      case 'aiProposal':
+        if (data.proposal) handlers.onAiProposal?.(data.proposal);
         break;
       case 'joinGame':
         handlers.onJoinGame?.({ role: data.role, username: data.username });

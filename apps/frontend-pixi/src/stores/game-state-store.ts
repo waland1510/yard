@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import type {
   AiDecisionComparison,
+  AiProposal,
   Player,
   RoleType,
   Move,
@@ -43,12 +44,15 @@ export interface GameSession {
 
   /** Debug-only ring buffer of AI decider comparisons (last MAX_AI_DECISIONS). */
   aiDecisions: AiDecisionComparison[];
+  /** Open decider disagreement awaiting a human pick; cleared when the move lands. */
+  aiProposal: AiProposal | null;
 }
 
 export interface GameStateStore extends GameSession {
   /** Apply a full server-broadcast snapshot. Idempotent. */
   applyServerState(snapshot: Partial<GameState>): void;
   recordAiDecision(decision: AiDecisionComparison): void;
+  setAiProposal(proposal: AiProposal | null): void;
   /** Append a move (server-confirmed or optimistic). */
   appendMove(move: Move): void;
   /** Update a player's position (used after a move). */
@@ -85,6 +89,7 @@ const INITIAL: GameSession = {
   connection: 'idle',
   occupiedRoles: new Set<string>(),
   aiDecisions: [],
+  aiProposal: null,
 };
 
 export const useGameStateStore = create<GameStateStore>((set) => ({
@@ -175,6 +180,10 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
     set((state) => ({
       aiDecisions: [...state.aiDecisions, decision].slice(-MAX_AI_DECISIONS),
     }));
+  },
+
+  setAiProposal(proposal) {
+    set({ aiProposal: proposal });
   },
 
   reset() {

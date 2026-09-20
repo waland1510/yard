@@ -117,6 +117,25 @@ export interface Move {
 
 export type MoveType = 'taxi' | 'bus' | 'underground' | 'river';
 
+export type AiDecisionSource = 'jev' | 'heuristic';
+
+export interface AiProposalOption {
+  source: AiDecisionSource;
+  move: Move;
+  confidence?: number;
+}
+
+/** Offered when the two detective deciders disagree on an AI detective's move. The turn
+ *  waits for an `aiChoice` naming one source, or falls back to the heuristic at `expiresAt`. */
+export interface AiProposal {
+  id: string;
+  role: RoleType;
+  moveIndex: number;
+  options: AiProposalOption[];
+  expiresAt: number;
+  comparison: AiDecisionComparison;
+}
+
 export interface AiDecisionCandidate {
   key: string;
   move: Move;
@@ -166,7 +185,10 @@ export type MessageType =
   | 'companionRelay'
   | 'companionPing'
   | 'companionPong'
-  | 'pairUnlink';
+  | 'pairUnlink'
+  // AI decider disagreement: the server offers both moves, a human picks one.
+  | 'aiProposal'
+  | 'aiChoice';
 
 export interface PresenceMember {
   role: string;
@@ -193,6 +215,9 @@ export interface Message {
     double?: boolean;
     isAI?: boolean;
     aiDecision?: AiDecisionComparison;
+    proposal?: AiProposal;
+    proposalId?: string;
+    source?: AiDecisionSource;
     gameState?: GameState;
     player?: Player;
     players?: Player[];

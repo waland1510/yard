@@ -36,7 +36,8 @@ DATABASE_URL         PostgreSQL connection string (Neon)
 OPENROUTER_API_KEY   AI API key
 GEMINI_API_KEY       AI API key (alternate provider)
 TYPESAFE_API_KEY     Jev decision model key. Absent → Jev disabled, heuristic only.
-AI_DETECTIVE_POLICY  jev | heuristic (default: jev when a key is present)
+AI_DETECTIVE_POLICY  choose | jev | heuristic (default: choose). `choose` offers disagreements to humans.
+AI_CHOICE_TIMEOUT_MS How long a proposal waits for a human pick before the heuristic plays (default: 30000)
 JEV_MODEL            Jev model id (default: jev-latest)
 JEV_TIMEOUT_MS       Per-attempt timeout for a Jev call (default: 4000)
 JEV_MIN_CONFIDENCE   Below this Jev confidence, fall back to the heuristic (default: 0)
@@ -48,9 +49,18 @@ PORT                 Server port (default: 3000)
 ## Detective AI
 
 Two policies decide detective moves. The heuristic always runs. When
-`TYPESAFE_API_KEY` is set, a Jev policy runs concurrently and is preferred; on
-error, timeout, or low confidence the heuristic's move is used instead. Both
-picks travel to the client as `aiDecision` on the `makeMove` broadcast and
+`TYPESAFE_API_KEY` is set, a Jev policy runs concurrently. What happens next
+depends on `AI_DETECTIVE_POLICY`:
+
+- `choose` (default): if the two disagree, the server broadcasts an `aiProposal`
+  with both moves and waits. Any human client answers with `aiChoice`; the first
+  valid answer wins. With no answer by `AI_CHOICE_TIMEOUT_MS` the heuristic plays.
+  Agreement, or Jev unavailable, commits automatically. A client joining
+  mid-proposal receives the open proposal.
+- `jev`: Jev's move is committed when it answers above `JEV_MIN_CONFIDENCE`.
+- `heuristic`: Jev never runs.
+
+Both picks travel to the client as `aiDecision` on the `makeMove` broadcast and
 render in the Ctrl+D debug overlay. Never log the API key.
 
 ### Comparing deciders offline

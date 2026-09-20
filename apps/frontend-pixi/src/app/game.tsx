@@ -306,6 +306,7 @@ export function Game() {
         onMakeMove: (m) => {
           const store = useGameStateStore.getState();
           if (m.aiDecision) store.recordAiDecision(m.aiDecision);
+          if (store.aiProposal && store.aiProposal.role === m.role) store.setAiProposal(null);
           // Server echoes the sender's own moves. If the last move in our log already
           // matches this broadcast, we applied it optimistically — skip the duplicate
           // append and only sync the turn/double-move flags.
@@ -337,6 +338,9 @@ export function Game() {
             useGameStateStore.getState().setFinished('culprit');
             notifications.push('capture', 'Mr. X escaped the city');
           }
+        },
+        onAiProposal: (proposal) => {
+          useGameStateStore.getState().setAiProposal(proposal);
         },
         onEndGame: (payload) => {
           const s = useGameStateStore.getState();

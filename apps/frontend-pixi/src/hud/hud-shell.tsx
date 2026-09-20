@@ -9,6 +9,7 @@ import { SpecialMoves } from './special-moves';
 import { ReplayControls } from './replay-controls';
 import { SystemBar } from './system-bar';
 import { DebugOverlay } from './debug-overlay';
+import { AiChoicePanel } from './ai-choice-panel';
 import { InviteButton } from './invite-button';
 import { ImpersonationBanner } from './impersonation-banner';
 import { PairControl } from './pair-control';
@@ -26,6 +27,7 @@ export function HudShell() {
       <TopPills />
       <SpecialMoves />
       <TurnBanner />
+      <AiChoicePanel />
       <VictoryOverlay />
       <ReplayControls />
       <SystemBar />

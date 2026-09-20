@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
 import {
+  AiProposal,
   getNextRole,
   Message,
   Player,
@@ -13,8 +14,9 @@ import { fastify } from 'fastify';
 import { setTimeout } from 'timers/promises';
 import { app } from './app/app';
 import { AIPlayerService } from './app/helpers/ai-player';
-import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
+import { AiProposalRegistry } from './app/helpers/ai-proposal-registry';
 import { ENV } from './app/helpers/env';
+import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
 
 const host = ENV.HOST;
 const port = ENV.PORT;
@@ -24,6 +26,7 @@ const server = fastify({
   ignoreTrailingSlash: true,
 });
 const aiService = new AIPlayerService();
+const proposals = new AiProposalRegistry('heuristic');
 
 // CORS allowlist: the legacy SVG frontend (:4200) plus the new FPV frontend (:4201).
 // FRONTEND_URL stays the canonical prod origin; the localhost dev origins are added so
@@ -163,9 +166,44 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
         return;
       }
 
-      const aiMove = decision.move;
-      if (decision.comparison) {
-        server.log.info({ aiDecision: decision.comparison }, 'ai-decision');
+      let aiMove = decision.move;
+      const comparison = decision.comparison;
+
+      // In `choose` mode a disagreement is offered to the humans instead of resolved by
+      // the arbiter. Agreement, or Jev absent, needs no one's input.
+      if (
+        comparison &&
+        ENV.AI_DETECTIVE_POLICY === 'choose' &&
+        comparison.jev &&
+        !comparison.agree
+      ) {
+        const proposalId = proposals.nextId(currentChannel);
+        const proposal: AiProposal = {
+          id: proposalId,
+          role: comparison.role,
+          moveIndex: comparison.moveIndex,
+          options: [
+            { source: 'heuristic', move: comparison.heuristic.move },
+            { source: 'jev', move: comparison.jev.move, confidence: comparison.jev.confidence },
+          ],
+          expiresAt: Date.now() + ENV.AI_CHOICE_TIMEOUT_MS,
+          comparison,
+        };
+        const outcome = await Promise.all([
+          proposals.open(currentChannel, proposal, ENV.AI_CHOICE_TIMEOUT_MS),
+          Promise.resolve(broadcast(currentChannel, { type: 'aiProposal', data: { proposal } })),
+        ]).then(([o]) => o);
+
+        aiMove = outcome.source === 'jev' ? comparison.jev.move : comparison.heuristic.move;
+        comparison.chosen = outcome.source;
+        server.log.info(
+          { role: comparison.role, chosen: outcome.source, by: outcome.chosenBy },
+          'ai-choice'
+        );
+      }
+
+      if (comparison) {
+        server.log.info({ aiDecision: comparison }, 'ai-decision');
       }
 
       // Re-check: if a move was already added during the delay, abort
@@ -279,6 +317,11 @@ server.register(async function (fastify) {
                   deviceType: parsedMessage.data.deviceType,
                 }
               );
+            }
+
+            const openProposal = proposals.current(currentChannel);
+            if (openProposal) {
+              connection.send(JSON.stringify({ type: 'aiProposal', data: { proposal: openProposal } }));
             }
 
             broadcast(currentChannel, {
@@ -474,6 +517,13 @@ server.register(async function (fastify) {
               });
 
               await handleAIMove(currentTurn, currentChannel);
+            }
+            break;
+
+          case 'aiChoice':
+            if (currentChannel) {
+              const { proposalId, source } = parsedMessage.data;
+              if (proposalId && source) proposals.choose(currentChannel, proposalId, source);
             }
             break;
 
