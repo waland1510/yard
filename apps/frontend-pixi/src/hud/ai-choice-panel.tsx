@@ -2,20 +2,37 @@
 // game picks one; the server commits it. Disappears when the move lands or the server
 // times out to the heuristic.
 
-import { useEffect, useState } from 'react';
-import type { AiDecisionSource, AiProposalOption } from '@yard/shared-utils';
+import { useEffect, useRef, useState } from 'react';
+import type { AiDecisionSource, AiProposalOption, RoleType } from '@yard/shared-utils';
 import { useGameStateStore } from '../stores/game-state-store';
+import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import { getWebSocketClient } from '../net/websocket-client';
 import { nodeDisplayName } from '../core/map-data';
 import { COLOR, FONT, MOTION, RADIUS, SHADOW, centeredX } from './tokens';
 
 const LABEL: Record<AiDecisionSource, string> = { heuristic: 'Heuristic', jev: 'Jev' };
+const PROPOSAL_COLOR: Record<AiDecisionSource, string> = { heuristic: COLOR.gold, jev: COLOR.purple };
 
 export function AiChoicePanel() {
   const proposal = useGameStateStore((s) => s.aiProposal);
   const status = useGameStateStore((s) => s.status);
+  const surface = useRunnerStore(selectActiveSurface);
   const [picked, setPicked] = useState<AiDecisionSource | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  // In first-person there is no camera to pan, so we step into the AI detective's shoes
+  // for the duration of the proposal and step back out when it resolves.
+  const restoreViewRef = useRef<RoleType | null | undefined>(undefined);
+
+  useEffect(() => {
+    const runner = useRunnerStore.getState();
+    if (proposal && surface === 'fpv') {
+      if (restoreViewRef.current === undefined) restoreViewRef.current = runner.viewingAs;
+      if (runner.viewingAs !== proposal.role) runner.setViewingAs(proposal.role);
+    } else if (!proposal && restoreViewRef.current !== undefined) {
+      runner.setViewingAs(restoreViewRef.current);
+      restoreViewRef.current = undefined;
+    }
+  }, [proposal, surface]);
 
   useEffect(() => {
     setPicked(null);
@@ -78,7 +95,7 @@ function OptionCard({
         cursor: disabled ? 'default' : 'pointer',
       }}
     >
-      <span style={source}>
+      <span style={{ ...source, color: PROPOSAL_COLOR[option.source] }}>
         {LABEL[option.source]}
         {option.confidence != null && (
           <span style={{ color: COLOR.fg2 }}> · {(option.confidence * 100).toFixed(0)}% conf</span>
@@ -134,5 +151,5 @@ const card: React.CSSProperties = {
   transition: `border-color ${MOTION}, opacity ${MOTION}`,
 };
 
-const source: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: COLOR.gold };
+const source: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' };
 const moveText: React.CSSProperties = { fontSize: 14 };

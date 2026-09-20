@@ -75,6 +75,9 @@ const ROLE_LABEL: Record<string, string> = {
   detective5: 'Detective 5',
 };
 
+const PROPOSAL_COLOR = { heuristic: '#e8b64c', jev: '#9a6fd8' } as const;
+const PROPOSAL_LABEL = { heuristic: 'Heuristic', jev: 'Jev' } as const;
+
 const ROLE_COLOR: Record<string, string> = {
   culprit: '#1a1a1a',
   detective1: '#5a8dde',
@@ -273,6 +276,10 @@ export function MapView({
   const zoneCirclesRef = useRef<google.maps.Circle[]>([]);
   const lastSpotlightPosRef = useRef<number | null>(null);
   const lastTurnZoomRef = useRef<string | null>(null);
+  const proposalMarkersRef = useRef<google.maps.Marker[]>([]);
+  const proposalPulsesRef = useRef<EffectHandle[]>([]);
+  const proposalCameraRef = useRef<{ zoom: number; center: google.maps.LatLng | undefined } | null>(null);
+  const aiProposal = useGameStateStore((s) => s.aiProposal);
   const themeId = useGameStateStore((s) => s.theme);
   const status = useGameStateStore((s) => s.status);
 
@@ -622,6 +629,65 @@ export function MapView({
     if (isMyTurn) map.setZoom(15);
     else if (currentTurnRole === 'culprit') map.setZoom(13);
   }, [mapReady, currentTurnRole, isMyTurn]);
+
+  // AI choice camera: while humans pick between the two deciders' moves, frame the AI
+  // detective and both destinations, marking each with its decider's colour. The camera
+  // is restored when the proposal resolves.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const clear = () => {
+      for (const m of proposalMarkersRef.current) m?.setMap(null);
+      proposalMarkersRef.current = [];
+      for (const h of proposalPulsesRef.current) h?.cancel();
+      proposalPulsesRef.current = [];
+    };
+
+    if (!aiProposal) {
+      clear();
+      const saved = proposalCameraRef.current;
+      if (saved) {
+        proposalCameraRef.current = null;
+        map.setZoom(saved.zoom);
+        if (saved.center) map.panTo(saved.center);
+      }
+      return;
+    }
+
+    const detective = players.find((p) => p.role === aiProposal.role);
+    if (!detective) return;
+    clear();
+
+    if (!proposalCameraRef.current) {
+      proposalCameraRef.current = { zoom: map.getZoom() ?? 14, center: map.getCenter() };
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(coordsForNode(detective.position));
+    for (const option of aiProposal.options) bounds.extend(coordsForNode(option.move.position));
+    map.fitBounds(bounds, 140);
+    google.maps.event.addListenerOnce(map, 'idle', () => {
+      if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
+    });
+
+    for (const option of aiProposal.options) {
+      const color = PROPOSAL_COLOR[option.source];
+      const target = coordsForNode(option.move.position);
+      proposalMarkersRef.current.push(
+        new google.maps.Marker({
+          position: target,
+          map,
+          icon: makeNodeIcon(String(option.move.position), color, 40, 13),
+          zIndex: 210,
+          title: `${PROPOSAL_LABEL[option.source]} → ${nodeDisplayName(option.move.position)}`,
+        })
+      );
+      proposalPulsesRef.current.push(spawnPulse(map, target, color));
+    }
+
+    return clear;
+  }, [mapReady, aiProposal, players]);
 
   // Capture-zone (#11): a faint reach radius around each detective so coverage — and
   // Mr. X being surrounded — reads at a glance. Rebuilt as detectives move.
