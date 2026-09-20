@@ -53,6 +53,24 @@ error, timeout, or low confidence the heuristic's move is used instead. Both
 picks travel to the client as `aiDecision` on the `makeMove` broadcast and
 render in the Ctrl+D debug overlay. Never log the API key.
 
+### Comparing deciders offline
+
+`apps/backend/src/eval/` plays full games in memory with no database or socket.
+Every arm gets the same seeded starting positions, so results are paired per seed.
+Mr. X is always the existing culprit heuristic; arms differ only in detective play.
+
+```bash
+bun nx eval backend --args="--games 30 --arms legacy,heuristic,jev --out apps/backend/eval-results/run.json"
+# or directly:
+bun --env-file=apps/backend/.env.development run apps/backend/src/eval/run-ai-eval.ts --games 30
+```
+
+Arms: `legacy` (pre-policy greedy BFS), `heuristic` (candidate scoring), `jev`
+(Jev with heuristic fallback; skipped without `TYPESAFE_API_KEY`). Reports win
+rate, mean capture round, mean possible-set size after detective moves, and for
+Jev the fallback rate, agreement with the heuristic, latency, and token cost.
+Treat 30 games as a smoke test; differences under ~15 points need more seeds.
+
 ## Commands
 
 ```bash

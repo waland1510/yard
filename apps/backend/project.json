@@ -78,6 +78,13 @@
         "command": "node_modules/typescript-7/bin/tsc --noEmit -p apps/backend/tsconfig.app.json",
         "cwd": "{workspaceRoot}"
       }
+    },
+    "eval": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun --env-file=apps/backend/.env.development run apps/backend/src/eval/run-ai-eval.ts {args.args}",
+        "args": ""
+      }
     }
   }
 }

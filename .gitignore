@@ -49,3 +49,6 @@ vitest.config.*.timestamp*
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
+
+# AI eval output (reproducible from seeds)
+apps/backend/eval-results/

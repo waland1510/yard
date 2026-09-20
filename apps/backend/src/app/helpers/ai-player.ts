@@ -133,7 +133,8 @@ function pickTransportToNode(player: Player, targetPosition: number): MoveType |
   return null;
 }
 
-function calculateDetectiveMove(gameState: GameState, detective: Player): Move {
+/** Pre-policy greedy detective logic. Kept as the `legacy` arm of the AI eval. */
+export function calculateDetectiveMove(gameState: GameState, detective: Player): Move {
   const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
   const otherDetectives = new Set(
     gameState.players
