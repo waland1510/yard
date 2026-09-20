@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { GameState, Move } from '@yard/shared-utils';
+import { DeductionOptions, GameState, Move } from '@yard/shared-utils';
 import { deductionFor } from '../app/helpers/ai-decision-arbiter';
 import { ALL_ARMS, Arm, ArmName, armAvailable, buildArm, decideCulprit } from './arms';
 import { SimulationResult, simulateGame } from './simulate-game';
@@ -12,6 +12,8 @@ interface CliOptions {
   concurrency: number;
   out: string | null;
   verbose: boolean;
+  /** Flee prior for the heuristic and jev arms; omitted = engine default. */
+  prior: number[] | null;
 }
 
 interface GameRecord extends SimulationResult {
@@ -48,6 +50,7 @@ function parseArgs(argv: string[]): CliOptions {
     concurrency: 4,
     out: null,
     verbose: false,
+    prior: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -67,12 +70,15 @@ function parseArgs(argv: string[]): CliOptions {
     } else if (arg === '--out') {
       options.out = value;
       i++;
+    } else if (arg === '--prior') {
+      options.prior = value.split(',').map(Number);
+      i++;
     } else if (arg === '--verbose') {
       options.verbose = true;
     } else if (arg === '--help') {
       process.stdout.write(
         'bun run apps/backend/src/eval/run-ai-eval.ts [--games N] [--seed-start N] ' +
-          '[--arms legacy,heuristic,jev] [--concurrency N] [--out file.json] [--verbose]\n'
+          '[--arms legacy,heuristic,jev] [--prior 0.25,0.6,1] [--concurrency N] [--out file.json] [--verbose]\n'
       );
       process.exit(0);
     }
@@ -203,7 +209,8 @@ async function main() {
   }
 
   const requested = options.arms;
-  const arms = requested.filter(armAvailable).map(buildArm);
+  const deduction: DeductionOptions = options.prior ? { fleePrior: options.prior } : {};
+  const arms = requested.filter(armAvailable).map(name => buildArm(name, deduction));
   const skipped = requested.filter(name => !armAvailable(name));
   if (skipped.length) {
     process.stderr.write(`skipping ${skipped.join(', ')}: TYPESAFE_API_KEY not set or AI_DETECTIVE_POLICY=heuristic\n`);
@@ -219,6 +226,7 @@ async function main() {
     process.stderr.write(`${arm.name}: ${records.length} games in ${((Date.now() - started) / 1000).toFixed(1)}s\n`);
   }
 
+  if (options.prior) process.stdout.write(`prior: [${options.prior.join(', ')}]\n`);
   printTable(summaries);
   if (arms.length > 1) printHeadToHead(perArm);
 

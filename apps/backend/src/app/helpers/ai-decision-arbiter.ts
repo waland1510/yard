@@ -1,5 +1,6 @@
 import {
   AiDecisionComparison,
+  DeductionOptions,
   GAME_GRAPH,
   GameState,
   Move,
@@ -35,7 +36,7 @@ function uniformOverStartingNodes() {
 /** Possible Mr. X positions, or a uniform prior when the log cannot be replayed.
  *  The engine is a planning aid: a violated invariant degrades the AI's targeting,
  *  it must never abort the turn. */
-export function deductionFor(gameState: GameState) {
+export function deductionFor(gameState: GameState, options: DeductionOptions = {}) {
   const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
   if (culpritMoves.length === 0) return uniformOverStartingNodes();
 
@@ -49,7 +50,8 @@ export function deductionFor(gameState: GameState) {
       culpritMoves,
       GAME_GRAPH,
       detectivesByTurn,
-      detectiveStartPositions
+      detectiveStartPositions,
+      options
     );
   } catch (error) {
     console.warn(`[Deduction] falling back to uniform prior: ${(error as Error).message}`);

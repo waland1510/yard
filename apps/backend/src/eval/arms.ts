@@ -1,4 +1,4 @@
-import { GameState, Move, Player } from '@yard/shared-utils';
+import { DeductionOptions, GameState, Move, Player } from '@yard/shared-utils';
 import { AIPlayerService, calculateDetectiveMove } from '../app/helpers/ai-player';
 import { deductionFor } from '../app/helpers/ai-decision-arbiter';
 import { HeuristicDetectivePolicy } from '../app/helpers/heuristic-detective-policy';
@@ -32,8 +32,8 @@ const culpritService = new AIPlayerService();
 export const decideCulprit: CulpritDecider = (gameState, culprit) =>
   culpritService.calculateMove(gameState, culprit);
 
-function pictureFor(gameState: GameState, detective: Player) {
-  const { possible, weights } = deductionFor(gameState);
+function pictureFor(gameState: GameState, detective: Player, options: DeductionOptions) {
+  const { possible, weights } = deductionFor(gameState, options);
   return buildTacticalPicture({ gameState, detective, possible, weights });
 }
 
@@ -50,18 +50,18 @@ export function legacyArm(): Arm {
   };
 }
 
-export function heuristicArm(): Arm {
+export function heuristicArm(options: DeductionOptions = {}): Arm {
   const policy = new HeuristicDetectivePolicy();
   return {
     name: 'heuristic',
     decideDetective: async (gameState, detective) => {
-      const result = await policy.decide(gameState, detective, pictureFor(gameState, detective));
+      const result = await policy.decide(gameState, detective, pictureFor(gameState, detective, options));
       return result?.move ?? null;
     },
   };
 }
 
-export function jevArm(): Arm {
+export function jevArm(options: DeductionOptions = {}): Arm {
   const jev = new JevDetectivePolicy();
   const heuristic = new HeuristicDetectivePolicy();
   const jevStats: JevStats = {
@@ -75,7 +75,7 @@ export function jevArm(): Arm {
   };
 
   const decideDetective: DetectiveDecider = async (gameState, detective) => {
-    const picture = pictureFor(gameState, detective);
+    const picture = pictureFor(gameState, detective, options);
     if (picture.candidates.length === 0) return null;
 
     const heuristicResult = await heuristic.decide(gameState, detective, picture);
@@ -111,10 +111,10 @@ export function jevArm(): Arm {
   return { name: 'jev', decideDetective, jevStats };
 }
 
-export function buildArm(name: ArmName): Arm {
+export function buildArm(name: ArmName, options: DeductionOptions = {}): Arm {
   if (name === 'legacy') return legacyArm();
-  if (name === 'heuristic') return heuristicArm();
-  return jevArm();
+  if (name === 'heuristic') return heuristicArm(options);
+  return jevArm(options);
 }
 
 export function armAvailable(name: ArmName): boolean {

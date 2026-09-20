@@ -76,7 +76,9 @@ bun --env-file=apps/backend/.env.development run apps/backend/src/eval/run-ai-ev
 ```
 
 Arms: `legacy` (pre-policy greedy BFS), `heuristic` (candidate scoring), `jev`
-(Jev with heuristic fallback; skipped without `TYPESAFE_API_KEY`). Reports win
+(Jev with heuristic fallback; skipped without `TYPESAFE_API_KEY`). `--prior a,b,c`
+overrides the deduction engine's flee prior for the heuristic and jev arms (see
+`docs/decisions/2026-09-20-flee-prior-in-deduction-weights.md`). Reports win
 rate, mean capture round, mean possible-set size after detective moves, and for
 Jev the fallback rate, agreement with the heuristic, latency, and token cost.
 Treat 30 games as a smoke test; differences under ~15 points need more seeds.

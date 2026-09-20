@@ -79,6 +79,57 @@ export interface PossibleState {
   weights: Map<number, number>;
 }
 
+/** How strongly the belief assumes Mr. X steers away from detectives. Indexed by hop
+ *  distance from the destination to the nearest detective at the moment he moves; the
+ *  last entry applies to every larger distance. Values are relative, so `[0.25, 0.6, 1]`
+ *  means an exit beside a detective draws a quarter of the mass a safe exit does. */
+export type FleePrior = readonly number[];
+
+export const DEFAULT_FLEE_PRIOR: FleePrior = [0.25, 0.6, 1];
+
+/** A flat prior: every exit equally likely, the behaviour before the flee prior existed. */
+export const UNIFORM_PRIOR: FleePrior = [1];
+
+export interface DeductionOptions {
+  fleePrior?: FleePrior;
+}
+
+/** Hop distance from every node to the nearest detective, one multi-source BFS. */
+export function distanceToNearest(
+  sources: Set<number>,
+  graph: Map<number, Node>
+): Map<number, number> {
+  const dist = new Map<number, number>();
+  if (sources.size === 0) return dist;
+  let frontier = [...sources];
+  for (const s of frontier) dist.set(s, 0);
+  let hops = 0;
+  while (frontier.length > 0) {
+    hops++;
+    const next: number[] = [];
+    for (const nodeId of frontier) {
+      const node = graph.get(nodeId);
+      if (!node) continue;
+      for (const type of TRANSPORT_TYPES) {
+        for (const n of node[type] ?? []) {
+          if (!dist.has(n)) {
+            dist.set(n, hops);
+            next.push(n);
+          }
+        }
+      }
+    }
+    frontier = next;
+  }
+  return dist;
+}
+
+function fleeFactor(distance: number | undefined, prior: FleePrior): number {
+  if (prior.length === 0) return 1;
+  if (distance === undefined) return prior[prior.length - 1];
+  return prior[Math.min(distance, prior.length - 1)];
+}
+
 /**
  * Recomputes Mr. X's possible positions from scratch using the full culprit move history.
  * Pure function — deterministic, stateless, fully replayable.
@@ -92,8 +143,10 @@ export function computePossiblePositions(
   culpritMoves: Move[],
   graph: Map<number, Node>,
   detectivesByTurn: Map<number, Set<number>>,
-  detectiveStartPositions: Set<number>
+  detectiveStartPositions: Set<number>,
+  options: DeductionOptions = {}
 ): PossibleState {
+  const fleePrior = options.fleePrior ?? DEFAULT_FLEE_PRIOR;
   let possible = new Set(
     VALID_STARTING_NODES.filter(n => !detectiveStartPositions.has(n))
   );
@@ -115,8 +168,9 @@ export function computePossiblePositions(
     pruneAgainst = move.double ? detectives : null;
 
     const ticket = move.secret ? 'secret' : move.type;
+    const threat = distanceToNearest(detectives, graph);
     possible = expand(possible, ticket, graph);
-    weights = expandWeights(weights, ticket, graph);
+    weights = expandWeights(weights, ticket, graph, threat, fleePrior);
     possible = prune(possible, detectives);
     weights = pruneWeights(weights, detectives);
 
@@ -147,7 +201,9 @@ function isRevealTurn(culpritMoveNumber: number): boolean {
 function expandWeights(
   weights: Map<number, number>,
   ticket: MoveType | 'secret',
-  graph: Map<number, Node>
+  graph: Map<number, Node>,
+  threat: Map<number, number>,
+  fleePrior: FleePrior
 ): Map<number, number> {
   const next = new Map<number, number>();
   const types = ticket === 'secret' ? TRANSPORT_TYPES : [ticket];
@@ -162,12 +218,18 @@ function expandWeights(
         if (n !== nodeId) neighbors.push(n);
       }
     }
-
     if (neighbors.length === 0) continue;
-    const share = w / neighbors.length;
-    for (const n of neighbors) {
-      next.set(n, (next.get(n) ?? 0) + share);
-    }
+
+    // Each exit's share is proportional to how safe it looks to a fleeing Mr. X. A node
+    // that will be pruned (a detective stands on it) still gets a share here; pruneWeights
+    // removes it and renormalizes, so the remaining exits absorb its mass.
+    const factors = neighbors.map(n => fleeFactor(threat.get(n), fleePrior));
+    const totalFactor = factors.reduce((a, b) => a + b, 0);
+    if (totalFactor === 0) continue;
+
+    neighbors.forEach((n, i) => {
+      next.set(n, (next.get(n) ?? 0) + (w * factors[i]) / totalFactor);
+    });
   }
 
   return normalize(next);
