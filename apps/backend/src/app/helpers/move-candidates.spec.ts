@@ -35,7 +35,7 @@ function makeGameState(players: Player[], moves: GameState['moves'] = []): GameS
 }
 
 describe('moveCandidates', () => {
-  it('moveCandidates_atHubNode_listsAllAffordableTransports', () => {
+  it('moveCandidates_atHubNode_listsEveryDestinationOnceViaItsPlentifulTransport', () => {
     const detective = makeDetective();
     const candidates = buildCandidates({
       gameState: makeGameState([detective]),
@@ -45,15 +45,18 @@ describe('moveCandidates', () => {
     });
 
     const node = GAME_GRAPH.get(HUB)!;
-    const types = new Set(candidates.map(c => c.move.type));
+    const destinations = new Set([...(node.taxi ?? []), ...(node.bus ?? []), ...(node.underground ?? [])]);
 
-    expect(types.has('taxi')).toBe(true);
-    expect(types.has('bus')).toBe(true);
-    expect(types.has('underground')).toBe(true);
+    expect(new Set(candidates.map(c => c.move.position))).toEqual(destinations);
+    expect(candidates).toHaveLength(destinations.size);
     expect(candidates.every(c => c.move.role === Role.detective1)).toBe(true);
-    expect(candidates.length).toBeLessThanOrEqual(
-      (node.taxi?.length ?? 0) + (node.bus?.length ?? 0) + (node.underground?.length ?? 0)
-    );
+
+    const remaining = { taxi: 10, bus: 8, underground: 4 } as const;
+    for (const c of candidates) {
+      const reaching = (['taxi', 'bus', 'underground'] as const).filter(t => node[t]?.includes(c.move.position));
+      const plentiful = reaching.reduce((best, t) => (remaining[t] > remaining[best] ? t : best), reaching[0]);
+      expect(c.move.type).toBe(plentiful);
+    }
   });
 
   it('moveCandidates_destinationOccupiedByDetective_isExcluded', () => {
@@ -106,6 +109,38 @@ describe('moveCandidates', () => {
     });
 
     expect(candidates).toEqual([]);
+  });
+
+  it('moveCandidates_sameDestinationByTwoTransports_keepsThePlentifulTicket', () => {
+    let origin: number | null = null;
+    let shared: number | null = null;
+    for (const [id, node] of GAME_GRAPH) {
+      const both = (node.taxi ?? []).find(n => (node.bus ?? []).includes(n));
+      if (both != null) { origin = id; shared = both; break; }
+    }
+    expect(origin).not.toBeNull();
+
+    const detective = makeDetective({ position: origin!, taxiTickets: 6, busTickets: 1 });
+    const candidates = buildCandidates({
+      gameState: makeGameState([detective]),
+      detective,
+      possible: new Set<number>(),
+      weights: new Map<number, number>(),
+    });
+
+    const toShared = candidates.filter(c => c.move.position === shared);
+    expect(toShared).toHaveLength(1);
+    expect(toShared[0].move.type).toBe('taxi');
+
+    const busOnly = makeDetective({ position: origin!, taxiTickets: 1, busTickets: 6 });
+    const flipped = buildCandidates({
+      gameState: makeGameState([busOnly]),
+      detective: busOnly,
+      possible: new Set<number>(),
+      weights: new Map<number, number>(),
+    }).filter(c => c.move.position === shared);
+    expect(flipped).toHaveLength(1);
+    expect(flipped[0].move.type).toBe('bus');
   });
 
   it('moveCandidates_ticketAfter_reflectsSpentTicket', () => {

@@ -111,6 +111,21 @@ export function buildCandidates({
   const sortedSuspects = [...weights.entries()].sort((a, b) => b[1] - a[1]);
   const topSuspect = sortedSuspects[0]?.[0];
 
+  // Two transports to the same node differ only in which ticket is spent. That is a pure
+  // economy call, so code makes it: keep the transport with the most tickets left after
+  // the move (ties fall to the earlier, cheaper transport in TRANSPORTS order).
+  const bestTransportTo = new Map<number, { type: MoveType; after: number }>();
+  for (const type of TRANSPORTS) {
+    const available = ticketsFor(detective, type);
+    if (available <= 0) continue;
+    for (const destination of neighbors(origin, type)) {
+      const current = bestTransportTo.get(destination);
+      if (!current || available - 1 > current.after) {
+        bestTransportTo.set(destination, { type, after: available - 1 });
+      }
+    }
+  }
+
   const seen = new Set<string>();
   const candidates: MoveCandidate[] = [];
 
@@ -120,6 +135,7 @@ export function buildCandidates({
 
     for (const destination of neighbors(origin, type)) {
       if (occupied.has(destination)) continue;
+      if (bestTransportTo.get(destination)?.type !== type) continue;
 
       const key = candidateKey(type, destination);
       if (seen.has(key)) continue;

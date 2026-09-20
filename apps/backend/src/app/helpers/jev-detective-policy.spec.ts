@@ -9,7 +9,7 @@ jest.mock('./jev-client', () => ({
 
 let mockEnabled = true;
 
-import { JevDetectivePolicy, buildState, describeCandidate } from './jev-detective-policy';
+import { JevDetectivePolicy, buildState, describeCandidate, describeContext, shuffleForDecision } from './jev-detective-policy';
 import { buildTacticalPicture } from './move-candidates';
 
 function nodeWithAllTransports(): number {
@@ -148,10 +148,32 @@ describe('JevDetectivePolicy', () => {
     const { picture } = setup();
     const candidate = { ...picture.candidates[0], landsOnSuspect: true, suspectMassWithin1: 0.5 };
 
-    const text = describeCandidate(candidate);
+    const text = describeCandidate(candidate, describeContext(picture.candidates));
 
     expect(text).toContain('possible Mr. X location');
     expect(text).toContain('50%');
     expect(text).toMatch(/\d+ hops|No route/);
+  });
+
+  it('jevPolicy_ticketCost_isStatedRelativeToOtherOptions', () => {
+    const { picture } = setup();
+    const rich = { ...picture.candidates[0], ticketAfter: 8 };
+    const poor = { ...picture.candidates[1], ticketAfter: 3 };
+    const context = describeContext([rich, poor]);
+
+    expect(describeCandidate(rich, context)).toContain('Cheapest option');
+    expect(describeCandidate(poor, context)).toContain('scarcer');
+    expect(describeCandidate({ ...poor, ticketAfter: 0 }, context)).toContain('last');
+  });
+
+  it('jevPolicy_optionOrder_isShuffledDeterministicallyPerDecision', () => {
+    const { picture } = setup();
+    const a = shuffleForDecision(picture.candidates, 'seed-a').map(c => c.key);
+    const b = shuffleForDecision(picture.candidates, 'seed-a').map(c => c.key);
+    const c = shuffleForDecision(picture.candidates, 'seed-b').map(c => c.key);
+
+    expect(a).toEqual(b);
+    expect(new Set(a)).toEqual(new Set(picture.candidates.map(x => x.key)));
+    expect(a.join() === c.join() && a.join() === picture.candidates.map(x => x.key).join()).toBe(false);
   });
 });
