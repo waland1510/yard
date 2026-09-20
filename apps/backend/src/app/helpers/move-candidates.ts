@@ -26,27 +26,37 @@ function neighbors(node: Node | undefined, type: MoveType): number[] {
   return [];
 }
 
-function allNeighbors(nodeId: number): number[] {
+/** Neighbours reachable using only the given transports. A detective's onward reach is
+ *  bounded by the tickets it will still hold, so features must never count a tube line it
+ *  cannot ride. */
+function neighborsVia(nodeId: number, types: readonly MoveType[]): number[] {
   const node = GAME_GRAPH.get(nodeId);
   if (!node) return [];
-  return [...(node.taxi ?? []), ...(node.bus ?? []), ...(node.underground ?? [])];
+  const out: number[] = [];
+  for (const type of types) for (const n of neighbors(node, type)) out.push(n);
+  return out;
 }
 
-function degree(nodeId: number): number {
-  return allNeighbors(nodeId).length;
+function degree(nodeId: number, types: readonly MoveType[]): number {
+  return new Set(neighborsVia(nodeId, types)).size;
 }
 
-/** Hop distance ignoring tickets. Returns HOPS_UNREACHABLE when no path exists. */
+/** Hop distance over the given transports. Returns HOPS_UNREACHABLE when no path exists. */
 export const HOPS_UNREACHABLE = 999;
 
-export function hopDistance(from: number, to: number, cap = 12): number {
+export function hopDistance(
+  from: number,
+  to: number,
+  cap = 12,
+  types: readonly MoveType[] = TRANSPORTS
+): number {
   if (from === to) return 0;
   const visited = new Set<number>([from]);
   let frontier = [from];
   for (let hops = 1; hops <= cap; hops++) {
     const next: number[] = [];
     for (const current of frontier) {
-      for (const n of allNeighbors(current)) {
+      for (const n of neighborsVia(current, types)) {
         if (n === to) return hops;
         if (!visited.has(n)) {
           visited.add(n);
@@ -63,7 +73,8 @@ export function hopDistance(from: number, to: number, cap = 12): number {
 function massWithin(
   origin: number,
   radius: number,
-  weights: Map<number, number>
+  weights: Map<number, number>,
+  types: readonly MoveType[]
 ): number {
   const visited = new Set<number>([origin]);
   let frontier = [origin];
@@ -72,7 +83,7 @@ function massWithin(
   for (let hop = 1; hop <= radius; hop++) {
     const next: number[] = [];
     for (const current of frontier) {
-      for (const n of allNeighbors(current)) {
+      for (const n of neighborsVia(current, types)) {
         if (visited.has(n)) continue;
         visited.add(n);
         next.push(n);
@@ -84,6 +95,11 @@ function massWithin(
   }
 
   return mass;
+}
+
+/** Transports the detective can still use after spending one `spent` ticket. */
+function usableAfter(detective: Player, spent: MoveType): MoveType[] {
+  return TRANSPORTS.filter(t => ticketsFor(detective, t) - (t === spent ? 1 : 0) > 0);
 }
 
 export interface CandidateInput {
@@ -149,16 +165,19 @@ export function buildCandidates({
         role: detective.role,
       };
 
+      const usable = usableAfter(detective, type);
       candidates.push({
         key,
         move,
         destinationName: `#${destination}`,
         hopsToTopSuspect:
-          topSuspect === undefined ? HOPS_UNREACHABLE : hopDistance(destination, topSuspect),
-        suspectMassWithin1: massWithin(destination, 1, weights),
-        suspectMassWithin2: massWithin(destination, 2, weights),
+          topSuspect === undefined
+            ? HOPS_UNREACHABLE
+            : hopDistance(destination, topSuspect, 12, usable),
+        suspectMassWithin1: massWithin(destination, 1, weights, usable),
+        suspectMassWithin2: massWithin(destination, 2, weights, usable),
         landsOnSuspect: possible.has(destination),
-        exits: degree(destination),
+        exits: degree(destination, usable),
         ticketAfter: available - 1,
       });
     }

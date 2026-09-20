@@ -64,7 +64,7 @@ export function describeCandidate(candidate: MoveCandidate, context: DescribeCon
   parts.push(
     `Probability Mr. X is on or next to this node: ${pct(candidate.suspectMassWithin1)}; within two hops: ${pct(candidate.suspectMassWithin2)}.`
   );
-  parts.push(`The node has ${candidate.exits} connections.`);
+  parts.push(`From there the detective can afford ${candidate.exits} onward connection${candidate.exits === 1 ? '' : 's'}.`);
   parts.push(ticketCostPhrase(candidate, context));
 
   return parts.join(' ');

@@ -143,6 +143,46 @@ describe('moveCandidates', () => {
     expect(flipped[0].move.type).toBe('bus');
   });
 
+  it('moveCandidates_noUndergroundTickets_ignoresTubeLinesInFeatures', () => {
+    // Find a taxi destination that is an underground station whose tube neighbours are
+    // NOT reachable by taxi/bus within 2 hops, so tube-only reach is measurable.
+    let origin: number | null = null;
+    let station: number | null = null;
+    let tubeOnly: number | null = null;
+    outer: for (const [id, node] of GAME_GRAPH) {
+      for (const dest of node.taxi ?? []) {
+        const d = GAME_GRAPH.get(dest);
+        if (!d?.underground?.length) continue;
+        const surface1 = new Set([...(d.taxi ?? []), ...(d.bus ?? [])]);
+        const surface2 = new Set(surface1);
+        for (const n of surface1) for (const m of [...(GAME_GRAPH.get(n)?.taxi ?? []), ...(GAME_GRAPH.get(n)?.bus ?? [])]) surface2.add(m);
+        const far = d.underground.find(u => !surface2.has(u) && u !== dest);
+        if (far != null) { origin = id; station = dest; tubeOnly = far; break outer; }
+      }
+    }
+    expect(origin).not.toBeNull();
+
+    const broke = makeDetective({ position: origin!, taxiTickets: 5, busTickets: 3, undergroundTickets: 0 });
+    const rich = makeDetective({ position: origin!, taxiTickets: 5, busTickets: 3, undergroundTickets: 3 });
+    const weights = new Map<number, number>([[tubeOnly!, 1]]);
+    const possible = new Set<number>([tubeOnly!]);
+
+    const pick = (d: Player) =>
+      buildCandidates({ gameState: makeGameState([d]), detective: d, possible, weights }).find(
+        c => c.move.position === station && c.move.type === 'taxi'
+      )!;
+
+    const withTickets = pick(rich);
+    const without = pick(broke);
+
+    expect(withTickets.hopsToTopSuspect).toBe(1);
+    expect(withTickets.suspectMassWithin1).toBeCloseTo(1);
+    expect(without.hopsToTopSuspect).toBeGreaterThan(2);
+    expect(without.suspectMassWithin1).toBe(0);
+    expect(without.suspectMassWithin2).toBe(0);
+    expect(without.exits).toBeLessThan(withTickets.exits);
+  });
+
   it('moveCandidates_ticketAfter_reflectsSpentTicket', () => {
     const detective = makeDetective({ taxiTickets: 3 });
     const candidates = buildCandidates({
