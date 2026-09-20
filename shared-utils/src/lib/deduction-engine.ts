@@ -101,37 +101,26 @@ export function computePossiblePositions(
     [...possible].map(n => [n, 1 / possible.size])
   );
 
+  // Detectives do not move between the two legs of a double, so the second leg is pruned
+  // against the same detective positions as the first.
+  let pruneAgainst: Set<number> | null = null;
+
   for (let turn = 0; turn < culpritMoves.length; turn++) {
     const move = culpritMoves[turn];
-    const detectives = detectivesByTurn.get(turn) ?? new Set<number>();
+    const previous = turn > 0 ? culpritMoves[turn - 1] : undefined;
+    const isSecondLeg = previous?.double === true;
+    const detectives: Set<number> = isSecondLeg && pruneAgainst
+      ? pruneAgainst
+      : detectivesByTurn.get(turn) ?? new Set<number>();
+    pruneAgainst = move.double ? detectives : null;
 
-    if (move.double) {
-      // First half of double move
-      const ticket1 = move.secret ? 'secret' : move.type;
-      possible = expand(possible, ticket1, graph);
-      weights = expandWeights(weights, ticket1, graph);
-      possible = prune(possible, detectives);
-      weights = pruneWeights(weights, detectives);
+    const ticket = move.secret ? 'secret' : move.type;
+    possible = expand(possible, ticket, graph);
+    weights = expandWeights(weights, ticket, graph);
+    possible = prune(possible, detectives);
+    weights = pruneWeights(weights, detectives);
 
-      // Second half — next move entry
-      const move2 = culpritMoves[turn + 1];
-      if (move2) {
-        turn++;
-        const ticket2 = move2.secret ? 'secret' : move2.type;
-        possible = expand(possible, ticket2, graph);
-        weights = expandWeights(weights, ticket2, graph);
-        possible = prune(possible, detectives);
-        weights = pruneWeights(weights, detectives);
-      }
-    } else {
-      const ticket = move.secret ? 'secret' : move.type;
-      possible = expand(possible, ticket, graph);
-      weights = expandWeights(weights, ticket, graph);
-      possible = prune(possible, detectives);
-      weights = pruneWeights(weights, detectives);
-    }
-
-    // Reveal: hard reset to single known position
+    // Reveal rounds count every leg of a double as its own move, so the check runs per leg.
     if (isRevealTurn(turn + 1) && move.position != null) {
       if (!possible.has(move.position)) {
         throw new Error(
