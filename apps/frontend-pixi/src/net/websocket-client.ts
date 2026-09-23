@@ -5,12 +5,14 @@
 import type {
   AiDecisionComparison,
   AiProposal,
+  CallSignal,
   Message,
   MessageType,
   Move,
   RoleType,
   GameState,
   CompanionDevice,
+  PresenceMember,
 } from '@yard/shared-utils';
 
 const RECONNECT_MS = 4000;
@@ -34,7 +36,8 @@ export interface WSHandlers {
   onAiProposal?: (proposal: AiProposal) => void;
   onJoinGame?: (payload: { role?: RoleType; username?: string }) => void;
   onImpersonate?: (payload: { role?: RoleType }) => void;
-  onPresence?: (payload: { members: Array<{ role: string; username: string }> }) => void;
+  onPresence?: (payload: { members: PresenceMember[] }) => void;
+  onCallSignal?: (payload: { from: string; signal: CallSignal }) => void;
   /** Companion-pairing messages (#1) — routed to the CompanionSession. */
   onPairing?: (type: 'pairCode' | 'paired' | 'pairError', data: Message['data']) => void;
   /** Companion relay (#6) — transient view/intent from the paired peer. */
@@ -140,6 +143,9 @@ export function createWebSocketClient(url?: string): WebSocketClient {
         break;
       case 'companionPong':
         handlers.onCompanionPong?.();
+        break;
+      case 'callSignal':
+        if (data.from && data.signal) handlers.onCallSignal?.({ from: data.from, signal: data.signal });
         break;
       default:
         break;

@@ -188,7 +188,21 @@ export type MessageType =
   | 'pairUnlink'
   // AI decider disagreement: the server offers both moves, a human picks one.
   | 'aiProposal'
-  | 'aiChoice';
+  | 'aiChoice'
+  // Group call: `callState` updates this socket's call flags on presence; `callSignal`
+  // carries WebRTC offers/answers/candidates to one target socket, untouched by the server.
+  | 'callState'
+  | 'callSignal';
+
+export interface CallSignal {
+  description?: { type: 'offer' | 'answer' | 'pranswer' | 'rollback'; sdp?: string };
+  candidate?: {
+    candidate?: string;
+    sdpMid?: string | null;
+    sdpMLineIndex?: number | null;
+    usernameFragment?: string | null;
+  };
+}
 
 export interface PresenceMember {
   role: string;
@@ -199,6 +213,9 @@ export interface PresenceMember {
   deviceType?: import('./companion').CompanionDevice;
   /** Surface this device drives when paired. */
   surface?: import('./companion').CompanionSurface;
+  inCall?: boolean;
+  mic?: boolean;
+  cam?: boolean;
 }
 
 export interface Message {
@@ -234,6 +251,12 @@ export interface Message {
     peerClientId?: string;
     peerSurface?: import('./companion').CompanionSurface;
     expiresAt?: number;
+    inCall?: boolean;
+    mic?: boolean;
+    cam?: boolean;
+    to?: string;
+    from?: string;
+    signal?: CallSignal;
   };
 }
 

@@ -69,6 +69,9 @@ const channelMembers: Record<
       clientId?: string;
       deviceType?: CompanionDevice;
       surface?: CompanionSurface;
+      inCall?: boolean;
+      mic?: boolean;
+      cam?: boolean;
     }
   >
 > = {};
@@ -474,6 +477,31 @@ server.register(async function (fastify) {
               }
             }
             broadcastPresence(currentChannel);
+            break;
+          }
+
+          case 'callState': {
+            if (!currentChannel) break;
+            const me = channelMembers[currentChannel]?.get(connection as unknown as WebSocket);
+            if (!me) break;
+            const { inCall, mic, cam } = parsedMessage.data;
+            me.inCall = !!inCall;
+            me.mic = !!inCall && !!mic;
+            me.cam = !!inCall && !!cam;
+            broadcastPresence(currentChannel);
+            break;
+          }
+
+          case 'callSignal': {
+            if (!currentChannel || !currentClientId) break;
+            const { to, signal } = parsedMessage.data;
+            if (!to || !signal) break;
+            const target = findByClientId(currentChannel, to);
+            if (target && target.readyState === target.OPEN) {
+              target.send(
+                JSON.stringify({ type: 'callSignal', data: { from: currentClientId, signal } })
+              );
+            }
             break;
           }
 

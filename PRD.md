@@ -248,6 +248,16 @@ A long, deliberately exhaustive list. Organized by phase, not priority. Numbered
 
 Allowed when a feature calls for it (AI decisions, presence, companion pairing, persistence). Coordinate `shared-utils` and WebSocket-protocol changes across frontend and backend.
 
+### Group call
+
+Opt-in video/voice call for everyone at the table, Mr. X included (like players around a physical board).
+
+- **Topology**: full-mesh WebRTC, at most 6 human seats. Only the desktop joins; a paired `fpv-companion` phone never does.
+- **Protocol (additive)**: `callState { inCall, mic, cam }` sets flags on the sender's presence entry, so presence is the call roster; `callSignal { to, signal }` is relayed untouched to one `clientId`, with `from` stamped by the server.
+- **Modules** (additions to the 24): `net/call-mesh` (peer connections; the lower `clientId` of each pair always offers), `net/voice-activity` (speaking detection), `net/ice-servers` (`VITE_ICE_SERVERS`, default Google STUN), `stores/call-store`, `hud/call-strip` (side-strip layout).
+- **Layouts**: side strip ships first. Floating window and faces-on-dock-cards are planned as further views over `call-store`, with no network changes.
+- **Secure context**: camera/mic need HTTPS or `localhost`. The LAN-IP dev setup is plain HTTP, so remote LAN browsers can't publish media until dev HTTPS exists.
+
 ### Schema (no DB changes)
 
 The existing tables (`games`, `players`, `moves`, `ip_info`) remain unchanged. Persistence, channel naming, and the move log all stay as today.

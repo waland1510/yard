@@ -14,6 +14,7 @@ import { InviteButton } from './invite-button';
 import { ImpersonationBanner } from './impersonation-banner';
 import { PairControl } from './pair-control';
 import { GraphicsToggle } from './graphics-toggle';
+import { CallStrip } from './call-strip';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 
 export function HudShell() {
@@ -36,6 +37,7 @@ export function HudShell() {
       <ImpersonationBanner />
       <PairControl />
       <GraphicsToggle />
+      <CallStrip />
     </>
   );
 }

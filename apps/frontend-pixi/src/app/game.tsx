@@ -37,6 +37,9 @@ import { getWebSocketClient } from '../net/websocket-client';
 import { CompanionSession, setCompanionSession, getCompanionSession } from '../net/companion-session';
 import { CompanionRelay, setCompanionRelay } from '../net/companion-relay';
 import { LivenessMonitor } from '../net/liveness-monitor';
+import { CallMesh } from '../net/call-mesh';
+import { readIceServers } from '../net/ice-servers';
+import { connectCallMesh } from '../stores/call-store';
 import { MoveAuthority } from '../net/move-authority';
 import { getGame } from '../net/rest-client';
 import type { SurfaceRole } from '../core/device-surface';
@@ -239,6 +242,15 @@ export function Game() {
       });
       setCompanionRelay(relay);
       const liveness = new LivenessMonitor();
+      const callMesh = new CallMesh({
+        selfId: companion.clientId,
+        iceServers: readIceServers(),
+        transport: {
+          sendState: (state) => { client.send('callState', { ...state }); },
+          sendSignal: (to, signal) => { client.send('callSignal', { to, signal }); },
+        },
+      });
+      const disconnectCall = connectCallMesh(callMesh);
 
       // Inbound relay → apply to local view state. `applyingRemote` guards the outbound
       // subscription below so a mirrored value isn't immediately echoed back (ping-pong).
@@ -349,6 +361,10 @@ export function Game() {
         },
         onPresence: ({ members }) => {
           useGameStateStore.getState().setOccupiedRoles(new Set(members.map((m) => m.role)));
+          callMesh.syncRoster(members);
+        },
+        onCallSignal: ({ from, signal }) => {
+          callMesh.handleSignal(from, signal);
         },
         onPairing: (type, data) => {
           companion.handleMessage(type, data);
@@ -412,6 +428,7 @@ export function Game() {
         window.clearInterval(pingTimer);
         window.clearInterval(livenessTimer);
         unsubRelay();
+        disconnectCall();
       };
     }
 
