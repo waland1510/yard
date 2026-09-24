@@ -127,9 +127,20 @@ export function PairControl() {
     );
   }
 
+  const closePanel = () => {
+    getCompanionSession()?.reset();
+    useRunnerStore.getState().setPairingRole(null);
+    setCode(null);
+  };
+
   return (
     <div style={panel}>
-      <div style={panelTitle}>Pair your phone</div>
+      <div style={panelHeader}>
+        <div style={panelTitle}>Pair your phone</div>
+        <button type="button" style={closeBtn} onClick={closePanel} aria-label="Close pairing">
+          ✕
+        </button>
+      </div>
       {qrDataUrl && (
         <div style={qrWrap}>
           <img src={qrDataUrl} alt="Pairing QR code" style={qrImg} width={180} height={180} />
@@ -173,11 +184,32 @@ const panel: React.CSSProperties = {
   boxShadow: SHADOW.dock,
 };
 
+const panelHeader: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 10,
+};
+
 const panelTitle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
   letterSpacing: 0.3,
-  marginBottom: 10,
+};
+
+const closeBtn: React.CSSProperties = {
+  width: 24,
+  height: 24,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  background: 'transparent',
+  border: 0,
+  borderRadius: RADIUS.chip,
+  color: COLOR.fg2,
+  fontSize: 13,
+  cursor: 'pointer',
 };
 
 const qrWrap: React.CSSProperties = {
