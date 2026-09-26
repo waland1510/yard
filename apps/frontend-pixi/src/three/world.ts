@@ -3,6 +3,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { FOG_TINT } from './palette';
 import { createPostProcessing, type QualityTier } from './post-processing';
 import { createWeather } from './weather';
+import { setVehicleEnvironment } from './vehicles';
 
 export interface World {
   scene: THREE.Scene;
@@ -58,9 +59,20 @@ function makeSkyGradient(): THREE.CanvasTexture {
   return tex;
 }
 
+interface TierSettings {
+  maxPixelRatio: number;
+  shadowMapSize: number;
+  rain: boolean;
+}
+
+const TIER_SETTINGS: Record<QualityTier, TierSettings> = {
+  low: { maxPixelRatio: 1, shadowMapSize: 1024, rain: false },
+  high: { maxPixelRatio: 2, shadowMapSize: 4096, rain: true },
+};
+
 export function createWorld(canvas: HTMLCanvasElement): World {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, TIER_SETTINGS.high.maxPixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -95,6 +107,7 @@ export function createWorld(canvas: HTMLCanvasElement): World {
     // The HDRI is a bright open-sky capture; at full intensity its irradiance alone pushes
     // sunlit diffuse past 1.0 and washes the street out. Keep it for reflections only.
     scene.environmentIntensity = 0.3;
+    setVehicleEnvironment(envRT.texture, scene);
     hdr.dispose();
   });
 
@@ -111,7 +124,7 @@ export function createWorld(canvas: HTMLCanvasElement): World {
   const sun = new THREE.DirectionalLight(0xffe4bd, 2.6);
   sun.position.set(22, 58, 30);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.mapSize.setScalar(TIER_SETTINGS.high.shadowMapSize);
   sun.shadow.camera.left = -55;
   sun.shadow.camera.right = 55;
   sun.shadow.camera.top = 55;
@@ -169,8 +182,16 @@ export function createWorld(canvas: HTMLCanvasElement): World {
       };
     },
     setQuality(tier) {
+      const settings = TIER_SETTINGS[tier];
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.maxPixelRatio));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (sun.shadow.mapSize.x !== settings.shadowMapSize) {
+        sun.shadow.mapSize.setScalar(settings.shadowMapSize);
+        sun.shadow.map?.dispose();
+        sun.shadow.map = null;
+      }
       post.setQuality(tier);
-      weather.setEnabled(tier === 'high');
+      weather.setEnabled(settings.rain);
     },
     destroy() {
       cancelAnimationFrame(raf);

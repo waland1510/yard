@@ -1,4 +1,7 @@
 import axios from 'axios';
+import { Move } from '@yard/shared-utils';
+
+export type ParsedMoveDecision = Pick<Move, 'type' | 'position' | 'secret' | 'double'>;
 
 export async function makeApiCall(url: string, apiKey: string, payload: object, headers: object) {
   try {
@@ -16,9 +19,9 @@ export function sanitizeApiResponse(response: string): string {
   return response.replace(/```[a-zA-Z]*\n?|```/g, '').trim();
 }
 
-export function parseJsonResponse(response: string): any {
+export function parseJsonResponse(response: string): ParsedMoveDecision {
   try {
-    return JSON.parse(response);
+    return JSON.parse(response) as ParsedMoveDecision;
   } catch (error) {
     console.error('[API Call] Failed to parse JSON response:', error);
     throw error;

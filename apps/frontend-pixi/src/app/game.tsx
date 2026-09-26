@@ -5,15 +5,19 @@ import type { Move, MoveType } from '@yard/shared-utils';
 import { createWorld, type World } from '../three/world';
 import {
   buildIntersection,
+  BUILDING_LINE,
   DIRECTION_FORWARD,
   Direction,
   IntersectionBuild,
+  quadrantAt,
+  type Quadrant,
 } from '../three/intersection';
 import {
   createTaxi,
   createBus,
   createUnderground,
   createFerry,
+  STATION_FOOTPRINT,
   VehicleHandle,
   VehicleKind,
 } from '../three/vehicles';
@@ -23,7 +27,6 @@ import { playRide, type ArrivalAnchor } from '../three/ride';
 import { Hud } from '../hud/hud';
 import { Crosshair } from '../hud/crosshair';
 import { Intro } from '../hud/intro';
-import { PaperMap } from '../hud/paper-map';
 import { VehicleLabels } from '../hud/vehicle-labels';
 import { HudShell } from '../hud/hud-shell';
 import { JoinOverlay } from '../hud/join-overlay';
@@ -103,8 +106,6 @@ export function Game() {
   const channel = useGameStateStore((s) => s.channel);
   const myRole = useRunnerStore((s) => s.myRole);
   const viewingAs = useRunnerStore((s) => s.viewingAs);
-  const mapOpen = useRunnerStore((s) => s.mapOpen);
-  const setMapOpen = useRunnerStore((s) => s.setMapOpen);
   // Which surface this device shows by default (#2): desktop → strategic map,
   // phone → immersive FPV; overridable via the surface switch in <TopPills/>.
   const activeSurface = useRunnerStore(selectActiveSurface);
@@ -117,16 +118,11 @@ export function Game() {
   // we render the FPV from this player's intersection but the click handler still acts
   // (or refuses to act) on behalf of myRole.
   const viewerRole = viewingAs ?? myRole;
-  const isImpersonating = viewerRole != null && myRole != null && viewerRole !== myRole;
 
   // Derived view from the IMPERSONATED player when impersonating, else from myRole
   const viewerPlayer = useMemo(
     () => (viewerRole ? players.find((p) => p.role === viewerRole) : undefined),
     [players, viewerRole]
-  );
-  const myPlayer = useMemo(
-    () => (myRole ? players.find((p) => p.role === myRole) : undefined),
-    [players, myRole]
   );
   const myPosition = viewerPlayer?.position ?? null;
   // "Is it my turn" follows the impersonated role — when you click another detective's
@@ -171,8 +167,6 @@ export function Game() {
   myRoleRef.current = myRole;
   const isMyTurnRef = useRef(isMyTurn);
   isMyTurnRef.current = isMyTurn;
-  const mapOpenRef = useRef(mapOpen);
-  mapOpenRef.current = mapOpen;
   const ticketsRef = useRef(tickets);
   ticketsRef.current = tickets;
   const ridingRef = useRef(false);
@@ -330,8 +324,9 @@ export function Game() {
             last.type === m.type &&
             !!last.secret === !!m.secret &&
             !!last.double === !!m.double;
+          // Only the first leg of a double carries `double`, so any other move ends it.
+          store.setIsDoubleMove(!!m.double);
           if (isEcho) {
-            if (m.double) store.setIsDoubleMove(true);
             if (m.currentTurn) store.setCurrentTurn(m.currentTurn);
             return;
           }
@@ -344,7 +339,6 @@ export function Game() {
           });
           store.setPosition(m.role, m.position);
           store.decrementTickets(m.role, m.type, m.secret, m.double);
-          if (m.double) store.setIsDoubleMove(true);
           if (m.currentTurn) store.setCurrentTurn(m.currentTurn);
           if (m.role === 'culprit' && culpritEscaped(useGameStateStore.getState().moves)) {
             useGameStateStore.getState().setFinished('culprit');
@@ -438,7 +432,6 @@ export function Game() {
     return () => {
       useGameStateStore.getState().reset();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsJoin, urlSession?.channel, urlSession?.role, urlSession?.name, urlSession?.theme]);
 
   // Three.js setup — runs once
@@ -446,6 +439,8 @@ export function Game() {
     const canvas = canvasRef.current;
     const fade = fadeRef.current;
     if (!canvas || !fade) return;
+    // Hoisted function declarations below don't inherit the null-check narrowing.
+    const fadeEl: HTMLDivElement = fade;
 
     const world = createWorld(canvas);
     worldRef.current = world;
@@ -497,12 +492,17 @@ export function Game() {
           stopsByDirection[conn.direction] = conn.kind;
         }
       }
+      const stations = planStations(connections);
+      const stationQuadrants = new Set<Quadrant>(
+        [...stations.values()].map(({ position }) => quadrantAt(position.x, position.z))
+      );
       const built = buildIntersection(
         world.scene,
         nodeId,
         getActiveDirections(nodeId, includeRiver),
         riverDirs,
-        stopsByDirection
+        stopsByDirection,
+        stationQuadrants
       );
       currentIntersection = built;
 
@@ -513,7 +513,13 @@ export function Game() {
         else if (conn.kind === 'underground') v = createUnderground(conn.targetNodeId);
         else if (conn.kind === 'river') v = createFerry(conn.targetNodeId);
         else continue;
-        placeVehicle(v, built.exitAnchors[conn.direction], conn.direction, conn.slotIndex);
+        const station = stations.get(conn);
+        if (station) {
+          v.group.position.copy(station.position);
+          v.group.rotation.y = station.yaw;
+        } else {
+          placeVehicle(v, built.exitAnchors[conn.direction], conn.direction, conn.slotIndex);
+        }
         world.scene.add(v.group);
         vehicles.push(v);
       }
@@ -521,14 +527,14 @@ export function Game() {
       // Face the busiest road arm at eye height for the new node — never a wall-building
       // sealing a dead arm. PointerLockControls own the camera in FPV mode; this resets
       // yaw/pitch so framing is consistent across nodes.
-      if (controls) controls.resetView(spawnYaw(connections));
+      controls?.resetView(spawnYaw(connections));
 
       lastBuiltForNode = nodeId;
       vehiclesRef.current = vehicles;
       setSceneVersion((v) => v + 1);
     }
 
-    let controls: PovControls;
+    let controls: PovControls | null = null;
 
     // The arrival ride comes in at the stop that leads back where we came from; if the
     // graph is asymmetric, fall back to the compass arm pointing at the previous node.
@@ -555,7 +561,6 @@ export function Game() {
     }
 
     async function onVehicleClick(v: VehicleHandle) {
-      if (mapOpenRef.current) return;
       if (ridingRef.current) return; // already mid-ride; ignore extra clicks
       // Use the impersonated role for the actual move — impersonation IS seat-takeover.
       const runner = useRunnerStore.getState();
@@ -619,9 +624,9 @@ export function Game() {
       }
 
       setRiding(true);
-      controls.disable();
+      controls?.disable();
       playSfx('ride-start');
-      const overlay = makeRideOverlay(fade!);
+      const overlay = makeRideOverlay(fadeEl);
       const target = v.targetNodeId;
       const kind = v.kind as MoveType;
 
@@ -652,7 +657,7 @@ export function Game() {
         const store = useGameStateStore.getState();
         store.appendMove(move);
         store.setPosition(role, target);
-        store.decrementTickets(role, kind, useSecret);
+        store.decrementTickets(role, kind, useSecret, tagDouble);
         playSfx('ticket-spent');
         if (!useSecret) {
           const me = useGameStateStore.getState().players.find((p) => p.role === role);
@@ -689,8 +694,6 @@ export function Game() {
           // Mock mode turn advancement, with double-move bookkeeping
           if (useDouble) {
             // Just consumed leg 1 of a double — flag mid-double and DON'T advance turn.
-            // Also deduct the double-ticket once (here, when the first leg commits).
-            store.decrementTickets(role, kind, false, true);
             store.setIsDoubleMove(true);
           } else if (isCulpritMidDouble) {
             // Leg 2 just committed — clear the flag and advance normally.
@@ -719,16 +722,16 @@ export function Game() {
         }
       } finally {
         setRiding(false);
-        controls.enable();
+        controls?.enable();
       }
     }
 
     function flashInvalid() {
-      fade!.style.transition = 'background 80ms ease';
-      fade!.style.background = 'rgba(255, 50, 50, 0.25)';
+      fadeEl.style.transition = 'background 80ms ease';
+      fadeEl.style.background = 'rgba(255, 50, 50, 0.25)';
       setTimeout(() => {
-        fade!.style.transition = 'background 400ms ease';
-        fade!.style.background = 'rgba(0,0,0,0)';
+        fadeEl.style.transition = 'background 400ms ease';
+        fadeEl.style.background = 'rgba(0,0,0,0)';
       }, 80);
     }
 
@@ -762,28 +765,22 @@ export function Game() {
 
     // Pointer-lock state — tracks whether the canvas owns the cursor. HUD overlays
     // (Crosshair, VehicleLabels, Hud) gate visibility on this so they only appear
-    // during true FPV engagement (not during Intro / PaperMap / ride cinematic).
+    // during true FPV engagement (not during Intro / ride cinematic).
     const pointerLockHandler = () => {
       setPointerLocked(document.pointerLockElement === canvas);
     };
     document.addEventListener('pointerlockchange', pointerLockHandler);
 
     const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        // The TAB peek only applies in FPV — on the map surface the map is already shown.
-        if (selectActiveSurface(useRunnerStore.getState()) !== 'fpv') return;
-        const cur = useRunnerStore.getState().mapOpen;
-        const next = !cur;
-        useRunnerStore.getState().setMapOpen(next);
-        playSfx(next ? 'map-open' : 'map-close');
-        if (next && document.pointerLockElement === canvas) {
-          document.exitPointerLock();
-        }
-      } else if (e.key === 'Escape' && mapOpenRef.current) {
-        useRunnerStore.getState().setMapOpen(false);
-        playSfx('map-close');
-      }
+      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      e.preventDefault();
+      const runner = useRunnerStore.getState();
+      const toMap = selectActiveSurface(runner) === 'fpv';
+      runner.toggleSurface();
+      playSfx(toMap ? 'map-open' : 'map-close');
+      if (toMap && document.pointerLockElement === canvas) document.exitPointerLock();
     };
     window.addEventListener('keydown', keyHandler);
 
@@ -822,17 +819,11 @@ export function Game() {
       unsubReplay();
       window.removeEventListener('keydown', keyHandler);
       document.removeEventListener('pointerlockchange', pointerLockHandler);
-      controls.detach();
+      controls?.detach();
       if (currentIntersection) currentIntersection.dispose();
       world.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleMapDismiss = () => {
-    setMapOpen(false);
-    canvasRef.current?.requestPointerLock();
-  };
 
   // Bridge a map-click into the existing three.js vehicle-click pipeline by matching
   // the connection's (kind, targetNodeId) to the live VehicleHandle. All move logic
@@ -885,44 +876,26 @@ export function Game() {
             round={round}
             tickets={tickets}
             hoveredInfo={hoveredInfo}
-            mapHint={!mapOpen}
           />
           <Crosshair
             pointerLocked={pointerLocked}
             hoveredKind={hoveredInfo?.kind ?? null}
-            hidden={riding || mapOpen || !pointerLocked}
+            hidden={riding || !pointerLocked}
           />
           <VehicleLabels
             world={worldRef.current}
             sceneVersion={sceneVersion}
             getVehicles={() => vehiclesRef.current}
-            hidden={riding || mapOpen || !fpvEngaged}
+            hidden={riding || !fpvEngaged}
             onVehicleClick={(v) => vehicleClickRef.current?.(v)}
           />
-          {showIntro && !fpvEngaged && !riding && !mapOpen && (
+          {showIntro && !fpvEngaged && !riding && (
             <Intro
               onDismiss={() => {
                 setShowIntro(false);
                 // Pointer lock only applies to mouse controls; touch engages immediately.
                 if (!touchMode) canvasRef.current?.requestPointerLock();
               }}
-            />
-          )}
-          {mapOpen && myPosition != null && (
-            <PaperMap
-              currentNodeId={myPosition}
-              connections={mapConnections}
-              isMyTurn={!riding && isMyTurn}
-              currentTurnRole={currentTurn}
-              viewerRole={viewerRole}
-              players={players}
-              culpritMoveCount={moves.filter((m) => m.role === 'culprit').length}
-              ticketsByKind={ticketsByKind}
-              onConnectionClick={(conn) => {
-                handleMapClick(conn);
-                canvasRef.current?.requestPointerLock();
-              }}
-              onClose={handleMapDismiss}
             />
           )}
         </>
@@ -1039,23 +1012,6 @@ function placeVehicle(
     return;
   }
 
-  // Underground: a station house in the corner building of the quadrant beside this arm,
-  // portal facing the middle of the junction. CORNER_DISTANCE puts the front just behind
-  // the corner pavement (ROAD_HALF + SIDEWALK in intersection.ts) along the diagonal.
-  if (handle.kind === 'underground') {
-    const CORNER_DISTANCE = 10.6;
-    const forward = directionVector(dir);
-    const right = lateralVector(dir);
-    const side = slotIndex % 2 === 0 ? 1 : -1;
-    const diagonal = forward.clone().add(right.clone().multiplyScalar(side)).normalize();
-    handle.group.position.copy(diagonal.clone().multiplyScalar(CORNER_DISTANCE));
-    // Face the junction, turned part-way toward this arm's carriageway so the house
-    // sits closer to square with the building fronts than a flat 45° would.
-    const facing = forward.clone().multiplyScalar(0.45).add(right.clone().multiplyScalar(side)).negate();
-    handle.group.rotation.y = Math.atan2(facing.x, facing.z);
-    return;
-  }
-
   // Road vehicles: two-lane × multi-row packing keyed off the road centerline (so we
   // ignore the anchor's curbside lateral bias). Lanes at ±LANE_OFFSET keep all vehicles
   // within the ±ROAD_HALF=5 road bed. Rows spaced by ROW_DEPTH keep adjacent rows from
@@ -1077,6 +1033,49 @@ function placeVehicle(
   handle.group.position.copy(pos);
 
   handle.group.rotation.y = Math.atan2(forward.x, forward.z);
+}
+
+interface StationPlacement {
+  position: THREE.Vector3;
+  yaw: number;
+}
+
+/** Station houses set into an arm's frontage just past the corner, square to the street
+ *  with the portal opening onto the pavement. Each takes a free corner, preferring the
+ *  side its slot alternates to; once both corners of an arm are taken it moves further
+ *  down the street so no two houses overlap. */
+function planStations(connections: readonly Connection[]): Map<Connection, StationPlacement> {
+  const FRONT_SETBACK = 0.3;
+  const CORNER_GAP = 0.5;
+  const HOUSE_GAP = 1;
+  const plan = new Map<Connection, StationPlacement>();
+  const taken = new Set<string>();
+  for (const conn of connections) {
+    if (conn.kind !== 'underground') continue;
+    const forward = directionVector(conn.direction);
+    const right = lateralVector(conn.direction);
+    const preferred = conn.slotIndex % 2 === 0 ? 1 : -1;
+    let chosen: { side: number; row: number } | null = null;
+    for (let row = 0; !chosen; row++) {
+      for (const side of [preferred, -preferred]) {
+        const quadrant = quadrantAt(forward.x + right.x * side, forward.z + right.z * side);
+        const key = row === 0 ? quadrant : `${conn.direction}:${side}:${row}`;
+        if (taken.has(key)) continue;
+        taken.add(key);
+        chosen = { side, row };
+        break;
+      }
+    }
+    const along =
+      BUILDING_LINE + CORNER_GAP + STATION_FOOTPRINT.width / 2 + chosen.row * (STATION_FOOTPRINT.width + HOUSE_GAP);
+    const position = forward
+      .clone()
+      .multiplyScalar(along)
+      .add(right.clone().multiplyScalar(chosen.side * (BUILDING_LINE + FRONT_SETBACK)));
+    const facing = right.clone().multiplyScalar(-chosen.side);
+    plan.set(conn, { position, yaw: Math.atan2(facing.x, facing.z) });
+  }
+  return plan;
 }
 
 function centerlineFromAnchor(anchor: THREE.Vector3, dir: Direction): THREE.Vector3 {
@@ -1144,7 +1143,7 @@ function makeRideOverlay(el: HTMLDivElement) {
     setBlur(px: number) {
       el.style.backdropFilter = px > 0 ? `blur(${px}px)` : 'none';
     },
-    setLabel(_text: string | null) {
+    setLabel() {
       // not yet wired
     },
   };

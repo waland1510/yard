@@ -9,7 +9,6 @@ interface HudProps {
   round: number;
   tickets: { taxi: number; bus: number; underground: number };
   hoveredInfo: HoveredInfo | null;
-  mapHint: boolean;
 }
 
 const KIND_COLOR: Record<VehicleKind, string> = {
@@ -33,7 +32,7 @@ const KIND_VERB: Record<VehicleKind, string> = {
   river: 'Board',
 };
 
-export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo, mapHint }: HudProps) {
+export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo }: HudProps) {
   const themeId = useGameStateStore((s) => s.theme);
   const theme = getTheme(themeId);
   const labelFor = (kind: VehicleKind): string => theme.transportation[kind];
@@ -73,11 +72,9 @@ export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo, mapHint }: 
         </div>
       )}
 
-      {mapHint && (
-        <div style={mapHintStyle}>
-          <kbd style={kbdStyle}>TAB</kbd> open map
-        </div>
-      )}
+      <div style={mapHintStyle}>
+        <kbd style={kbdStyle}>TAB</kbd> strategic map
+      </div>
     </>
   );
 }

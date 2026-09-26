@@ -1,4 +1,4 @@
-// Graphics-quality control (#3). Cycles the FPV post-processing tier: auto → low → high.
+// Graphics-quality control (#3). Cycles the FPV rendering tier: auto → low → high.
 // `auto` picks low on phones / high on desktops. Only shown while the FPV surface is active.
 
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';

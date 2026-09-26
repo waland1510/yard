@@ -25,6 +25,7 @@ import { DetectiveDecisionArbiter } from './ai-decision-arbiter';
 import { HeuristicDetectivePolicy } from './heuristic-detective-policy';
 import { JevDetectivePolicy, JevPolicyResult } from './jev-detective-policy';
 import { PolicyResult, TacticalPicture } from './detective-policy';
+import { defined } from '../../test-utils/defined';
 
 function nodeWithAllTransports(): number {
   for (const [id, node] of GAME_GRAPH) {
@@ -103,12 +104,12 @@ describe('DetectiveDecisionArbiter', () => {
     });
     const arbiter = new DetectiveDecisionArbiter(new HeuristicDetectivePolicy(), jev);
 
-    const decision = await arbiter.decide(gameState, detective);
+    const decision = defined(await arbiter.decide(gameState, detective), 'decision');
 
-    expect(decision!.source).toBe('heuristic');
-    expect(decision!.comparison.jevEnabled).toBe(false);
-    expect(decision!.comparison.jev).toBeNull();
-    expect(decision!.comparison.agree).toBe(false);
+    expect(decision.source).toBe('heuristic');
+    expect(decision.comparison.jevEnabled).toBe(false);
+    expect(decision.comparison.jev).toBeNull();
+    expect(decision.comparison.agree).toBe(false);
     expect(jev.decide).not.toHaveBeenCalled();
   });
 
@@ -118,11 +119,12 @@ describe('DetectiveDecisionArbiter', () => {
     const jev = stubJev(picture => jevResultFor(picture, picture.candidates.length - 1));
     const arbiter = new DetectiveDecisionArbiter(new HeuristicDetectivePolicy(), jev);
 
-    const decision = await arbiter.decide(gameState, detective);
+    const decision = defined(await arbiter.decide(gameState, detective), 'decision');
 
-    expect(decision!.source).toBe('jev');
-    expect(decision!.move).toEqual(decision!.comparison.jev!.move);
-    expect(decision!.comparison.jev!.top.length).toBeGreaterThan(0);
+    expect(decision.source).toBe('jev');
+    const jevPick = defined(decision.comparison.jev, 'jev');
+    expect(decision.move).toEqual(jevPick.move);
+    expect(jevPick.top.length).toBeGreaterThan(0);
   });
 
   it('arbiter_jevFails_fallsBackToHeuristicWithError', async () => {
@@ -132,12 +134,12 @@ describe('DetectiveDecisionArbiter', () => {
     jest.spyOn(jev, 'decide').mockRejectedValue(new Error('timed out'));
     const arbiter = new DetectiveDecisionArbiter(new HeuristicDetectivePolicy(), jev);
 
-    const decision = await arbiter.decide(gameState, detective);
+    const decision = defined(await arbiter.decide(gameState, detective), 'decision');
 
-    expect(decision!.source).toBe('heuristic');
-    expect(decision!.comparison.jevError).toBe('timed out');
-    expect(decision!.comparison.jev).toBeNull();
-    expect(decision!.comparison.jevEnabled).toBe(true);
+    expect(decision.source).toBe('heuristic');
+    expect(decision.comparison.jevError).toBe('timed out');
+    expect(decision.comparison.jev).toBeNull();
+    expect(decision.comparison.jevEnabled).toBe(true);
   });
 
   it('arbiter_belowMinConfidence_fallsBackToHeuristic', async () => {
@@ -147,11 +149,11 @@ describe('DetectiveDecisionArbiter', () => {
     const jev = stubJev(picture => jevResultFor(picture, picture.candidates.length - 1, 0.3));
     const arbiter = new DetectiveDecisionArbiter(new HeuristicDetectivePolicy(), jev);
 
-    const decision = await arbiter.decide(gameState, detective);
+    const decision = defined(await arbiter.decide(gameState, detective), 'decision');
 
-    expect(decision!.source).toBe('heuristic');
-    expect(decision!.comparison.jev).not.toBeNull();
-    expect(decision!.comparison.jev!.confidence).toBe(0.3);
+    expect(decision.source).toBe('heuristic');
+    expect(decision.comparison.jev).not.toBeNull();
+    expect(defined(decision.comparison.jev, 'jev').confidence).toBe(0.3);
   });
 
   it('arbiter_sameMove_agreeTrueAndRankZero', async () => {
@@ -170,7 +172,7 @@ describe('DetectiveDecisionArbiter', () => {
 
     const jev = new JevDetectivePolicy();
     jest.spyOn(jev, 'decide').mockImplementation(async (_g, _d, picture) => {
-      const heuristicPick = (await originalDecide(gameState, detective, picture))!.move;
+      const heuristicPick = defined(await originalDecide(gameState, detective, picture), 'heuristic pick').move;
       const index = picture.candidates.findIndex(
         c => c.move.position === heuristicPick.position && c.move.type === heuristicPick.type
       );
@@ -178,10 +180,10 @@ describe('DetectiveDecisionArbiter', () => {
     });
 
     const arbiter = new DetectiveDecisionArbiter(heuristic, jev);
-    const decision = await arbiter.decide(gameState, detective);
+    const decision = defined(await arbiter.decide(gameState, detective), 'decision');
 
-    expect(decision!.comparison.agree).toBe(true);
-    expect(decision!.comparison.heuristic.rankInJev).toBe(0);
+    expect(decision.comparison.agree).toBe(true);
+    expect(decision.comparison.heuristic.rankInJev).toBe(0);
   });
 
   it('arbiter_strandedDetective_returnsNull', async () => {

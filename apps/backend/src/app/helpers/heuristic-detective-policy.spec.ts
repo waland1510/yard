@@ -1,6 +1,7 @@
 import { GAME_GRAPH, GameState, Player, Role } from '@yard/shared-utils';
 import { HeuristicDetectivePolicy } from './heuristic-detective-policy';
 import { buildTacticalPicture } from './move-candidates';
+import { defined } from '../../test-utils/defined';
 
 function nodeWithAllTransports(): number {
   for (const [id, node] of GAME_GRAPH) {
@@ -40,7 +41,7 @@ describe('HeuristicDetectivePolicy', () => {
 
   it('heuristicPolicy_suspectOnAdjacentNode_movesOntoIt', async () => {
     const detective = makeDetective();
-    const target = GAME_GRAPH.get(HUB)!.taxi![0];
+    const target = defined(GAME_GRAPH.get(HUB)?.taxi?.[0], 'taxi neighbour');
     const gameState = makeGameState([detective]);
 
     const picture = buildTacticalPicture({
@@ -50,11 +51,11 @@ describe('HeuristicDetectivePolicy', () => {
       weights: new Map<number, number>([[target, 1]]),
     });
 
-    const result = await policy.decide(gameState, detective, picture);
+    const result = defined(await policy.decide(gameState, detective, picture), 'result');
 
     expect(result).not.toBeNull();
-    expect(result!.move.position).toBe(target);
-    expect(result!.ranked[0]).toBe(`taxi_${target}`);
+    expect(result.move.position).toBe(target);
+    expect(result.ranked[0]).toBe(`taxi_${target}`);
   });
 
   it('heuristicPolicy_rankedList_coversEveryCandidate', async () => {
@@ -67,15 +68,15 @@ describe('HeuristicDetectivePolicy', () => {
       weights: new Map<number, number>(),
     });
 
-    const result = await policy.decide(gameState, detective, picture);
+    const result = defined(await policy.decide(gameState, detective, picture), 'result');
 
-    expect(result!.ranked).toHaveLength(picture.candidates.length);
-    expect(new Set(result!.ranked).size).toBe(picture.candidates.length);
+    expect(result.ranked).toHaveLength(picture.candidates.length);
+    expect(new Set(result.ranked).size).toBe(picture.candidates.length);
   });
 
   it('heuristicPolicy_neverMovesOntoAnotherDetective', async () => {
     const detective = makeDetective();
-    const blocked = GAME_GRAPH.get(HUB)!.taxi![0];
+    const blocked = defined(GAME_GRAPH.get(HUB)?.taxi?.[0], 'taxi neighbour');
     const blocker = makeDetective({ id: 2, role: Role.detective2, position: blocked });
     const gameState = makeGameState([detective, blocker]);
 
@@ -86,9 +87,9 @@ describe('HeuristicDetectivePolicy', () => {
       weights: new Map<number, number>([[blocked, 1]]),
     });
 
-    const result = await policy.decide(gameState, detective, picture);
+    const result = defined(await policy.decide(gameState, detective, picture), 'result');
 
-    expect(result!.move.position).not.toBe(blocked);
+    expect(result.move.position).not.toBe(blocked);
   });
 
   it('heuristicPolicy_strandedWithNoTickets_returnsNull', async () => {

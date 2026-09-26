@@ -180,18 +180,25 @@ function scaledDash(dash: { on: number; off: number } | undefined, scale: number
   return { on: dash.on * scale, off: dash.off * scale };
 }
 
-const NODE_TIER = new Map<number, TransportKind | null>(
+export interface StopServices {
+  bus: boolean;
+  underground: boolean;
+  river: boolean;
+}
+
+const STOP_SERVICES = new Map<number, StopServices>(
   mapData.nodes
     .filter((n) => n.id > 0)
     .map((n) => [
       n.id,
-      n.underground?.length ? 'underground' : n.bus?.length ? 'bus' : null,
+      {
+        bus: Boolean(n.bus?.length),
+        underground: Boolean(n.underground?.length),
+        river: Boolean(n.river?.length),
+      },
     ])
 );
 
-/** Ring colour for a base node marker: red for tube stations, green for bus stops,
- *  dark for taxi-only — as on the printed board. */
-export function nodeRingColor(nodeId: number): string {
-  const tier = NODE_TIER.get(nodeId);
-  return tier ? KIND_COLOR[tier] : '#222';
+export function stopServices(nodeId: number): StopServices {
+  return STOP_SERVICES.get(nodeId) ?? { bus: false, underground: false, river: false };
 }

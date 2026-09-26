@@ -147,7 +147,6 @@ export function VehicleLabels({ world, sceneVersion, getVehicles, hidden, onVehi
       for (const item of labels) item.el.remove();
     };
     // We DO want to rebuild whenever the scene rebuilds OR tickets change OR hidden flips
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [world, sceneVersion, tickets.taxi, tickets.bus, tickets.underground, hidden]);
 
   return (

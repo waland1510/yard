@@ -75,8 +75,6 @@ export interface RunnerStore {
    *  turns in between). Auto-clears after both legs are committed. */
   pendingDouble: boolean;
 
-  /** Paper map open (TAB). */
-  mapOpen: boolean;
   /** Magnify lens on the paper map. */
   magnifyEnabled: boolean;
   /** Deduction heatmap toggle. */
@@ -107,7 +105,6 @@ export interface RunnerStore {
   updatePendingMove(patch: Partial<PendingMove>): void;
   setPendingSecret(v: boolean): void;
   setPendingDouble(v: boolean): void;
-  setMapOpen(open: boolean): void;
   setMagnifyEnabled(v: boolean): void;
   setHeatmapEnabled(v: boolean): void;
   setPlayersDrawerOpen(v: boolean): void;
@@ -154,7 +151,6 @@ export const useRunnerStore = create<RunnerStore>((set, get) => ({
   pendingMove: null,
   pendingSecret: false,
   pendingDouble: false,
-  mapOpen: false,
   magnifyEnabled: false,
   heatmapEnabled: true,
   playersDrawerOpen: false,
@@ -237,10 +233,6 @@ export const useRunnerStore = create<RunnerStore>((set, get) => ({
     set({ pendingDouble: v });
   },
 
-  setMapOpen(open) {
-    set({ mapOpen: open });
-  },
-
   setMagnifyEnabled(v) {
     set({ magnifyEnabled: v });
   },
@@ -280,7 +272,6 @@ export const useRunnerStore = create<RunnerStore>((set, get) => ({
       pendingMove: null,
       pendingSecret: false,
       pendingDouble: false,
-      mapOpen: false,
       magnifyEnabled: false,
       playersDrawerOpen: false,
       movesDrawerOpen: false,

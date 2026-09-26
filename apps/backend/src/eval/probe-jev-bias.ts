@@ -3,7 +3,7 @@
 // Run: bun --env-file=apps/backend/.env.development run apps/backend/src/eval/probe-jev-bias.ts
 
 import { choice } from '@typesafe-ai/sdk';
-import { GAME_GRAPH, Player, Role } from '@yard/shared-utils';
+import { Player, Role } from '@yard/shared-utils';
 import { MoveCandidate, TacticalPicture, candidateKey } from '../app/helpers/detective-policy';
 import { DECISION_FOCUS, buildState, describeCandidate, describeContext } from '../app/helpers/jev-detective-policy';
 import { getJevClient } from '../app/helpers/jev-client';

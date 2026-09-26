@@ -17,7 +17,9 @@ function SetupRoute() {
   );
 }
 
-const root = createRoot(document.getElementById('root')!);
+const rootEl = document.getElementById('root');
+if (!rootEl) throw new Error('#root element missing');
+const root = createRoot(rootEl);
 root.render(
   <StrictMode>
     <BrowserRouter>

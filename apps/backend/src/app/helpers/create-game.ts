@@ -1,5 +1,4 @@
-import { GameState, initialPlayers } from '@yard/shared-utils';
-import { themes } from '../../../../frontend/src/app/themes';
+import { GameState, initialPlayers, themes } from '@yard/shared-utils';
 
 export interface CreateGameOptions {
   aiRoles?: string[];

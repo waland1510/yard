@@ -33,12 +33,12 @@ export const isSfxMuted = () => muted;
 export const playSfx = (key: SfxKey, volume = 0.35) => {
   if (muted) return;
   try {
-    if (!cache[key]) {
-      const audio = new Audio(SFX_FILES[key]);
+    let audio = cache[key];
+    if (!audio) {
+      audio = new Audio(SFX_FILES[key]);
       audio.volume = volume;
       cache[key] = audio;
     }
-    const audio = cache[key]!;
     audio.currentTime = 0;
     audio.play().catch(() => {
       /* autoplay blocked or file missing — silent */

@@ -46,7 +46,6 @@ export function decideLocalMove(gameState: GameState, player: Player): Move {
   } else {
     // Detective: move toward last known or predicted culprit position
     const culpritMoves = gameState.moves.filter(m => m.role === 'culprit');
-    const numCulpritMoves = culpritMoves.length;
     const lastRevealedIdx = [...culpritMoves.keys()]
       .reverse()
       .find(i => showCulpritAtMoves.includes(i + 1));

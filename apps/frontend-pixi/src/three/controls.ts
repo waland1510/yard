@@ -123,7 +123,7 @@ export function createPovControls({
     applyOrientation();
   }
 
-  function onClick(_e: MouseEvent) {
+  function onClick() {
     if (!enabled) return;
     if (!isLocked()) {
       // First click engages pointer lock. requestPointerLock() must be invoked

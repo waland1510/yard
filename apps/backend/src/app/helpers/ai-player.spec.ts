@@ -1,6 +1,7 @@
 import { AIPlayerService } from './ai-player';
 import { GameState, MoveType, Player, Role } from '@yard/shared-utils';
 import axios from 'axios';
+import { defined } from '../../test-utils/defined';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -150,7 +151,7 @@ describe('AIPlayerService', () => {
     });
 
     it('should handle the culprit role differently', async () => {
-      const culpritPlayer = mockGameState.players.find(p => p.role === Role.culprit)!;
+      const culpritPlayer = defined(mockGameState.players.find(p => p.role === Role.culprit), 'culprit');
       const move = await aiService.calculateMove(mockGameState, culpritPlayer);
 
       expect(move).toBeDefined();

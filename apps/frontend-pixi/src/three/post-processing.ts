@@ -5,9 +5,9 @@
 //   - bloom on bright emissives (signage, tube glow, lamps)
 //   - OutputPass applies tone mapping + sRGB at the end of the chain
 //
-// Two quality tiers keep it smooth on a phone: `low` (render + bloom + output) and `high`
-// (render + GTAO + bloom + output). The composer is rebuilt when the tier changes so we
-// never pay for AO on a device that can't afford it.
+// Two quality tiers: `low` (single-sample render + output) and `high` (MSAA render + GTAO +
+// bloom + output). The composer is rebuilt when the tier changes so a device on `low`
+// never pays for multisampling, AO or bloom.
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -28,7 +28,7 @@ export interface PostProcessing {
   dispose: () => void;
 }
 
-const MSAA_SAMPLES = 4;
+const MSAA_SAMPLES: Record<QualityTier, number> = { low: 0, high: 4 };
 
 // Bloom runs on linear HDR values before tone mapping. Sunlit cream/yellow diffuse lands
 // around 1.0, so the threshold must sit above that or the whole road glows white; only
@@ -90,27 +90,30 @@ export function createPostProcessing(
   renderer.getSize(size);
   let w = size.x;
   let h = size.y;
-  const pixelRatio = renderer.getPixelRatio();
-
-  const target = new THREE.WebGLRenderTarget(w * pixelRatio, h * pixelRatio, {
-    type: THREE.HalfFloatType,
-    samples: MSAA_SAMPLES,
-  });
-  const composer = new EffectComposer(renderer, target);
-  composer.setPixelRatio(pixelRatio);
+  let composer: EffectComposer | null = null;
   let currentTier: QualityTier = initialTier;
   let owned: Pass[] = [];
 
-  function disposeOwned() {
+  function disposeComposer() {
     for (const p of owned) {
       (p as { dispose?: () => void }).dispose?.();
     }
     owned = [];
-    composer.passes = [];
+    composer?.renderTarget1.dispose();
+    composer?.renderTarget2.dispose();
+    composer?.dispose();
+    composer = null;
   }
 
   function build(tier: QualityTier) {
-    disposeOwned();
+    disposeComposer();
+    const pixelRatio = renderer.getPixelRatio();
+    const target = new THREE.WebGLRenderTarget(w * pixelRatio, h * pixelRatio, {
+      type: THREE.HalfFloatType,
+      samples: MSAA_SAMPLES[tier],
+    });
+    composer = new EffectComposer(renderer, target);
+    composer.setPixelRatio(pixelRatio);
 
     const render = new RenderPass(scene, camera);
     composer.addPass(render);
@@ -125,14 +128,16 @@ export function createPostProcessing(
       owned.push(gtao);
     }
 
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(w, h),
-      BLOOM_STRENGTH,
-      BLOOM_RADIUS,
-      BLOOM_THRESHOLD
-    );
-    composer.addPass(bloom);
-    owned.push(bloom);
+    if (tier === 'high') {
+      const bloom = new UnrealBloomPass(
+        new THREE.Vector2(w, h),
+        BLOOM_STRENGTH,
+        BLOOM_RADIUS,
+        BLOOM_THRESHOLD
+      );
+      composer.addPass(bloom);
+      owned.push(bloom);
+    }
 
     const output = new OutputPass();
     composer.addPass(output);
@@ -149,20 +154,17 @@ export function createPostProcessing(
   build(initialTier);
 
   return {
-    render: () => composer.render(),
+    render: () => composer?.render(),
     setSize: (width, height) => {
       w = width;
       h = height;
-      composer.setSize(width, height);
+      composer?.setSize(width, height);
     },
     setQuality: (tier) => {
       if (tier === currentTier) return;
       build(tier);
     },
     tier: () => currentTier,
-    dispose: () => {
-      disposeOwned();
-      composer.dispose();
-    },
+    dispose: disposeComposer,
   };
 }

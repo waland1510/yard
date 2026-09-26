@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import type { RoleType } from '@yard/shared-utils';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
-import { getTheme, characterFor } from '../core/theme-registry';
+import { getTheme } from '../core/theme-registry';
 import { ROLE_PALETTE } from '../core/map-data';
 import { getPresence } from '../net/rest-client';
 
@@ -54,10 +54,10 @@ export function JoinOverlay({ channel, onJoin }: JoinOverlayProps) {
   const canJoin = role != null && name.trim().length > 0 && !occupied.has(role);
 
   const handleJoin = () => {
-    if (!canJoin) return;
-    const params = new URLSearchParams({ role: role!, name: name.trim(), theme: themeId });
+    if (!canJoin || role == null) return;
+    const params = new URLSearchParams({ role, name: name.trim(), theme: themeId });
     navigate(`/game/${encodeURIComponent(channel)}?${params.toString()}`, { replace: true });
-    onJoin(role!, name.trim());
+    onJoin(role, name.trim());
   };
 
   return (

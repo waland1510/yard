@@ -7,6 +7,7 @@ import {
   seededStartingPositions,
   simulateGame,
 } from './simulate-game';
+import { defined } from '../test-utils/defined';
 
 function firstTaxi(player: Player): Move | null {
   const node = GAME_GRAPH.get(player.position);
@@ -34,12 +35,12 @@ describe('simulateGame', () => {
 
   it('applyMove_spendsTicketAdvancesTurnAndRecordsMove', () => {
     const state = initialGameState(1);
-    const culprit = state.players.find(p => p.role === Role.culprit)!;
-    const dest = GAME_GRAPH.get(culprit.position)!.taxi![0];
+    const culprit = defined(state.players.find(p => p.role === Role.culprit), 'culprit');
+    const dest = defined(GAME_GRAPH.get(culprit.position)?.taxi?.[0], 'taxi neighbour');
 
     const next = applyMove(state, { role: Role.culprit, type: 'taxi', position: dest });
 
-    const moved = next.players.find(p => p.role === Role.culprit)!;
+    const moved = defined(next.players.find(p => p.role === Role.culprit), 'moved culprit');
     expect(moved.position).toBe(dest);
     expect(moved.taxiTickets).toBe(culprit.taxiTickets - 1);
     expect(next.currentTurn).toBe(Role.detective1);
@@ -49,19 +50,19 @@ describe('simulateGame', () => {
 
   it('applyMove_doubleMove_keepsTurnWithCulprit', () => {
     const state = initialGameState(1);
-    const culprit = state.players.find(p => p.role === Role.culprit)!;
-    const dest = GAME_GRAPH.get(culprit.position)!.taxi![0];
+    const culprit = defined(state.players.find(p => p.role === Role.culprit), 'culprit');
+    const dest = defined(GAME_GRAPH.get(culprit.position)?.taxi?.[0], 'taxi neighbour');
 
     const next = applyMove(state, { role: Role.culprit, type: 'taxi', position: dest, double: true });
 
     expect(next.currentTurn).toBe(Role.culprit);
     expect(next.isDoubleMove).toBe(true);
-    expect(next.players.find(p => p.role === Role.culprit)!.doubleTickets).toBe(1);
+    expect(defined(next.players.find(p => p.role === Role.culprit), 'culprit').doubleTickets).toBe(1);
   });
 
   it('findCaptor_detectiveOnCulpritNode_returnsThatDetective', () => {
     const state = initialGameState(1);
-    const culprit = state.players.find(p => p.role === Role.culprit)!;
+    const culprit = defined(state.players.find(p => p.role === Role.culprit), 'culprit');
     const withCapture = {
       ...state,
       players: state.players.map(p => (p.role === Role.detective2 ? { ...p, position: culprit.position } : p)),
@@ -95,7 +96,7 @@ describe('simulateGame', () => {
         return move;
       },
       decideDetective: async (state, detective) => {
-        const culprit = state.players.find(p => p.role === Role.culprit)!;
+        const culprit = defined(state.players.find(p => p.role === Role.culprit), 'culprit');
         // Teleport onto Mr. X: legality is the policy's job, not the simulator's.
         return { role: detective.role, type: 'taxi', position: culprit.position };
       },

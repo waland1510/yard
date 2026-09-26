@@ -1,4 +1,4 @@
-import { runQuery } from '@yard/shared-utils';
+import { runQuery } from '../helpers/run-query';
 import { FastifyInstance, FastifyRequest } from 'fastify';
 
 const addUser = `INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *;`;

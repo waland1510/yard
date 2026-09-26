@@ -1,4 +1,4 @@
-import { IpInfo, Move } from '@yard/shared-utils';
+import { IpInfo, Move, Player } from '@yard/shared-utils';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { gamesTable, ipInfoTable, movesTable, playersTable } from '../helpers/pg-tables';
@@ -8,7 +8,7 @@ const db = drizzle(ENV.DATABASE_URL, {
   casing: 'snake_case',
 });
 
-export async function createGame(channel: string, players: any[], currentTurn: string, theme = 'classic') {
+export async function createGame(channel: string, players: Player[], currentTurn: string, theme = 'classic') {
   try {
     return await db.transaction(async (trx) => {
       const [game] = await trx
@@ -20,7 +20,7 @@ export async function createGame(channel: string, players: any[], currentTurn: s
           moves: [],
           status: 'active',
           theme,
-        } as any)
+        })
         .returning()
         .execute();
 
@@ -29,9 +29,10 @@ export async function createGame(channel: string, players: any[], currentTurn: s
       await trx
         .insert(playersTable)
         .values(
-          players.map(({ id, ...player }) => ({
-            gameId,
+          players.map((player) => ({
             ...player,
+            id: undefined,
+            gameId,
           }))
         )
         .execute();
@@ -51,7 +52,7 @@ export async function createGame(channel: string, players: any[], currentTurn: s
   }
 }
 
-export async function updatePlayer(id: number, updates: Partial<any>) {
+export async function updatePlayer(id: number, updates: Partial<typeof playersTable.$inferInsert>) {
   try {
     await db
       .update(playersTable)
@@ -66,6 +67,7 @@ export async function updatePlayer(id: number, updates: Partial<any>) {
 
 export async function addMove(move: Move) {
   const { gameId, role, type, position, secret = false, double = false } = move;
+  if (gameId == null || role == null) throw new Error('addMove requires gameId and role');
   try {
     await db.transaction(async (trx) => {
       await trx
@@ -77,7 +79,7 @@ export async function addMove(move: Move) {
           secret,
           double,
           position,
-        } as any)
+        })
         .execute();
 
       await trx
@@ -90,7 +92,7 @@ export async function addMove(move: Move) {
           doubleTickets: sql`${playersTable.doubleTickets} - ${double ? 1 : 0}`,
           position,
           previousPosition: sql`${playersTable.position}`,
-        } as any)
+        })
         .where(sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`)
         .execute();
     });

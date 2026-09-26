@@ -4,7 +4,6 @@ import {
   Player,
   MoveType,
   mapData,
-  Node,
   computePossiblePositions,
   buildDetectivesByTurn,
   GAME_GRAPH,
@@ -34,7 +33,9 @@ function findShortestPath(
   }];
 
   while (queue.length > 0) {
-    const { path, taxi, bus, underground } = queue.shift()!;
+    const next = queue.shift();
+    if (!next) break;
+    const { path, taxi, bus, underground } = next;
     const current = path[path.length - 1];
 
     if (targets.includes(current)) return path;
@@ -77,7 +78,9 @@ function bfsHopDistance(
   const queue: { node: number; hops: number }[] = [{ node: from, hops: 0 }];
 
   while (queue.length > 0) {
-    const { node: current, hops } = queue.shift()!;
+    const next = queue.shift();
+    if (!next) break;
+    const { node: current, hops } = next;
     if (visited.has(current)) continue;
     visited.add(current);
 

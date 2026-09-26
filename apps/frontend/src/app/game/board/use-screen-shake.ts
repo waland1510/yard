@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { showCulpritAtMoves } from '@yard/shared-utils';
 import { useGameStore } from '../../../stores/use-game-store';
 
@@ -8,6 +8,7 @@ export const useScreenShake = () => {
   const [isShaking, setIsShaking] = useState(false);
   const moves = useGameStore((s) => s.moves);
   const status = useGameStore((s) => s.status);
+  const handledMoveCount = useRef(0);
 
   useEffect(() => {
     if (status === 'finished') {
@@ -18,6 +19,8 @@ export const useScreenShake = () => {
   }, [status]);
 
   useEffect(() => {
+    if (moves.length === handledMoveCount.current) return;
+    handledMoveCount.current = moves.length;
     if (moves.length === 0) return;
 
     const lastMove = moves[moves.length - 1];
@@ -29,7 +32,7 @@ export const useScreenShake = () => {
     setIsShaking(true);
     const timer = setTimeout(() => setIsShaking(false), SHAKE_TTL);
     return () => clearTimeout(timer);
-  }, [moves.length]);
+  }, [moves]);
 
   return isShaking;
 };

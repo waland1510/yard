@@ -1,5 +1,3 @@
-import type { PostgresDb } from '@fastify/postgres';
-
 export const Role = {
   culprit: 'culprit',
   detective1: 'detective1',
@@ -285,19 +283,6 @@ export interface IpInfo {
   postal: string;
   timezone: string;
   createdAt: string;
-}
-
-export async function runQuery(
-  pg: PostgresDb,
-  query: string,
-  params: unknown[] = []
-) {
-  const client = await pg.connect();
-  try {
-    return await client.query(query, params);
-  } finally {
-    client.release();
-  }
 }
 
 export interface PredictedCulpritMove {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeRoundelTexture, makeTextTexture } from './canvas-textures';
 import { TFL_BLUE, TFL_RED } from './palette';
 
@@ -20,7 +21,6 @@ export interface VehicleHandle {
 const TAXI_BODY = 0xf6c945;
 const TAXI_DARK = 0x7a5e0e;
 const BUS_BODY = 0xc02f2f;
-const BUS_ROOF = 0x9a2424;
 const BUS_TRIM = 0xefe7d8;
 const GLASS = 0x2a3446;
 const RUBBER = 0x171719;
@@ -40,8 +40,63 @@ function mat(color: number, roughness = 0.6, metalness = 0): Mat {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness });
 }
 
+// The street's scene.environmentIntensity is kept low so sunlit diffuse doesn't wash out;
+// vehicles bind the environment directly so paint, glass and chrome get full reflections.
+let vehicleEnv: THREE.Texture | null = null;
+const ENV_INTENSITY_KEY = 'vehicleEnvIntensity';
+
+function reflective<T extends Mat>(m: T, intensity: number): T {
+  m.userData[ENV_INTENSITY_KEY] = intensity;
+  if (vehicleEnv) {
+    m.envMap = vehicleEnv;
+    m.envMapIntensity = intensity;
+  }
+  return m;
+}
+
+/** Binds the reflection map to every vehicle material, current and future. */
+export function setVehicleEnvironment(env: THREE.Texture, scene: THREE.Object3D) {
+  vehicleEnv = env;
+  scene.traverse((obj) => {
+    const mats = (obj as THREE.Mesh).material;
+    for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+      const intensity = m.userData[ENV_INTENSITY_KEY];
+      if (typeof intensity !== 'number' || !(m instanceof THREE.MeshStandardMaterial)) continue;
+      m.envMap = env;
+      m.envMapIntensity = intensity;
+      m.needsUpdate = true;
+    }
+  });
+}
+
+function paintMat(color: number, metalness: number): THREE.MeshPhysicalMaterial {
+  return reflective(
+    new THREE.MeshPhysicalMaterial({
+      color,
+      roughness: 0.38,
+      metalness,
+      clearcoat: 1,
+      clearcoatRoughness: 0.06,
+    }),
+    0.75
+  );
+}
+
 function glassMat(): Mat {
-  return new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.2, metalness: 0.25 });
+  return reflective(
+    new THREE.MeshPhysicalMaterial({
+      color: GLASS,
+      roughness: 0.04,
+      metalness: 0.1,
+      clearcoat: 1,
+      clearcoatRoughness: 0.02,
+    }),
+    1.6
+  );
+}
+
+function chromeMat(color = CHROME): Mat {
+  return reflective(mat(color, 0.14, 1), 1.3);
 }
 
 function lampMat(color: number, intensity: number, base = 0xfff8e6): Mat {
@@ -50,6 +105,39 @@ function lampMat(color: number, intensity: number, base = 0xfff8e6): Mat {
 
 function rbox(w: number, h: number, d: number, radius: number): RoundedBoxGeometry {
   return new RoundedBoxGeometry(w, h, d, 3, radius);
+}
+
+/** Extrudes a side profile (shape x = vehicle +Z forward, shape y = height) across the
+ *  vehicle's width, centred on X, with every edge rounded by `bevel`. */
+function profileBody(shape: THREE.Shape, width: number, bevel: number): THREE.BufferGeometry {
+  const depth = width - bevel * 2;
+  const extruded = new THREE.ExtrudeGeometry(shape, {
+    depth,
+    bevelEnabled: true,
+    bevelThickness: bevel,
+    bevelSize: bevel,
+    // Keeps the side walls on the profile outline so the drawn coordinates are exact.
+    bevelOffset: -bevel,
+    bevelSegments: 5,
+    curveSegments: 14,
+  });
+  extruded.rotateY(-Math.PI / 2);
+  extruded.translate(depth / 2, 0, 0);
+  // Welding caps to walls gives smooth normals across the bevels instead of facets.
+  extruded.deleteAttribute('uv');
+  extruded.deleteAttribute('normal');
+  const smooth = mergeVertices(extruded, 1e-4);
+  extruded.dispose();
+  smooth.computeVertexNormals();
+  return smooth;
+}
+
+/** Cuts a semicircular wheel arch into a profile's bottom edge while tracing it front-ward. */
+function archNotch(shape: THREE.Shape, z: number, centerY: number, radius: number, bottomY: number) {
+  shape.lineTo(z - radius, bottomY);
+  if (bottomY !== centerY) shape.lineTo(z - radius, centerY);
+  shape.absarc(z, centerY, radius, Math.PI, 0, true);
+  if (bottomY !== centerY) shape.lineTo(z + radius, bottomY);
 }
 
 function shadowed<T extends THREE.Mesh>(m: T, receive = false): T {
@@ -93,12 +181,6 @@ function addWheel(
   parent.add(h);
 }
 
-function addWheelArch(parent: THREE.Object3D, x: number, z: number, radius: number, bodyHalfWidth: number, arch: Mat) {
-  const a = new THREE.Mesh(new THREE.BoxGeometry(0.16, radius * 1.2, radius * 2.3), arch);
-  a.position.set(Math.sign(x) * (bodyHalfWidth - 0.02), radius * 1.05, z);
-  parent.add(a);
-}
-
 function addPane(parent: THREE.Object3D, w: number, h: number, pos: THREE.Vector3, rotY: number, glass: Mat, tiltX = 0) {
   const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glass);
   p.position.copy(pos);
@@ -114,73 +196,86 @@ export function createTaxi(targetNodeId: number): VehicleHandle {
   const group = new THREE.Group();
   group.name = `taxi-${targetNodeId}`;
 
-  const bodyMat = mat(TAXI_BODY, 0.4, 0.15);
+  const bodyMat = paintMat(TAXI_BODY, 0.15);
   const darkMat = mat(TAXI_DARK, 0.6);
   const glass = glassMat();
   const trimMat = mat(GUNMETAL, 0.5, 0.4);
-  const chromeMat = mat(CHROME, 0.3, 0.8);
+  const chrome = chromeMat();
   const tyreMat = mat(RUBBER, 0.95);
 
-  const body = shadowed(new THREE.Mesh(rbox(1.9, 0.62, 4.4, 0.12), bodyMat), true);
-  body.position.y = 0.66;
-  group.add(body);
+  const WHEEL_R = 0.4;
+  const WHEEL_Z = [1.5, -1.45];
 
-  const cabin = shadowed(new THREE.Mesh(rbox(1.8, 0.82, 2.5, 0.16), bodyMat));
-  cabin.position.set(0, 1.32, -0.35);
-  group.add(cabin);
+  const bodyShape = new THREE.Shape();
+  bodyShape.moveTo(-2.05, WHEEL_R);
+  archNotch(bodyShape, WHEEL_Z[1], WHEEL_R, 0.47, WHEEL_R);
+  archNotch(bodyShape, WHEEL_Z[0], WHEEL_R, 0.47, WHEEL_R);
+  bodyShape.lineTo(2.05, WHEEL_R);
+  bodyShape.quadraticCurveTo(2.25, WHEEL_R, 2.25, 0.58);
+  bodyShape.lineTo(2.25, 0.82);
+  bodyShape.quadraticCurveTo(2.24, 1.04, 1.95, 1.06);
+  bodyShape.lineTo(0.95, 1.12);
+  bodyShape.lineTo(-1.85, 1.12);
+  bodyShape.quadraticCurveTo(-2.22, 1.12, -2.22, 0.9);
+  bodyShape.lineTo(-2.22, 0.6);
+  bodyShape.quadraticCurveTo(-2.22, WHEEL_R, -2.05, WHEEL_R);
+  group.add(shadowed(new THREE.Mesh(profileBody(bodyShape, 1.9, 0.1), bodyMat), true));
 
-  const bonnet = shadowed(new THREE.Mesh(rbox(1.7, 0.22, 1.35, 0.08), bodyMat));
-  bonnet.position.set(0, 1.04, 1.35);
-  group.add(bonnet);
+  const cabinShape = new THREE.Shape();
+  cabinShape.moveTo(-1.9, 1.0);
+  cabinShape.lineTo(1.0, 1.0);
+  cabinShape.lineTo(0.92, 1.1);
+  cabinShape.lineTo(0.52, 1.66);
+  cabinShape.quadraticCurveTo(0.42, 1.76, 0.2, 1.76);
+  cabinShape.lineTo(-1.3, 1.76);
+  cabinShape.quadraticCurveTo(-1.52, 1.76, -1.6, 1.62);
+  cabinShape.lineTo(-1.88, 1.14);
+  cabinShape.lineTo(-1.9, 1.0);
+  group.add(shadowed(new THREE.Mesh(profileBody(cabinShape, 1.74, 0.12), bodyMat)));
 
-  const boot = new THREE.Mesh(rbox(1.7, 0.16, 0.6, 0.06), bodyMat);
-  boot.position.set(0, 1.02, -1.85);
-  group.add(boot);
-
-  addPane(group, 1.5, 0.6, new THREE.Vector3(0, 1.4, 0.92), 0, glass, -0.28);
-  addPane(group, 1.4, 0.55, new THREE.Vector3(0, 1.42, -1.62), Math.PI, glass, -0.22);
+  addPane(group, 1.45, 0.58, new THREE.Vector3(0, 1.387, 0.73), 0, glass, -0.62);
+  addPane(group, 1.35, 0.46, new THREE.Vector3(0, 1.385, -1.75), Math.PI, glass, -0.53);
   for (const side of [-1, 1] as const) {
     const rotY = (side * Math.PI) / 2;
-    addPane(group, 0.95, 0.52, new THREE.Vector3(side * 0.905, 1.42, 0.25), rotY, glass);
-    addPane(group, 0.95, 0.52, new THREE.Vector3(side * 0.905, 1.42, -0.9), rotY, glass);
-    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.2), trimMat);
-    mirror.position.set(side * 1.02, 1.3, 0.85);
+    addPane(group, 0.8, 0.44, new THREE.Vector3(side * 0.875, 1.36, 0.1), rotY, glass);
+    addPane(group, 1.0, 0.44, new THREE.Vector3(side * 0.875, 1.36, -0.975), rotY, glass);
+    const mirror = new THREE.Mesh(rbox(0.08, 0.14, 0.2, 0.03), trimMat);
+    mirror.position.set(side * 0.98, 1.18, 0.8);
     group.add(mirror);
-    for (const z of [0.25, -0.9]) {
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.22), chromeMat);
-      handle.position.set(side * 0.965, 0.95, z + 0.3);
+    for (const z of [0.35, -0.7]) {
+      const handle = new THREE.Mesh(rbox(0.03, 0.05, 0.22, 0.012), chrome);
+      handle.position.set(side * 0.955, 0.95, z);
       group.add(handle);
     }
   }
 
-  for (const [x, z] of [[-0.95, 1.5], [0.95, 1.5], [-0.95, -1.45], [0.95, -1.45]]) {
-    addWheelArch(group, x, z, 0.4, 0.95, trimMat);
-    addWheel(group, x, z, 0.4, 0.3, tyreMat, chromeMat);
+  for (const z of WHEEL_Z) {
+    for (const x of [-0.8, 0.8]) addWheel(group, x, z, WHEEL_R, 0.3, tyreMat, chrome);
   }
 
-  for (const z of [2.24, -2.24]) {
-    const bumper = new THREE.Mesh(rbox(1.92, 0.16, 0.18, 0.05), trimMat);
+  for (const z of [2.26, -2.26]) {
+    const bumper = new THREE.Mesh(rbox(1.92, 0.16, 0.18, 0.06), trimMat);
     bumper.position.set(0, 0.5, z);
     group.add(bumper);
   }
-  const grille = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.05), trimMat);
-  grille.position.set(0, 0.78, 2.22);
+  const grille = new THREE.Mesh(rbox(0.9, 0.24, 0.05, 0.02), trimMat);
+  grille.position.set(0, 0.7, 2.26);
   group.add(grille);
   const plate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.02), mat(0xf4efe2, 0.7));
-  plate.position.set(0, 0.6, 2.23);
+  plate.position.set(0, 0.5, 2.36);
   group.add(plate);
 
   const headMat = lampMat(LAMP_WARM, 2.8);
   for (const x of [-0.68, 0.68]) {
     const hl = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.06, 14), headMat);
     hl.rotation.x = Math.PI / 2;
-    hl.position.set(x, 0.86, 2.21);
+    hl.position.set(x, 0.8, 2.25);
     group.add(hl);
   }
   const tailMat = lampMat(LAMP_RED, 2.6, 0x3a0705);
   for (const x of [-0.72, 0.72]) {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.04), tailMat);
-    tl.position.set(x, 0.88, -2.21);
+    const tl = new THREE.Mesh(rbox(0.22, 0.12, 0.04, 0.015), tailMat);
+    tl.position.set(x, 0.8, -2.23);
     group.add(tl);
   }
 
@@ -226,43 +321,47 @@ export function createBus(targetNodeId: number): VehicleHandle {
   const group = new THREE.Group();
   group.name = `bus-${targetNodeId}`;
 
-  const bodyMat = mat(BUS_BODY, 0.5, 0.15);
-  const roofMat = mat(BUS_ROOF, 0.75);
+  const bodyMat = paintMat(BUS_BODY, 0.2);
   const trimMat = mat(BUS_TRIM, 0.7);
   const pillarMat = mat(0x8e1f1f, 0.6);
   const glass = glassMat();
   const darkMat = mat(GUNMETAL, 0.55, 0.4);
   const tyreMat = mat(RUBBER, 0.95);
-  const hubMat = mat(0xc9c2b4, 0.5);
+  const hubMat = chromeMat(0xc9c2b4);
 
-  const lower = shadowed(new THREE.Mesh(rbox(2.4, 1.55, 7.6, 0.14), bodyMat), true);
-  lower.position.y = 1.02;
-  group.add(lower);
+  const WHEEL_R = 0.52;
+  const WHEEL_Z = [2.45, -2.35];
+  const SILL = 0.3;
 
-  const upper = shadowed(new THREE.Mesh(rbox(2.36, 1.5, 7.3, 0.18), bodyMat));
-  upper.position.set(0, 2.55, -0.12);
-  group.add(upper);
+  const bodyShape = new THREE.Shape();
+  bodyShape.moveTo(-3.6, SILL);
+  archNotch(bodyShape, WHEEL_Z[1], WHEEL_R, 0.62, SILL);
+  archNotch(bodyShape, WHEEL_Z[0], WHEEL_R, 0.62, SILL);
+  bodyShape.lineTo(3.62, SILL);
+  bodyShape.quadraticCurveTo(3.82, SILL, 3.82, 0.5);
+  bodyShape.lineTo(3.82, 1.85);
+  bodyShape.lineTo(3.62, 1.97);
+  bodyShape.lineTo(3.55, 3.2);
+  bodyShape.quadraticCurveTo(3.55, 3.45, 3.25, 3.45);
+  bodyShape.lineTo(-3.4, 3.45);
+  bodyShape.quadraticCurveTo(-3.8, 3.45, -3.8, 3.1);
+  bodyShape.lineTo(-3.8, 0.5);
+  bodyShape.quadraticCurveTo(-3.8, SILL, -3.6, SILL);
+  group.add(shadowed(new THREE.Mesh(profileBody(bodyShape, 2.4, 0.18), bodyMat), true));
 
-  const roof = new THREE.Mesh(rbox(2.3, 0.22, 7.15, 0.1), roofMat);
-  roof.position.set(0, 3.36, -0.12);
-  group.add(roof);
-
-  const trim = new THREE.Mesh(rbox(2.46, 0.14, 7.64, 0.04), trimMat);
+  const trim = new THREE.Mesh(rbox(2.44, 0.12, 7.66, 0.05), trimMat);
   trim.position.y = 1.83;
   group.add(trim);
-  const skirt = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.08, 7.62), darkMat);
-  skirt.position.y = 0.28;
-  group.add(skirt);
 
   const lowerZ = [2.55, 1.5, 0.45, -0.6, -1.65];
   const upperZ = [2.75, 1.7, 0.65, -0.4, -1.45, -2.5];
   for (const side of [-1, 1] as const) {
     const rotY = (side * Math.PI) / 2;
     for (const z of lowerZ) {
-      addPane(group, 0.86, 0.72, new THREE.Vector3(side * 1.205, 1.35, z), rotY, glass);
+      addPane(group, 0.86, 0.6, new THREE.Vector3(side * 1.205, 1.47, z), rotY, glass);
     }
     for (const z of upperZ) {
-      addPane(group, 0.86, 0.74, new THREE.Vector3(side * 1.185, 2.72, z - 0.12), rotY, glass);
+      addPane(group, 0.86, 0.74, new THREE.Vector3(side * 1.205, 2.72, z - 0.12), rotY, glass);
     }
     const roundelTex = cachedTexture('bus-roundel', () =>
       makeRoundelTexture({ ringColor: hex(BUS_TRIM), barColor: hex(BUS_TRIM), barText: 'BUS', size: 256 })
@@ -271,28 +370,29 @@ export function createBus(targetNodeId: number): VehicleHandle {
       new THREE.CircleGeometry(0.28, 32),
       new THREE.MeshStandardMaterial({ map: roundelTex, transparent: true, roughness: 0.6 })
     );
-    roundel.position.set(side * 1.21, 0.78, -2.9);
+    roundel.position.set(side * 1.21, 0.78, -3.3);
     roundel.rotation.y = rotY;
     group.add(roundel);
   }
   for (const z of [2.03, 0.98, -0.07, -1.12]) {
     for (const side of [-1, 1] as const) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.8, 0.14), pillarMat);
-      pillar.position.set(side * 1.215, 1.35, z);
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.6, 0.14), pillarMat);
+      pillar.position.set(side * 1.215, 1.47, z);
       group.add(pillar);
     }
   }
 
-  addPane(group, 2.0, 0.78, new THREE.Vector3(0, 1.28, 3.81), 0, glass);
-  addPane(group, 0.98, 0.78, new THREE.Vector3(-0.56, 2.7, 3.54), 0, glass, -0.08);
-  addPane(group, 0.98, 0.78, new THREE.Vector3(0.56, 2.7, 3.54), 0, glass, -0.08);
-  addPane(group, 1.9, 0.72, new THREE.Vector3(0, 2.72, -3.78), Math.PI, glass);
+  const UPPER_FRONT_TILT = -0.057;
+  addPane(group, 2.0, 0.78, new THREE.Vector3(0, 1.28, 3.83), 0, glass);
+  addPane(group, 0.98, 0.72, new THREE.Vector3(-0.56, 2.62, 3.593), 0, glass, UPPER_FRONT_TILT);
+  addPane(group, 0.98, 0.72, new THREE.Vector3(0.56, 2.62, 3.593), 0, glass, UPPER_FRONT_TILT);
+  addPane(group, 1.9, 0.72, new THREE.Vector3(0, 2.72, -3.81), Math.PI, glass);
 
   const platform = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.35, 0.06), mat(0x1a1114, 0.9));
-  platform.position.set(0.62, 1.0, -3.78);
+  platform.position.set(0.62, 1.0, -3.83);
   group.add(platform);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 8), trimMat);
-  pole.position.set(0.2, 1.0, -3.7);
+  pole.position.set(0.2, 1.0, -3.86);
   group.add(pole);
 
   const blindTex = cachedTexture(`bus-blind-${targetNodeId}`, () =>
@@ -304,17 +404,19 @@ export function createBus(targetNodeId: number): VehicleHandle {
     emissiveMap: blindTex,
     emissiveIntensity: 2.6,
   });
-  const blindFrame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06), darkMat);
-  blindFrame.position.set(0, 3.12, 3.55);
+  const blindFrame = new THREE.Mesh(rbox(1.6, 0.3, 0.06, 0.02), darkMat);
+  blindFrame.position.set(0, 3.13, 3.575);
+  blindFrame.rotation.x = UPPER_FRONT_TILT;
   group.add(blindFrame);
-  const blind = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 0.4), blindMat);
-  blind.position.set(0, 3.12, 3.585);
+  const blind = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 0.26), blindMat);
+  blind.position.set(0, 3.13, 3.607);
+  blind.rotation.x = UPPER_FRONT_TILT;
   group.add(blind);
 
   const grille = new THREE.Mesh(rbox(0.7, 0.55, 0.08, 0.04), darkMat);
-  grille.position.set(0, 0.72, 3.8);
+  grille.position.set(0, 0.72, 3.84);
   group.add(grille);
-  for (const z of [3.84, -3.84]) {
+  for (const z of [3.86, -3.85]) {
     const bumper = new THREE.Mesh(rbox(2.3, 0.14, 0.16, 0.04), darkMat);
     bumper.position.set(0, 0.42, z);
     group.add(bumper);
@@ -324,21 +426,18 @@ export function createBus(targetNodeId: number): VehicleHandle {
   for (const x of [-0.82, 0.82]) {
     const hl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.06, 14), headMat);
     hl.rotation.x = Math.PI / 2;
-    hl.position.set(x, 0.72, 3.81);
+    hl.position.set(x, 0.72, 3.84);
     group.add(hl);
   }
   const tailMat = lampMat(LAMP_RED, 2.6, 0x3a0705);
   for (const x of [-0.95, 0.95]) {
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.04), tailMat);
+    const tl = new THREE.Mesh(rbox(0.16, 0.26, 0.04, 0.015), tailMat);
     tl.position.set(x, 0.6, -3.82);
     group.add(tl);
   }
 
-  for (const z of [2.45, -2.35]) {
-    for (const x of [-1.1, 1.1]) {
-      addWheelArch(group, x, z, 0.52, 1.2, darkMat);
-      addWheel(group, x, z, 0.52, 0.38, tyreMat, hubMat);
-    }
+  for (const z of WHEEL_Z) {
+    for (const x of [-1.0, 1.0]) addWheel(group, x, z, WHEEL_R, 0.38, tyreMat, hubMat);
   }
 
   const hit = new THREE.Mesh(new THREE.BoxGeometry(2.8, 3.7, 8.0), new THREE.MeshBasicMaterial({ visible: false }));
@@ -360,12 +459,15 @@ export function createBus(targetNodeId: number): VehicleHandle {
 // UNDERGROUND — a station house set into the building line. Local +Z faces the road;
 // the portal opens onto a tiled stairwell descending toward -Z into warm light.
 // ---------------------------------------------------------------------------
+/** Station house footprint; the origin is the middle of the front facade. */
+export const STATION_FOOTPRINT = { width: 6.4, depth: 4.6 } as const;
+
 export function createUnderground(targetNodeId: number): VehicleHandle {
   const group = new THREE.Group();
   group.name = `underground-${targetNodeId}`;
 
-  const W = 6.4;
-  const D = 4.6;
+  const W = STATION_FOOTPRINT.width;
+  const D = STATION_FOOTPRINT.depth;
   const H = 5.6;
   const OPEN_W = 2.8;
   const OPEN_H = 3.0;
@@ -455,6 +557,32 @@ export function createUnderground(targetNodeId: number): VehicleHandle {
   const canopy = shadowed(new THREE.Mesh(rbox(OPEN_W + 1.6, 0.12, 1.1, 0.04), railMat));
   canopy.position.set(0, OPEN_H + 0.1, 0.5);
   group.add(canopy);
+
+  // Kerbside roundel, turned to face along the street so it reads from the junction.
+  const totem = new THREE.Group();
+  totem.position.set(W / 2 - 0.3, 0, 2.0);
+  totem.rotation.y = Math.PI / 2;
+  const pole = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.5, 12), mat(GUNMETAL, 0.5, 0.6)));
+  pole.position.y = 1.75;
+  totem.add(pole);
+  const roundelTex = cachedTexture('underground-roundel', () =>
+    makeRoundelTexture({ ringColor: hex(TFL_RED), barColor: hex(TFL_BLUE), barText: 'UNDERGROUND' })
+  );
+  const roundelMat = new THREE.MeshStandardMaterial({
+    map: roundelTex,
+    emissive: 0xffffff,
+    emissiveMap: roundelTex,
+    emissiveIntensity: 0.35,
+    transparent: true,
+  });
+  const roundelGeo = new THREE.CircleGeometry(0.7, 48);
+  for (const flip of [0, Math.PI]) {
+    const roundel = new THREE.Mesh(roundelGeo, roundelMat);
+    roundel.position.set(0, 3.7, flip === 0 ? 0.01 : -0.01);
+    roundel.rotation.y = flip;
+    totem.add(roundel);
+  }
+  group.add(totem);
 
   const hit = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, H + 0.6, D + 1.6), new THREE.MeshBasicMaterial({ visible: false }));
   hit.position.set(0, H / 2, -D / 2 + 0.6);

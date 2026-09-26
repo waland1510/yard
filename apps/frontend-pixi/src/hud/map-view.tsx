@@ -24,7 +24,8 @@ import { nodeDisplayName } from '../core/map-data';
 import { useGameStateStore } from '../stores/game-state-store';
 import { getTheme, characterFor } from '../core/theme-registry';
 import { spawnSpotlight, spawnTrailDot, spawnPulse, type EffectHandle } from './map-effects';
-import { KIND_COLOR, drawEdge, boardDash, mountBoardEdges, nodeRingColor } from './map-edges';
+import { KIND_COLOR, drawEdge, boardDash, mountBoardEdges, stopServices } from './map-edges';
+import { SCREEN_MARGIN } from './tokens';
 
 export interface MapViewProps {
   currentNodeId: number;
@@ -110,6 +111,26 @@ const BW_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: 'administrative.neighborhood', stylers: [{ visibility: 'off' }] },
 ];
 
+const TOP_HUD_CLEARANCE = 96;
+const BOTTOM_HUD_CLEARANCE = 72;
+
+function dockWidth(): number {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-w')) || 0;
+}
+
+/** Frames every node in the viewport area not covered by the dock and HUD pills. */
+function fitBoard(map: google.maps.Map) {
+  const bounds = new google.maps.LatLngBounds();
+  for (const id of ALL_NODE_IDS) bounds.extend(coordsForNode(id));
+  const { clientWidth, clientHeight } = map.getDiv();
+  map.fitBounds(bounds, {
+    left: Math.min(dockWidth() + SCREEN_MARGIN * 2, clientWidth / 3),
+    right: SCREEN_MARGIN,
+    top: Math.min(TOP_HUD_CLEARANCE, clientHeight / 4),
+    bottom: Math.min(BOTTOM_HUD_CLEARANCE, clientHeight / 4),
+  });
+}
+
 let mapsApiPromise: Promise<{
   maps: google.maps.MapsLibrary;
   streetView: google.maps.StreetViewLibrary;
@@ -125,25 +146,35 @@ function loadMapsApi(apiKey: string) {
   return mapsApiPromise;
 }
 
-/** Builds an SVG-as-data-URI icon for a classic Marker. White circle, colored
- *  ring, centered node number. */
+/** Builds an SVG-as-data-URI stop icon for a classic Marker, drawn like the printed
+ *  board: a numbered disc (dashed outline at ferry piers) inside a green ring for bus
+ *  stops and an outer red ring for tube stations. `size` is the disc diameter; the
+ *  rings extend the icon beyond it. */
 function makeNodeIcon(
-  label: string,
+  nodeId: number,
   ringColor: string,
   size: number,
   fontSize: number,
   fillColor = '#fff'
 ): google.maps.Icon {
-  const half = size / 2;
-  const r = half - 2;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-    <circle cx="${half}" cy="${half}" r="${r}" fill="${fillColor}" stroke="${ringColor}" stroke-width="3"/>
-    <text x="${half}" y="${half + fontSize * 0.36}" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#111">${label}</text>
+  const { bus, underground, river } = stopServices(nodeId);
+  const u = size / 32;
+  const extent = (underground ? 24 : bus ? 20 : 16) * u;
+  const px = Math.ceil(extent * 2);
+  const c = px / 2;
+  const ring = (r: number, color: string) =>
+    `<circle cx="${c}" cy="${c}" r="${r * u}" fill="none" stroke="${color}" stroke-width="${4 * u}"/>`;
+  const dash = river ? ` stroke-dasharray="${5 * u} ${5 * u}"` : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}">
+    ${underground ? ring(22, KIND_COLOR.underground) : ''}
+    ${bus ? ring(18, KIND_COLOR.bus) : ''}
+    <circle cx="${c}" cy="${c}" r="${14 * u}" fill="${fillColor}" stroke="${ringColor}" stroke-width="${4 * u}"${dash}/>
+    <text x="${c}" y="${c + fontSize * 0.36}" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#111">${nodeId}</text>
   </svg>`;
   return {
     url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-    scaledSize: new google.maps.Size(size, size),
-    anchor: new google.maps.Point(half, half),
+    scaledSize: new google.maps.Size(px, px),
+    anchor: new google.maps.Point(c, c),
   };
 }
 
@@ -337,6 +368,7 @@ export function MapView({
         mapRef.current = new maps.Map(containerRef.current, {
           center: { lat: here.lat, lng: here.lng },
           zoom: 14,
+          isFractionalZoomEnabled: true,
           styles: BW_STYLES,
           disableDefaultUI: true,
           clickableIcons: false,
@@ -344,6 +376,7 @@ export function MapView({
           backgroundColor: '#eee',
         });
         google.maps.event.trigger(mapRef.current, 'resize');
+        fitBoard(mapRef.current);
         setMapReady(true);
       })
       .catch((err) => {
@@ -369,7 +402,7 @@ export function MapView({
       const marker = new google.maps.Marker({
         position: pos,
         map,
-        icon: makeNodeIcon(String(id), nodeRingColor(id), 20, 9),
+        icon: makeNodeIcon(id, '#111', 20, 9),
         zIndex: 20,
         title: nodeDisplayName(id),
       });
@@ -405,13 +438,13 @@ export function MapView({
     if (currentMarkerRef.current) currentMarkerRef.current.setMap(null);
 
     const here = coordsForNode(currentNodeId);
-    map.panTo(here);
+    if (!map.getBounds()?.contains(here)) map.panTo(here);
 
     // Current player position
     currentMarkerRef.current = new google.maps.Marker({
       position: here,
       map,
-      icon: makeNodeIcon(String(currentNodeId), '#ff6b35', 38, 13),
+      icon: makeNodeIcon(currentNodeId, '#ff6b35', 38, 13),
       zIndex: 200,
       title: `YOU — ${nodeDisplayName(currentNodeId)}`,
     });
@@ -444,7 +477,7 @@ export function MapView({
       const dest = new google.maps.Marker({
         position: target,
         map,
-        icon: makeNodeIcon(String(conn.targetNodeId), ringColor, 30, 12),
+        icon: makeNodeIcon(conn.targetNodeId, ringColor, 30, 12),
         zIndex: 100,
         title: `${nodeDisplayName(conn.targetNodeId)} — ${
           empty
@@ -619,16 +652,39 @@ export function MapView({
     spawnSpotlight(map, coordsForNode(culprit.position), '#ff3b30', 380);
   }, [mapReady, isCulpritOnRevealRound, players]);
 
-  // Turn camera (#4): zoom in on your turn; pull back to an overview on the culprit's
-  // turn so detectives can read the whole chase.
+  // Turn camera (#4): reframe the whole board on your turn and on the culprit's turn so
+  // every option and the whole chase stay readable.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     if (lastTurnZoomRef.current === currentTurnRole) return;
     lastTurnZoomRef.current = currentTurnRole;
-    if (isMyTurn) map.setZoom(15);
-    else if (currentTurnRole === 'culprit') map.setZoom(13);
+    if (isMyTurn || currentTurnRole === 'culprit') fitBoard(map);
   }, [mapReady, currentTurnRole, isMyTurn]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    let lastDock = dockWidth();
+    let frame = 0;
+    const refit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => fitBoard(map));
+    };
+    const dockObserver = new MutationObserver(() => {
+      const w = dockWidth();
+      if (w === lastDock) return;
+      lastDock = w;
+      refit();
+    });
+    dockObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    window.addEventListener('resize', refit);
+    return () => {
+      cancelAnimationFrame(frame);
+      dockObserver.disconnect();
+      window.removeEventListener('resize', refit);
+    };
+  }, [mapReady]);
 
   // AI choice camera: while humans pick between the two deciders' moves, frame the AI
   // detective and both destinations, marking each with its decider's colour. The camera
@@ -678,7 +734,7 @@ export function MapView({
         new google.maps.Marker({
           position: target,
           map,
-          icon: makeNodeIcon(String(option.move.position), color, 40, 13),
+          icon: makeNodeIcon(option.move.position, color, 40, 13),
           zIndex: 210,
           title: `${PROPOSAL_LABEL[option.source]} → ${nodeDisplayName(option.move.position)}`,
         })

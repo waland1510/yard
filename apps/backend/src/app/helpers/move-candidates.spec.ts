@@ -1,5 +1,6 @@
 import { GAME_GRAPH, GameState, Player, Role } from '@yard/shared-utils';
-import { buildCandidates, buildTacticalPicture, hopDistance } from './move-candidates';
+import { buildCandidates, buildTacticalPicture, hasLegalMove, hopDistance } from './move-candidates';
+import { defined } from '../../test-utils/defined';
 
 function nodeWithAllTransports(): number {
   for (const [id, node] of GAME_GRAPH) {
@@ -44,7 +45,7 @@ describe('moveCandidates', () => {
       weights: new Map<number, number>(),
     });
 
-    const node = GAME_GRAPH.get(HUB)!;
+    const node = defined(GAME_GRAPH.get(HUB), 'hub node');
     const destinations = new Set([...(node.taxi ?? []), ...(node.bus ?? []), ...(node.underground ?? [])]);
 
     expect(new Set(candidates.map(c => c.move.position))).toEqual(destinations);
@@ -61,7 +62,7 @@ describe('moveCandidates', () => {
 
   it('moveCandidates_destinationOccupiedByDetective_isExcluded', () => {
     const detective = makeDetective();
-    const blockedNode = GAME_GRAPH.get(HUB)!.taxi![0];
+    const blockedNode = defined(GAME_GRAPH.get(HUB)?.taxi?.[0], 'taxi neighbour');
     const blocker: Player = makeDetective({
       id: 2,
       role: Role.detective2,
@@ -80,7 +81,7 @@ describe('moveCandidates', () => {
 
   it('moveCandidates_landsOnSuspect_setsFlagAndMass', () => {
     const detective = makeDetective();
-    const target = GAME_GRAPH.get(HUB)!.taxi![0];
+    const target = defined(GAME_GRAPH.get(HUB)?.taxi?.[0], 'taxi neighbour');
 
     const candidates = buildCandidates({
       gameState: makeGameState([detective]),
@@ -89,7 +90,7 @@ describe('moveCandidates', () => {
       weights: new Map<number, number>([[target, 1]]),
     });
 
-    const landing = candidates.find(c => c.move.position === target)!;
+    const landing = defined(candidates.find(c => c.move.position === target), 'landing candidate');
     expect(landing.landsOnSuspect).toBe(true);
     expect(landing.suspectMassWithin1).toBeCloseTo(1);
     expect(landing.hopsToTopSuspect).toBe(0);
@@ -119,8 +120,9 @@ describe('moveCandidates', () => {
       if (both != null) { origin = id; shared = both; break; }
     }
     expect(origin).not.toBeNull();
+    const start = defined(origin, 'origin');
 
-    const detective = makeDetective({ position: origin!, taxiTickets: 6, busTickets: 1 });
+    const detective = makeDetective({ position: start, taxiTickets: 6, busTickets: 1 });
     const candidates = buildCandidates({
       gameState: makeGameState([detective]),
       detective,
@@ -132,7 +134,7 @@ describe('moveCandidates', () => {
     expect(toShared).toHaveLength(1);
     expect(toShared[0].move.type).toBe('taxi');
 
-    const busOnly = makeDetective({ position: origin!, taxiTickets: 1, busTickets: 6 });
+    const busOnly = makeDetective({ position: start, taxiTickets: 1, busTickets: 6 });
     const flipped = buildCandidates({
       gameState: makeGameState([busOnly]),
       detective: busOnly,
@@ -161,16 +163,21 @@ describe('moveCandidates', () => {
       }
     }
     expect(origin).not.toBeNull();
+    const start = defined(origin, 'origin');
+    const suspect = defined(tubeOnly, 'tube-only node');
 
-    const broke = makeDetective({ position: origin!, taxiTickets: 5, busTickets: 3, undergroundTickets: 0 });
-    const rich = makeDetective({ position: origin!, taxiTickets: 5, busTickets: 3, undergroundTickets: 3 });
-    const weights = new Map<number, number>([[tubeOnly!, 1]]);
-    const possible = new Set<number>([tubeOnly!]);
+    const broke = makeDetective({ position: start, taxiTickets: 5, busTickets: 3, undergroundTickets: 0 });
+    const rich = makeDetective({ position: start, taxiTickets: 5, busTickets: 3, undergroundTickets: 3 });
+    const weights = new Map<number, number>([[suspect, 1]]);
+    const possible = new Set<number>([suspect]);
 
     const pick = (d: Player) =>
-      buildCandidates({ gameState: makeGameState([d]), detective: d, possible, weights }).find(
-        c => c.move.position === station && c.move.type === 'taxi'
-      )!;
+      defined(
+        buildCandidates({ gameState: makeGameState([d]), detective: d, possible, weights }).find(
+          c => c.move.position === station && c.move.type === 'taxi'
+        ),
+        'taxi candidate to station'
+      );
 
     const withTickets = pick(rich);
     const without = pick(broke);
@@ -192,12 +199,12 @@ describe('moveCandidates', () => {
       weights: new Map<number, number>(),
     });
 
-    const taxiCandidate = candidates.find(c => c.move.type === 'taxi')!;
+    const taxiCandidate = defined(candidates.find(c => c.move.type === 'taxi'), 'taxi candidate');
     expect(taxiCandidate.ticketAfter).toBe(2);
   });
 
   it('hopDistance_adjacentNodes_returnsOne', () => {
-    const neighbor = GAME_GRAPH.get(HUB)!.taxi![0];
+    const neighbor = defined(GAME_GRAPH.get(HUB)?.taxi?.[0], 'taxi neighbour');
     expect(hopDistance(HUB, HUB)).toBe(0);
     expect(hopDistance(HUB, neighbor)).toBe(1);
   });
@@ -222,5 +229,35 @@ describe('moveCandidates', () => {
     expect(picture.lastRevealed).toEqual({ node: 30, roundsAgo: 1 });
     expect(picture.nextRevealInRounds).toBe(4);
     expect(picture.topSuspects[0]).toEqual({ node: 40, probability: 1 });
+  });
+});
+
+describe('hasLegalMove', () => {
+  const TAXI_ONLY = 128;
+
+  it('hasLegalMove_onTaxiOnlyNodeWithoutTaxiTickets_returnsFalse', () => {
+    const detective = makeDetective({ position: TAXI_ONLY, taxiTickets: 0 });
+    expect(hasLegalMove(detective, [detective])).toBe(false);
+  });
+
+  it('hasLegalMove_withAffordableTransport_returnsTrue', () => {
+    const detective = makeDetective({ position: TAXI_ONLY, taxiTickets: 1, busTickets: 0, undergroundTickets: 0 });
+    expect(hasLegalMove(detective, [detective])).toBe(true);
+  });
+
+  it('hasLegalMove_whenOtherDetectivesBlockEveryDestination_returnsFalse', () => {
+    const detective = makeDetective({ position: TAXI_ONLY, busTickets: 0, undergroundTickets: 0 });
+    const blockers = (GAME_GRAPH.get(TAXI_ONLY)?.taxi ?? []).map((position, i) =>
+      makeDetective({ id: i + 2, role: Role.detective2, position })
+    );
+    expect(hasLegalMove(detective, [detective, ...blockers])).toBe(false);
+  });
+
+  it('hasLegalMove_whenOnlyMrXOccupiesTheDestination_returnsTrue', () => {
+    const detective = makeDetective({ position: TAXI_ONLY, busTickets: 0, undergroundTickets: 0 });
+    const culprits = (GAME_GRAPH.get(TAXI_ONLY)?.taxi ?? []).map((position, i) =>
+      makeDetective({ id: i + 2, role: Role.culprit, position })
+    );
+    expect(hasLegalMove(detective, [detective, ...culprits])).toBe(true);
   });
 });

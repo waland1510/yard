@@ -20,6 +20,12 @@ function makeCanvas(width: number, height: number) {
   return c;
 }
 
+function context2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D canvas context unavailable');
+  return ctx;
+}
+
 function finalize(canvas: HTMLCanvasElement, anisotropy = 4) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.anisotropy = anisotropy;
@@ -45,7 +51,7 @@ export function makeTextTexture(
   const width = opts.width ?? 512;
   const height = opts.height ?? 256;
   const c = makeCanvas(width, height);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   ctx.fillStyle = opts.bg ?? '#000';
   ctx.fillRect(0, 0, width, height);
   if (opts.border) {
@@ -56,8 +62,17 @@ export function makeTextTexture(
   ctx.fillStyle = opts.fg ?? '#fff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontPx = opts.fontPx ?? Math.floor(height * 0.62);
-  ctx.font = `${opts.fontWeight ?? '700'} ${fontPx}px ${opts.fontFamily ?? 'Helvetica, Arial, sans-serif'}`;
+  const setFont = (px: number) => {
+    ctx.font = `${opts.fontWeight ?? '700'} ${px}px ${opts.fontFamily ?? 'Helvetica, Arial, sans-serif'}`;
+  };
+  let fontPx = opts.fontPx ?? Math.floor(height * 0.62);
+  setFont(fontPx);
+  const maxTextWidth = width * 0.9;
+  const textWidth = ctx.measureText(text).width;
+  if (!opts.rotateDeg && textWidth > maxTextWidth) {
+    fontPx = Math.floor((fontPx * maxTextWidth) / textWidth);
+    setFont(fontPx);
+  }
   if (opts.rotateDeg) {
     ctx.save();
     ctx.translate(width / 2, height / 2);
@@ -79,7 +94,7 @@ export function makeRoundelTexture(opts: {
 } = {}): THREE.CanvasTexture {
   const size = opts.size ?? 512;
   const c = makeCanvas(size, size);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   ctx.clearRect(0, 0, size, size);
   // White disc background (so the texture's negative space reads white, not transparent
   // black, on a double-sided plane)
@@ -117,7 +132,7 @@ export function makeChequerTexture(
 ): THREE.CanvasTexture {
   const cell = 16;
   const c = makeCanvas(cols * cell, rows * cell);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       ctx.fillStyle = (x + y) % 2 === 0 ? colorA : colorB;
@@ -132,7 +147,7 @@ export function makePierSignTexture(name: string): THREE.CanvasTexture {
   const w = 512;
   const h = 200;
   const c = makeCanvas(w, h);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   ctx.fillStyle = '#f4efe2';
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = '#1a1a1c';
@@ -165,7 +180,7 @@ export function makeBeaconStripeTexture(): THREE.CanvasTexture {
   const w = 64;
   const h = 256;
   const c = makeCanvas(w, h);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   const bands = 6;
   const bandH = h / bands;
   for (let i = 0; i < bands; i++) {
@@ -180,7 +195,7 @@ export function makeRouteFlagTexture(routes: readonly (string | number)[]): THRE
   const w = 256;
   const h = 320;
   const c = makeCanvas(w, h);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   ctx.fillStyle = '#f4efe2';
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = '#1a1a1c';
@@ -203,7 +218,7 @@ export function makeStationLintelTexture(name: string): THREE.CanvasTexture {
   const w = 1024;
   const h = 200;
   const c = makeCanvas(w, h);
-  const ctx = c.getContext('2d')!;
+  const ctx = context2d(c);
   ctx.fillStyle = '#f4efe2';
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = '#1a1a1c';
@@ -255,7 +270,7 @@ export function makeAsphaltTexture(): THREE.CanvasTexture {
   return cachedSurface('asphalt', () => {
     const size = 512;
     const c = makeCanvas(size, size);
-    const ctx = c.getContext('2d')!;
+    const ctx = context2d(c);
     const rng = seeded(1234);
     ctx.fillStyle = '#3e4147';
     ctx.fillRect(0, 0, size, size);
@@ -276,7 +291,7 @@ export function makePavingTexture(): THREE.CanvasTexture {
   return cachedSurface('paving', () => {
     const size = 512;
     const c = makeCanvas(size, size);
-    const ctx = c.getContext('2d')!;
+    const ctx = context2d(c);
     const rng = seeded(777);
     const cols = 6;
     const rows = 6;
@@ -315,7 +330,7 @@ export function makeGrassTexture(): THREE.CanvasTexture {
   return cachedSurface('grass', () => {
     const size = 256;
     const c = makeCanvas(size, size);
-    const ctx = c.getContext('2d')!;
+    const ctx = context2d(c);
     const rng = seeded(4242);
     ctx.fillStyle = '#4c7a37';
     ctx.fillRect(0, 0, size, size);
@@ -352,7 +367,7 @@ export function makeFacadeTexture(cols: number, floors: number, wallHex: string,
     const w = Math.max(1, cols) * cellW;
     const h = groundH + Math.max(0, floors) * floorH;
     const c = makeCanvas(w, h);
-    const ctx = c.getContext('2d')!;
+    const ctx = context2d(c);
     const rng = seeded(cols * 7919 + floors * 104729 + variant * 31 + wallHex.length);
 
     ctx.fillStyle = wallHex;

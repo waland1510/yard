@@ -27,7 +27,7 @@ const useWebSocket = (channel?: string) => {
   const { t } = useTranslation();
 
   const sendMessage = useCallback(
-    (type: MessageType, data: any) => {
+    (type: MessageType, data: unknown) => {
       if (socket && socket.readyState === WebSocket.OPEN) {
         const message = JSON.stringify({ type, channel, data });
         socket.send(message);

@@ -72,8 +72,16 @@ function rotYForDirection(dir: Direction): number {
 }
 
 // Quadrant key built from two perpendicular directions (e.g. 'north'+'east').
-type Quadrant = 'NE' | 'NW' | 'SE' | 'SW';
+export type Quadrant = 'NE' | 'NW' | 'SE' | 'SW';
 const QUADRANTS: readonly Quadrant[] = ['NE', 'NW', 'SE', 'SW'];
+
+/** Distance from a road's centreline to the back of its pavement, where frontages start. */
+export const BUILDING_LINE = ROAD_HALF + SIDEWALK;
+
+export function quadrantAt(x: number, z: number): Quadrant {
+  if (z < 0) return x < 0 ? 'NW' : 'NE';
+  return x < 0 ? 'SW' : 'SE';
+}
 
 function quadrantSign(q: Quadrant): { sx: 1 | -1; sz: 1 | -1 } {
   // +X east, -Z north. So NE => +x, -z.
@@ -107,7 +115,9 @@ export function buildIntersection(
   nodeId: number,
   activeDirections?: ReadonlySet<Direction>,
   riverDirections?: ReadonlySet<Direction>,
-  stopsByDirection?: Partial<Record<Direction, StopKind>>
+  stopsByDirection?: Partial<Record<Direction, StopKind>>,
+  /** Quadrants holding a station house; their generic corner buildings are left out. */
+  stationQuadrants?: ReadonlySet<Quadrant>
 ): IntersectionBuild {
   const group = new THREE.Group();
   group.name = `intersection-${nodeId}`;
@@ -692,7 +702,7 @@ export function buildIntersection(
       continue;
     }
     placeCornerSidewalk(q);
-    placeBuildingsInQuadrant(q);
+    if (!stationQuadrants?.has(q)) placeBuildingsInQuadrant(q);
     placeTreesInQuadrant(q);
   }
 
@@ -752,13 +762,13 @@ export function buildIntersection(
   // most adjacent active arms.
   // ---------------------------------------------------------------------------
   if (active.size >= 3) {
-    // Pick the NE-ish corner first, but rotate based on which arms are active
+    // First corner between two active road arms, preferring one without a station house.
     const cornerQ: Quadrant = (() => {
-      for (const q of QUADRANTS) {
+      const roadCorners = QUADRANTS.filter((q) => {
         const [d1, d2] = quadrantDirs(q);
-        if (active.has(d1) && active.has(d2) && !rivers.has(d1) && !rivers.has(d2)) return q;
-      }
-      return 'NE';
+        return active.has(d1) && active.has(d2) && !rivers.has(d1) && !rivers.has(d2);
+      });
+      return roadCorners.find((q) => !stationQuadrants?.has(q)) ?? roadCorners[0] ?? 'NE';
     })();
     const { sx, sz } = quadrantSign(cornerQ);
     const pole = buildTrafficLightPole(addGeo, addMat);
@@ -778,10 +788,12 @@ export function buildIntersection(
   // built quadrant's sidewalk.
   // ---------------------------------------------------------------------------
   if (rng() < 0.4) {
-    const builtQuads = QUADRANTS.filter((q) => {
+    const landQuads = QUADRANTS.filter((q) => {
       const [d1, d2] = quadrantDirs(q);
       return !(rivers.has(d1) || rivers.has(d2));
     });
+    const freeQuads = landQuads.filter((q) => !stationQuadrants?.has(q));
+    const builtQuads = freeQuads.length > 0 ? freeQuads : landQuads;
     if (builtQuads.length > 0) {
       const q = pickFrom(rng, builtQuads);
       const { sx, sz } = quadrantSign(q);
@@ -802,7 +814,8 @@ export function buildIntersection(
   if (stopsByDirection) {
     for (const dir of ALL_DIRS) {
       const kind = stopsByDirection[dir];
-      if (!kind) continue;
+      // The station house placed by game.tsx is the underground stop.
+      if (!kind || kind === 'underground') continue;
       const stop = buildStop(kind, nodeId, dir, addGeo, addMat, textures);
       group.add(stop);
     }

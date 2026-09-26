@@ -11,6 +11,7 @@ let mockEnabled = true;
 
 import { JevDetectivePolicy, buildState, describeCandidate, describeContext, shuffleForDecision } from './jev-detective-policy';
 import { buildTacticalPicture } from './move-candidates';
+import { defined } from '../../test-utils/defined';
 
 function nodeWithAllTransports(): number {
   for (const [id, node] of GAME_GRAPH) {
@@ -82,13 +83,13 @@ describe('JevDetectivePolicy', () => {
       usage: { input_tokens: 400, output_tokens: 12 },
     });
 
-    const result = await policy.decide(gameState, detective, picture);
+    const result = defined(await policy.decide(gameState, detective, picture), 'result');
 
     expect(result).not.toBeNull();
-    expect(result!.move).toEqual(target.move);
-    expect(result!.details.confidence).toBe(0.82);
-    expect(result!.details.model).toBe('jev-1.13.0');
-    expect(result!.ranked[0]).toBe(target.key);
+    expect(result.move).toEqual(target.move);
+    expect(result.details.confidence).toBe(0.82);
+    expect(result.details.model).toBe('jev-1.13.0');
+    expect(result.ranked[0]).toBe(target.key);
   });
 
   it('jevPolicy_unknownKey_returnsNull', async () => {

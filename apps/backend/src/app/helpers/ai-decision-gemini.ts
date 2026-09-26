@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { Move, Player } from '@yard/shared-utils';
 import { ENV } from './env';
 import { makeApiCall, sanitizeApiResponse, parseJsonResponse } from './ai-decision-utils';

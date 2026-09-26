@@ -37,6 +37,18 @@ function neighborsVia(nodeId: number, types: readonly MoveType[]): number[] {
   return out;
 }
 
+/** Whether a detective can make any move: an affordable transport leading to a node no
+ *  other detective occupies. A detective without one is stranded and skipped. */
+export function hasLegalMove(detective: Player, players: readonly Player[]): boolean {
+  const occupied = new Set(
+    players.filter(p => p.role !== 'culprit' && p.role !== detective.role).map(p => p.position)
+  );
+  const node = GAME_GRAPH.get(detective.position);
+  return TRANSPORTS.some(
+    type => ticketsFor(detective, type) > 0 && neighbors(node, type).some(n => !occupied.has(n))
+  );
+}
+
 function degree(nodeId: number, types: readonly MoveType[]): number {
   return new Set(neighborsVia(nodeId, types)).size;
 }

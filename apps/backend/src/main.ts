@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import ws from '@fastify/websocket';
 import {
   AiProposal,
+  GameState,
   getNextRole,
   Message,
   Player,
@@ -17,6 +18,7 @@ import { AIPlayerService } from './app/helpers/ai-player';
 import { AiProposalRegistry } from './app/helpers/ai-proposal-registry';
 import { ENV } from './app/helpers/env';
 import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
+import { hasLegalMove } from './app/helpers/move-candidates';
 
 const host = ENV.HOST;
 const port = ENV.PORT;
@@ -135,6 +137,37 @@ server.register(ws);
 
 const aiMoveInProgress = new Set<string>();
 
+/** The role that actually plays next: stranded detectives lose their turn. Returns null
+ *  when every detective is stranded, which ends the game in Mr. X's favour. */
+function resolveTurn(players: readonly Player[], next: RoleType): RoleType | null {
+  const detectives = players.filter(p => p.role !== 'culprit');
+  if (detectives.length > 0 && detectives.every(d => !hasLegalMove(d, players))) return null;
+  let turn = next;
+  for (let i = 0; i < players.length; i++) {
+    const player = players.find(p => p.role === turn);
+    if (!player || player.role === 'culprit' || hasLegalMove(player, players)) return turn;
+    server.log.info({ role: turn }, 'turn-skipped: detective stranded');
+    turn = getNextRole(turn, false);
+  }
+  return turn;
+}
+
+/** Whose turn it is according to the move log. The stored currentTurn can lag behind it
+ *  when the server stops between saving a move and advancing the turn. */
+function turnFromMoves(game: Pick<GameState, 'players' | 'moves'>): RoleType | null {
+  const last = game.moves[game.moves.length - 1];
+  if (!last?.role) return 'culprit';
+  return resolveTurn(game.players, getNextRole(last.role as RoleType, !!last.double));
+}
+
+async function endGameAllStranded(channel: string, gameId: number) {
+  broadcast(channel, {
+    type: 'endGame',
+    data: { winner: 'culprit', reason: 'No detective can move' },
+  });
+  await updateGame(gameId, { status: 'finished' });
+}
+
 async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
   const lockKey = `${currentChannel}:${currentTurn}`;
   if (aiMoveInProgress.has(lockKey)) return;
@@ -166,6 +199,18 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
           'ai-move-skipped: no legal move'
         );
         aiMoveInProgress.delete(lockKey);
+        if (!game.id) return;
+        const passedTo = resolveTurn(game.players as Player[], getNextRole(currentTurn, false));
+        if (!passedTo) {
+          await endGameAllStranded(currentChannel, game.id);
+          return;
+        }
+        await updateGame(game.id, { currentTurn: passedTo });
+        const passed = await hasActiveGame(currentChannel);
+        if (passed) broadcast(currentChannel, { type: 'updateGameState', data: { gameState: passed } });
+        if (game.players.find(p => p.role === passedTo)?.isAI) {
+          await handleAIMove(passedTo, currentChannel);
+        }
         return;
       }
 
@@ -238,16 +283,24 @@ async function handleAIMove(currentTurn: RoleType, currentChannel: string) {
         return;
       }
 
-      const nextTurn = getNextRole(aiMove.role as RoleType, aiMove.double || false);
+      const nextTurn = resolveTurn(
+        game.players as Player[],
+        getNextRole(aiMove.role as RoleType, aiMove.double || false)
+      );
 
       broadcast(currentChannel, {
         type: 'makeMove',
         data: {
           ...aiMove,
-          currentTurn: nextTurn,
+          currentTurn: nextTurn ?? 'culprit',
           ...(decision.comparison ? { aiDecision: decision.comparison } : {}),
         },
       });
+
+      if (!nextTurn) {
+        await endGameAllStranded(currentChannel, game.id);
+        return;
+      }
 
       await updateGame(game.id, {
         currentTurn: nextTurn,
@@ -336,11 +389,22 @@ server.register(async function (fastify) {
             });
             broadcastPresence(currentChannel);
 
-            if (game && !game.moves.length) {
+            if (game?.id) {
               try {
-                const nextPlayer = game.players.find(p => p.role === 'culprit');
+                // Also resumes a turn that stalled mid-game (e.g. a server restart).
+                const turn = turnFromMoves(game as GameState);
+                if (!turn) {
+                  await endGameAllStranded(currentChannel, game.id);
+                  break;
+                }
+                if (turn !== game.currentTurn) {
+                  await updateGame(game.id, { currentTurn: turn });
+                  const synced = await hasActiveGame(currentChannel);
+                  if (synced) broadcast(currentChannel, { type: 'updateGameState', data: { gameState: synced } });
+                }
+                const nextPlayer = game.players.find(p => p.role === turn);
                 if (nextPlayer?.isAI) {
-                  await handleAIMove('culprit', currentChannel);
+                  await handleAIMove(turn, currentChannel);
                 }
               } catch (error) {
                 console.error('AI move calculation failed:', error);
@@ -534,16 +598,24 @@ server.register(async function (fastify) {
                 break;
               }
 
-              const currentTurn = getNextRole(role as RoleType, double || false);
+              const currentTurn = resolveTurn(
+                updatedGame.players as Player[],
+                getNextRole(role as RoleType, double || false)
+              );
 
               broadcast(currentChannel, {
                 type: 'makeMove',
                 data: {
                   ...parsedMessage.data,
-                  currentTurn,
+                  currentTurn: currentTurn ?? 'culprit',
                 },
               });
 
+              if (!currentTurn) {
+                await endGameAllStranded(currentChannel, updatedGame.id);
+                break;
+              }
+              await updateGame(updatedGame.id, { currentTurn });
               await handleAIMove(currentTurn, currentChannel);
             }
             break;

@@ -1,4 +1,4 @@
-import { RoleType } from '@yard/shared-utils';
+import { Player, RoleType } from '@yard/shared-utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +25,7 @@ interface ChooseRoleProps {
 }
 
 interface FanCardProps {
-  player: any;
+  player: Player;
   index: number;
   total: number;
   themeName: string;

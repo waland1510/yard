@@ -33,7 +33,6 @@ export function SetupFlow({ onStart }: SetupFlowProps) {
   const [role, setRole] = useState<RoleType | null>(null);
   const [withAI, setWithAI] = useState(true);
   const [greeting, setGreeting] = useState<string | null>(null);
-  const [launching, setLaunching] = useState(false);
 
   // Geo greeting on mount
   useEffect(() => {
@@ -55,7 +54,6 @@ export function SetupFlow({ onStart }: SetupFlowProps) {
 
   const handleStart = async () => {
     if (!role || !name.trim()) return;
-    setLaunching(true);
     setStep('launching');
     // Try real backend first
     const created = await createGame({ theme, withAI });

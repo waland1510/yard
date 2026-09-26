@@ -61,7 +61,7 @@ export async function addMove(gameId: number, role: string, type: string, positi
           secret,
           double,
           position,
-        } as any)
+        })
         .execute();
 
       await trx
@@ -74,7 +74,7 @@ export async function addMove(gameId: number, role: string, type: string, positi
           doubleTickets: sql`${playersTable.doubleTickets} - ${double ? 1 : 0}`,
           position,
           previousPosition: sql`${playersTable.position}`,
-        } as any)
+        })
         .where(sql`${playersTable.gameId} = ${gameId} AND ${playersTable.role} = ${role}`)
         .execute();
     });

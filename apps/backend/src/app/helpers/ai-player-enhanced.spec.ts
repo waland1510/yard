@@ -1,5 +1,48 @@
 import { AIPlayerService } from './ai-player';
 import { GameState, Player, Move, initialPlayers } from '@yard/shared-utils';
+import { defined } from '../../test-utils/defined';
+
+interface SkillAssessment {
+  skillLevel: string;
+  metrics: Record<string, number>;
+}
+
+interface AdaptiveDifficulty {
+  level: string;
+  aggressiveness: number;
+  coordination: number;
+  mistakes: number;
+}
+
+interface CulpritPositionEstimate {
+  type: string;
+  position: number;
+  probability: number;
+}
+
+interface MovementPattern {
+  type: string;
+  confidence: number;
+  predictedNextPositions: number[];
+}
+
+interface EnhancedAIInternals {
+  assessHumanPlayerSkill(gameState: GameState): SkillAssessment;
+  calculateAdaptiveDifficulty(skill: SkillAssessment, gameState: GameState): AdaptiveDifficulty;
+  calculateDynamicRole(
+    detective: Player,
+    otherDetectives: Player[],
+    possibleCulpritPositions: CulpritPositionEstimate[],
+    map: Map<number, unknown>
+  ): string;
+  getEnhancedCulpritPositions(gameState: GameState): CulpritPositionEstimate[];
+  detectMovementPattern(moves: Move[]): MovementPattern;
+  determineGamePhase(gameState: GameState): string;
+}
+
+function internals(service: AIPlayerService): EnhancedAIInternals {
+  return service as unknown as EnhancedAIInternals;
+}
 
 describe('Enhanced AI Detective System', () => {
   let aiService: AIPlayerService;
@@ -45,7 +88,7 @@ describe('Enhanced AI Detective System', () => {
         moves: [...mockGameState.moves, ...beginnerMoves]
       };
 
-      const skillAssessment = (aiService as any).assessHumanPlayerSkill(gameStateWithBeginnerMoves);
+      const skillAssessment = internals(aiService).assessHumanPlayerSkill(gameStateWithBeginnerMoves);
       
       expect(skillAssessment.skillLevel).toBe('beginner');
       expect(skillAssessment.metrics.transportVariety).toBeLessThan(0.5);
@@ -67,7 +110,7 @@ describe('Enhanced AI Detective System', () => {
         moves: [...mockGameState.moves, ...expertMoves]
       };
 
-      const skillAssessment = (aiService as any).assessHumanPlayerSkill(gameStateWithExpertMoves);
+      const skillAssessment = internals(aiService).assessHumanPlayerSkill(gameStateWithExpertMoves);
       
       expect(skillAssessment.skillLevel).toBe('expert');
       expect(skillAssessment.metrics.transportVariety).toBeGreaterThan(0.8);
@@ -99,8 +142,8 @@ describe('Enhanced AI Detective System', () => {
         }
       };
 
-      const beginnerDifficulty = (aiService as any).calculateAdaptiveDifficulty(beginnerSkill, mockGameState);
-      const expertDifficulty = (aiService as any).calculateAdaptiveDifficulty(expertSkill, mockGameState);
+      const beginnerDifficulty = internals(aiService).calculateAdaptiveDifficulty(beginnerSkill, mockGameState);
+      const expertDifficulty = internals(aiService).calculateAdaptiveDifficulty(expertSkill, mockGameState);
 
       expect(beginnerDifficulty.level).toBe('easy');
       expect(expertDifficulty.level).toBe('expert');
@@ -113,9 +156,9 @@ describe('Enhanced AI Detective System', () => {
 
   describe('Enhanced Detective Coordination', () => {
     it('should assign different roles to detectives', () => {
-      const detective1 = mockGameState.players.find(p => p.role === 'detective1')!;
-      const detective2 = mockGameState.players.find(p => p.role === 'detective2')!;
-      const detective3 = mockGameState.players.find(p => p.role === 'detective3')!;
+      const detective1 = defined(mockGameState.players.find(p => p.role === 'detective1'), 'detective1');
+      const detective2 = defined(mockGameState.players.find(p => p.role === 'detective2'), 'detective2');
+      const detective3 = defined(mockGameState.players.find(p => p.role === 'detective3'), 'detective3');
       
       const otherDetectives = [detective2, detective3];
       const possibleCulpritPositions = [
@@ -123,12 +166,12 @@ describe('Enhanced AI Detective System', () => {
         { type: 'bus' as const, position: 110, probability: 0.4 }
       ];
 
-      const map = new Map();
+      const map = new Map<number, unknown>();
       // Add some mock map data
       map.set(detective1.position, { taxi: [11, 12], bus: [13], underground: [14] });
 
-      const role1 = (aiService as any).calculateDynamicRole(detective1, otherDetectives, possibleCulpritPositions, map);
-      const role2 = (aiService as any).calculateDynamicRole(detective2, [detective1, detective3], possibleCulpritPositions, map);
+      const role1 = internals(aiService).calculateDynamicRole(detective1, otherDetectives, possibleCulpritPositions, map);
+      const role2 = internals(aiService).calculateDynamicRole(detective2, [detective1, detective3], possibleCulpritPositions, map);
       
       // Roles should be different for better coordination
       expect(role1).toBeDefined();
@@ -140,7 +183,7 @@ describe('Enhanced AI Detective System', () => {
 
   describe('Enhanced Culprit Tracking', () => {
     it('should predict culprit positions with human behavior patterns', () => {
-      const enhancedPositions = (aiService as any).getEnhancedCulpritPositions(mockGameState);
+      const enhancedPositions = internals(aiService).getEnhancedCulpritPositions(mockGameState);
       
       expect(enhancedPositions).toBeDefined();
       expect(Array.isArray(enhancedPositions)).toBe(true);
@@ -168,7 +211,7 @@ describe('Enhanced AI Detective System', () => {
         { role: 'culprit', type: 'taxi', position: 40, secret: false, double: false },
       ];
 
-      const pattern = (aiService as any).detectMovementPattern(linearMoves);
+      const pattern = internals(aiService).detectMovementPattern(linearMoves);
       
       expect(pattern).toHaveProperty('type');
       expect(pattern).toHaveProperty('confidence');
@@ -182,12 +225,12 @@ describe('Enhanced AI Detective System', () => {
   describe('Game Phase Detection', () => {
     it('should correctly identify game phases', () => {
       const earlyGame = { ...mockGameState, moves: mockGameState.moves.slice(0, 2) };
-      const midGame = { ...mockGameState, moves: [...mockGameState.moves, ...Array(10).fill(null).map((_, i) => ({
+      const midGame = { ...mockGameState, moves: [...mockGameState.moves, ...Array(10).fill(null).map((_, i): Move => ({
         role: 'culprit', type: 'taxi', position: 50 + i, secret: false, double: false
       }))] };
       
-      const earlyPhase = (aiService as any).determineGamePhase(earlyGame);
-      const midPhase = (aiService as any).determineGamePhase(midGame);
+      const earlyPhase = internals(aiService).determineGamePhase(earlyGame);
+      const midPhase = internals(aiService).determineGamePhase(midGame);
       
       expect(earlyPhase).toBe('early');
       expect(midPhase).toBe('mid');
@@ -196,7 +239,7 @@ describe('Enhanced AI Detective System', () => {
 
   describe('Enhanced Move Calculation', () => {
     it('should calculate enhanced detective moves', async () => {
-      const detective = mockGameState.players.find(p => p.role === 'detective1')!;
+      const detective = defined(mockGameState.players.find(p => p.role === 'detective1'), 'detective1');
       
       const move = await aiService.calculateMove(mockGameState, detective);
       
@@ -209,7 +252,7 @@ describe('Enhanced AI Detective System', () => {
     });
 
     it('should handle different difficulty levels', async () => {
-      const detective = mockGameState.players.find(p => p.role === 'detective1')!;
+      const detective = defined(mockGameState.players.find(p => p.role === 'detective1'), 'detective1');
       
       // Test multiple moves to see if there's variation (indicating difficulty scaling)
       const moves = [];
