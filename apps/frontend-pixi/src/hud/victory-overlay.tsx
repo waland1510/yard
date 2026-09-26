@@ -1,5 +1,5 @@
-// Full-screen game-end overlay. Themed confetti, winner announcement, replay/restart
-// buttons. Mounts only when game-state-store.status === 'finished'.
+// Full-screen game-end overlay. Themed confetti, winner announcement and a new-game
+// button. Mounts only when game-state-store.status === 'finished'.
 
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,6 @@ import { useRunnerStore } from '../stores/runner-store';
 import { getTheme, characterFor } from '../core/theme-registry';
 import type { RoleType } from '@yard/shared-utils';
 import { ROLE_PALETTE } from '../core/map-data';
-import { replay, useReplay } from '../core/replay-singleton';
 import { deriveWinner } from '../core/move-validator';
 
 export function VictoryOverlay() {
@@ -19,7 +18,6 @@ export function VictoryOverlay() {
   const moves = useGameStateStore((s) => s.moves);
   const themeId = useGameStateStore((s) => s.theme);
   const myRole = useRunnerStore((s) => s.myRole);
-  const replayView = useReplay();
   const navigate = useNavigate();
   const theme = getTheme(themeId);
 
@@ -38,7 +36,6 @@ export function VictoryOverlay() {
   }, [theme]);
 
   if (status !== 'finished') return null;
-  if (replayView.isActive) return null; // hidden while user is watching the replay
 
   const winner: RoleType = storedWinner ?? deriveWinner(undefined, players, moves) ?? currentTurn;
   const winnerIsCulprit = winner === 'culprit';
@@ -92,18 +89,7 @@ export function VictoryOverlay() {
 
         <div style={buttonRow}>
           <button style={primaryButton(theme.palette.accent)} onClick={() => navigate('/')}>
-            Play Again
-          </button>
-          {replayView.totalTurns > 0 && (
-            <button
-              style={ghostButton}
-              onClick={() => replay.enter()}
-            >
-              View Replay
-            </button>
-          )}
-          <button style={ghostButton} onClick={() => navigate('/')}>
-            Lobby
+            New game
           </button>
         </div>
       </div>
@@ -199,15 +185,3 @@ function primaryButton(accent: string): React.CSSProperties {
   };
 }
 
-const ghostButton: React.CSSProperties = {
-  padding: '12px 20px',
-  background: 'transparent',
-  border: '1px solid rgba(255,255,255,0.25)',
-  borderRadius: 8,
-  color: 'rgba(255,255,255,0.8)',
-  fontSize: 13,
-  letterSpacing: 1.5,
-  cursor: 'pointer',
-  fontFamily: 'inherit',
-  textTransform: 'uppercase',
-};

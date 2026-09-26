@@ -102,7 +102,9 @@ export async function addMove(move: Move) {
   }
 }
 
-export async function saveIpInfo(ipInfo: IpInfo) {
+export async function saveIpInfo(
+  ipInfo: Omit<IpInfo, 'id' | 'createdAt'> & Partial<Pick<IpInfo, 'id' | 'createdAt'>>
+) {
   const { postal  } = ipInfo;
   try {
     const records = await db.select().from(ipInfoTable).where(eq(ipInfoTable.postal, postal));

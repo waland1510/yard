@@ -14,9 +14,26 @@ export interface TunnelRig {
  * `start` is the world position of the entrance (top of the stairs).
  * `forward` is the unit direction the tunnel extends in.
  */
+export interface TunnelStyle {
+  wall: number;
+  floor: number;
+  stripe: number;
+  light: number;
+  train: boolean;
+}
+
+export const TUBE_TUNNEL: TunnelStyle = {
+  wall: 0x1d1d20,
+  floor: 0x2c2620,
+  stripe: 0xaa6a1a,
+  light: 0xfff5c8,
+  train: true,
+};
+
 export function createTunnelRig(
   start: THREE.Vector3,
-  forward: THREE.Vector3
+  forward: THREE.Vector3,
+  style: TunnelStyle = TUBE_TUNNEL
 ): TunnelRig {
   const LENGTH = 120;
   const WIDTH = 5.2;
@@ -38,7 +55,7 @@ export function createTunnelRig(
 
   // Inside-out concrete box — the walls and ceiling
   const wallMat = addMat(new THREE.MeshStandardMaterial({
-    color: 0x1d1d20,
+    color: style.wall,
     roughness: 1,
     side: THREE.BackSide,
     metalness: 0,
@@ -50,7 +67,7 @@ export function createTunnelRig(
 
   // Brighter floor (tile pattern feel just via a separate plane in a slightly different colour)
   const floorMat = addMat(new THREE.MeshStandardMaterial({
-    color: 0x2c2620,
+    color: style.floor,
     roughness: 0.9,
   }));
   const floor = new THREE.Mesh(addGeo(new THREE.PlaneGeometry(WIDTH - 0.05, LENGTH - 0.05)), floorMat);
@@ -62,7 +79,7 @@ export function createTunnelRig(
   // Track rails — two thin yellow stripes running the length
   const stripeMat = addMat(new THREE.MeshStandardMaterial({
     color: 0x44382a,
-    emissive: 0xaa6a1a,
+    emissive: style.stripe,
     emissiveIntensity: 0.15,
   }));
   for (const offset of [-0.7, 0.7]) {
@@ -79,8 +96,8 @@ export function createTunnelRig(
   // Ceiling lights — recessed strip lights every 7m
   const lightStripGeo = addGeo(new THREE.BoxGeometry(1.6, 0.06, 0.35));
   const lightStripMat = addMat(new THREE.MeshStandardMaterial({
-    color: 0xfff5c8,
-    emissive: 0xfff5c8,
+    color: style.light,
+    emissive: style.light,
     emissiveIntensity: 5,
   }));
   for (let dist = 3; dist < LENGTH; dist += 7) {
@@ -93,7 +110,7 @@ export function createTunnelRig(
     group.add(strip);
 
     // Cheap fill light to actually illuminate the walls nearby
-    const pl = new THREE.PointLight(0xfff5c8, 1.2, 10, 1.6);
+    const pl = new THREE.PointLight(style.light, 1.2, 10, 1.6);
     pl.position.copy(pos);
     pl.position.y -= 0.6;
     group.add(pl);
@@ -154,13 +171,15 @@ export function createTunnelRig(
   }
 
   // A tube train resting ahead in the tunnel — headlights on, windows lit.
-  const trainStart = LENGTH * 0.55;
-  const train = buildTubeTrain(addGeo, addMat);
-  train.position.copy(start)
-    .add(forward.clone().multiplyScalar(trainStart));
-  train.position.y = FLOOR_Y + 0.05;
-  train.rotation.y = yaw;
-  group.add(train);
+  if (style.train) {
+    const trainStart = LENGTH * 0.55;
+    const train = buildTubeTrain(addGeo, addMat);
+    train.position.copy(start)
+      .add(forward.clone().multiplyScalar(trainStart));
+    train.position.y = FLOOR_Y + 0.05;
+    train.rotation.y = yaw;
+    group.add(train);
+  }
 
   return {
     group,

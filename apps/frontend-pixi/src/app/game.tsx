@@ -9,18 +9,12 @@ import {
   DIRECTION_FORWARD,
   Direction,
   IntersectionBuild,
+  buildingPalette,
   quadrantAt,
   type Quadrant,
 } from '../three/intersection';
-import {
-  createTaxi,
-  createBus,
-  createUnderground,
-  createFerry,
-  STATION_FOOTPRINT,
-  VehicleHandle,
-  VehicleKind,
-} from '../three/vehicles';
+import { STATION_FOOTPRINT, VehicleHandle, VehicleKind } from '../three/vehicles';
+import { createVehicle } from '../three/vehicle-factory';
 import { createPovControls, PovControls } from '../three/controls';
 import { createTouchControls } from '../three/touch-controls';
 import { playRide, type ArrivalAnchor } from '../three/ride';
@@ -33,6 +27,8 @@ import { JoinOverlay } from '../hud/join-overlay';
 import { MapSurface } from '../hud/map-surface';
 import { getConnections, getActiveDirections, getRiverDirections, getNode, type Connection } from '../game/connections';
 import { compassFromDelta, nodeDisplayName, isRevealRound } from '../core/map-data';
+import { describeJoin, describeMove } from '../core/move-feed';
+import { getTheme } from '../core/theme-registry';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import { detectDeviceProfile, deviceTypeFromProfile, isTouchPrimary, resolveQualityTier } from '../core/device-surface';
@@ -44,7 +40,7 @@ import { CallMesh } from '../net/call-mesh';
 import { readIceServers } from '../net/ice-servers';
 import { connectCallMesh } from '../stores/call-store';
 import { MoveAuthority } from '../net/move-authority';
-import { getGame } from '../net/rest-client';
+import { getGame, updatePlayer } from '../net/rest-client';
 import type { SurfaceRole } from '../core/device-surface';
 import {
   validateMove,
@@ -90,6 +86,31 @@ export function Game() {
     !urlSession.isMock &&
     !urlSession.roleExplicit &&
     !urlSession.pairCode;
+  const gameStatus = useGameStateStore((s) => s.status);
+  // Claim the seat: record the human's name and take it off AI control (an invite joiner
+  // may pick a seat the AI was filling).
+  const myName = useRunnerStore((s) => s.myName);
+  const seatRole = useRunnerStore((s) => s.myRole);
+  const seatPlayers = useGameStateStore((s) => s.players);
+  const seatChannel = useGameStateStore((s) => s.channel);
+  const claimedSeatRef = useRef('');
+  useEffect(() => {
+    const role = seatRole;
+    if (!role || !myName || seatChannel.startsWith('mock')) return;
+    const me = seatPlayers.find((p) => p.role === role);
+    if (!me?.id || (me.username === myName && !me.isAI)) return;
+    const key = `${seatChannel}:${me.id}:${myName}`;
+    if (claimedSeatRef.current === key) return;
+    claimedSeatRef.current = key;
+    useGameStateStore.getState().patchPlayer(role, { username: myName, isAI: false });
+    updatePlayer(me.id, { username: myName, isAI: false });
+  }, [seatPlayers, seatChannel, seatRole, myName]);
+  useEffect(() => {
+    if (!urlSession || urlSession.isMock || !urlSession.roleExplicit || urlSession.pairCode) return;
+    useRunnerStore
+      .getState()
+      .setLastGamePath(gameStatus === 'finished' ? '' : `${location.pathname}${location.search}`);
+  }, [urlSession, gameStatus, location.pathname, location.search]);
   // Sentinels for the VehicleLabels component — world becomes available + sceneVersion
   // bumps each rebuild so labels rebuild their DOM accordingly.
   const worldRef = useRef<World | null>(null);
@@ -214,7 +235,10 @@ export function Game() {
     }
 
     if (urlSession) {
-      // Real mode: connect WebSocket
+      // Real mode: connect WebSocket. Start from a clean slate so nothing from a previous
+      // game (e.g. a finished status and its victory screen) shows before the server state lands.
+      useGameStateStore.getState().reset();
+      replay.reset();
       useRunnerStore.getState().setIdentity(urlSession.role, sessionName);
       useGameStateStore.getState().setChannel(urlSession.channel);
       useGameStateStore.getState().setTheme(urlSession.theme);
@@ -339,6 +363,10 @@ export function Game() {
           });
           store.setPosition(m.role, m.position);
           store.decrementTickets(m.role, m.type, m.secret, m.double);
+          const after = useGameStateStore.getState();
+          const line = describeMove(m, after.moves, getTheme(after.theme));
+          notifications.push(line.kind, line.message, line.kind === 'info' ? 2800 : undefined);
+          if (line.kind === 'reveal') playSfx('reveal');
           if (m.currentTurn) store.setCurrentTurn(m.currentTurn);
           if (m.role === 'culprit' && culpritEscaped(useGameStateStore.getState().moves)) {
             useGameStateStore.getState().setFinished('culprit');
@@ -352,6 +380,12 @@ export function Game() {
           const s = useGameStateStore.getState();
           s.setFinished(deriveWinner(payload.winner, s.players, s.moves));
           notifications.push('capture', payload.winner ? `${payload.winner} wins` : 'Game over');
+        },
+        onJoinGame: ({ role, username }) => {
+          const runner = useRunnerStore.getState();
+          if (!role || role === runner.myRole) return;
+          const line = describeJoin(role, username, getTheme(useGameStateStore.getState().theme));
+          notifications.push(line.kind, line.message);
         },
         onPresence: ({ members }) => {
           useGameStateStore.getState().setOccupiedRoles(new Set(members.map((m) => m.role)));
@@ -423,6 +457,8 @@ export function Game() {
         window.clearInterval(livenessTimer);
         unsubRelay();
         disconnectCall();
+        useGameStateStore.getState().reset();
+        replay.reset();
       };
     }
 
@@ -454,6 +490,7 @@ export function Game() {
     let currentIntersection: IntersectionBuild | null = null;
     let vehicles: VehicleHandle[] = [];
     let lastBuiltForNode: number | null = null;
+    let lastBuiltTheme: string | null = null;
 
     function rebuildScene(nodeId: number) {
       if (currentIntersection) currentIntersection.dispose();
@@ -492,6 +529,7 @@ export function Game() {
           stopsByDirection[conn.direction] = conn.kind;
         }
       }
+      const themeId = useGameStateStore.getState().theme;
       const stations = planStations(connections);
       const stationQuadrants = new Set<Quadrant>(
         [...stations.values()].map(({ position }) => quadrantAt(position.x, position.z))
@@ -502,17 +540,15 @@ export function Game() {
         getActiveDirections(nodeId, includeRiver),
         riverDirs,
         stopsByDirection,
-        stationQuadrants
+        stationQuadrants,
+        buildingPalette(themeId)
       );
       currentIntersection = built;
 
+      if (themeId !== lastBuiltTheme) world.setAtmosphere(themeId);
+      lastBuiltTheme = themeId;
       for (const conn of connections) {
-        let v: VehicleHandle;
-        if (conn.kind === 'taxi') v = createTaxi(conn.targetNodeId);
-        else if (conn.kind === 'bus') v = createBus(conn.targetNodeId);
-        else if (conn.kind === 'underground') v = createUnderground(conn.targetNodeId);
-        else if (conn.kind === 'river') v = createFerry(conn.targetNodeId);
-        else continue;
+        const v = createVehicle(conn.kind, conn.targetNodeId, themeId);
         const station = stations.get(conn);
         if (station) {
           v.group.position.copy(station.position);
@@ -793,7 +829,7 @@ export function Game() {
         const snap = replay.current();
         const pos = snap?.culpritActualPosition;
         if (pos == null) return;
-        if (pos === lastBuiltForNode) return;
+        if (pos === lastBuiltForNode && useGameStateStore.getState().theme === lastBuiltTheme) return;
         rebuildScene(pos);
         return;
       }
@@ -802,7 +838,7 @@ export function Game() {
       if (!role) return;
       const me = useGameStateStore.getState().players.find((p) => p.role === role);
       if (!me) return;
-      if (me.position === lastBuiltForNode) return;
+      if (me.position === lastBuiltForNode && useGameStateStore.getState().theme === lastBuiltTheme) return;
       rebuildScene(me.position);
     };
 

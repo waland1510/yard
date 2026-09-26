@@ -64,7 +64,16 @@ const SIDEWALK_Y = 0.05;
 
 const ALL_DIRS: readonly Direction[] = ['north', 'south', 'east', 'west'];
 
-const BUILDING_COLORS = [0x8a6b54, 0x9b8a72, 0xa39684, BRICK_WARM, 0x6f5a4a, 0xb09b80];
+const LONDON_BUILDINGS = [0x8a6b54, 0x9b8a72, 0xa39684, BRICK_WARM, 0x6f5a4a, 0xb09b80];
+
+const BUILDING_PALETTES: Record<string, readonly number[]> = {
+  barbie: [0xffc2dc, 0xffd9ec, 0xbfe9ff, 0xfff1b8, 0xd9c7ff, 0xc9f2e0],
+};
+
+/** Facade colours for a theme's streets; London brick and stone by default. */
+export function buildingPalette(themeId: string): readonly number[] {
+  return BUILDING_PALETTES[themeId] ?? LONDON_BUILDINGS;
+}
 
 function rotYForDirection(dir: Direction): number {
   const fwd = DIRECTION_FORWARD[dir];
@@ -117,7 +126,8 @@ export function buildIntersection(
   riverDirections?: ReadonlySet<Direction>,
   stopsByDirection?: Partial<Record<Direction, StopKind>>,
   /** Quadrants holding a station house; their generic corner buildings are left out. */
-  stationQuadrants?: ReadonlySet<Quadrant>
+  stationQuadrants?: ReadonlySet<Quadrant>,
+  buildingColors: readonly number[] = LONDON_BUILDINGS
 ): IntersectionBuild {
   const group = new THREE.Group();
   group.name = `intersection-${nodeId}`;
@@ -420,7 +430,7 @@ export function buildIntersection(
       while (z < ARM_LENGTH - 4) {
         const w = pickFloat(rng, 6, 10);
         const d = pickFloat(rng, 6, 9);
-        const b = makeBuilding(w, d, pickFloat(rng, 9, 16), pickFrom(rng, BUILDING_COLORS));
+        const b = makeBuilding(w, d, pickFloat(rng, 9, 16), pickFrom(rng, buildingColors));
         b.position.set(sx * (ROAD_HALF + SIDEWALK + 0.6 + d / 2), 0, z + w / 2);
         b.rotation.y = Math.PI / 2;
         armGroup.add(b);
@@ -433,7 +443,7 @@ export function buildIntersection(
         armGroup.add(lamp);
       }
     }
-    const endTerrace = makeBuilding((ROAD_HALF + SIDEWALK) * 2 + 14, 9, pickFloat(rng, 12, 17), pickFrom(rng, BUILDING_COLORS));
+    const endTerrace = makeBuilding((ROAD_HALF + SIDEWALK) * 2 + 14, 9, pickFloat(rng, 12, 17), pickFrom(rng, buildingColors));
     endTerrace.position.set(0, 0, ARM_LENGTH + 5);
     armGroup.add(endTerrace);
 
@@ -604,7 +614,7 @@ export function buildIntersection(
     farWalk.position.set(0, SIDEWALK_Y, lawnZ0 + lawnDepth + SIDEWALK / 2);
     farWalk.receiveShadow = true;
     armGroup.add(farWalk);
-    const terrace = makeBuilding(halfW * 2 + 2, 7, pickFloat(rng, 12, 16), pickFrom(rng, BUILDING_COLORS));
+    const terrace = makeBuilding(halfW * 2 + 2, 7, pickFloat(rng, 12, 16), pickFrom(rng, buildingColors));
     terrace.position.set(0, 0, lawnZ0 + lawnDepth + SIDEWALK + 3.5);
     armGroup.add(terrace);
 
@@ -657,7 +667,7 @@ export function buildIntersection(
       const w = pickFloat(rng, 3.5, 6);
       const d = pickFloat(rng, 3.5, 6);
       const h = pickFloat(rng, 8, 15);
-      const color = pickFrom(rng, BUILDING_COLORS);
+      const color = pickFrom(rng, buildingColors);
       const b = makeBuilding(w, d, h, color);
       let bx = innerX;
       let bz = innerZ;

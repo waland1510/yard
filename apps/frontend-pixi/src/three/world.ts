@@ -12,22 +12,78 @@ export interface World {
   addTick: (fn: (dt: number, t: number) => void) => () => void;
   /** Switch the post-processing fidelity tier (#3). */
   setQuality: (tier: QualityTier) => void;
+  /** Apply a theme's sky, fog and lighting. */
+  setAtmosphere: (themeId: string) => void;
   destroy: () => void;
 }
 
-// Stylized London sky palette. Cream-grey horizon dissolving into a soft
-// overcast blue zenith. The middle band matches FOG_TINT so distant
+// Sky, fog and light per theme. The horizon doubles as the fog colour so distant
 // procedural buildings melt cleanly into the sky.
-const SKY_ZENITH = new THREE.Color(0x7ea3cf);
-const SKY_HORIZON = new THREE.Color(FOG_TINT);
-const SKY_GROUND = new THREE.Color(0xead9c3);
+interface Atmosphere {
+  zenith: number;
+  horizon: number;
+  ground: number;
+  sunColor: number;
+  sunIntensity: number;
+  sunPosition: [number, number, number];
+  hemiSky: number;
+  hemiGround: number;
+  hemiIntensity: number;
+}
+
+const LONDON_DAY: Atmosphere = {
+  zenith: 0x7ea3cf,
+  horizon: FOG_TINT,
+  ground: 0xead9c3,
+  sunColor: 0xffe4bd,
+  sunIntensity: 2.6,
+  sunPosition: [22, 58, 30],
+  hemiSky: 0x9fbde0,
+  hemiGround: 0x6a5a48,
+  hemiIntensity: 0.65,
+};
+
+// Violet dusk over wizarding London: low amber sun, lavender haze.
+const WIZARDING_DUSK: Atmosphere = {
+  zenith: 0x241d4a,
+  horizon: 0x9b86b6,
+  ground: 0x4c4060,
+  sunColor: 0xffb98a,
+  sunIntensity: 1.7,
+  sunPosition: [34, 30, -22],
+  hemiSky: 0x7d6fb8,
+  hemiGround: 0x2e2438,
+  hemiIntensity: 0.7,
+};
+
+// Sunny Barbie World: clear blue overhead melting into pink haze.
+const DREAM_DAY: Atmosphere = {
+  zenith: 0x3fb2ff,
+  horizon: 0xffb8dc,
+  ground: 0xffe0f0,
+  sunColor: 0xfff0e6,
+  sunIntensity: 2.8,
+  sunPosition: [26, 60, 24],
+  hemiSky: 0xffc4e1,
+  hemiGround: 0xd9a0c0,
+  hemiIntensity: 0.85,
+};
+
+const ATMOSPHERES: Record<string, Atmosphere> = {
+  classic: LONDON_DAY,
+  'harry-potter': WIZARDING_DUSK,
+  barbie: DREAM_DAY,
+};
 
 /**
  * Procedural equirectangular sky gradient. Painted into a tall, narrow canvas
  * as vertical bands (zenith -> mid -> horizon -> ground) and wrapped as an
  * equirectangular texture so THREE can sample it via scene.background.
  */
-function makeSkyGradient(): THREE.CanvasTexture {
+function makeSkyGradient(atmosphere: Atmosphere): THREE.CanvasTexture {
+  const zenith = new THREE.Color(atmosphere.zenith);
+  const horizon = new THREE.Color(atmosphere.horizon);
+  const ground = new THREE.Color(atmosphere.ground);
   const w = 16;
   const h = 256;
   const canvas = document.createElement('canvas');
@@ -39,16 +95,12 @@ function makeSkyGradient(): THREE.CanvasTexture {
     return new THREE.CanvasTexture(canvas);
   }
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  // 0.00 zenith — soft london overcast blue
-  grad.addColorStop(0.0, `#${SKY_ZENITH.getHexString()}`);
-  // 0.45 upper-mid — blend toward fog tint
-  grad.addColorStop(0.45, `#${SKY_HORIZON.clone().lerp(SKY_ZENITH, 0.35).getHexString()}`);
-  // 0.62 horizon band — exactly FOG_TINT so fog dissolves seamlessly
-  grad.addColorStop(0.62, `#${SKY_HORIZON.getHexString()}`);
-  // 0.78 pale cream just below horizon
-  grad.addColorStop(0.78, `#${SKY_GROUND.clone().lerp(SKY_HORIZON, 0.4).getHexString()}`);
-  // 1.00 warm ground tint (rarely visible — camera at eye level)
-  grad.addColorStop(1.0, `#${SKY_GROUND.getHexString()}`);
+  grad.addColorStop(0.0, `#${zenith.getHexString()}`);
+  grad.addColorStop(0.45, `#${horizon.clone().lerp(zenith, 0.35).getHexString()}`);
+  // 0.62 horizon band — exactly the fog colour so fog dissolves seamlessly
+  grad.addColorStop(0.62, `#${horizon.getHexString()}`);
+  grad.addColorStop(0.78, `#${ground.clone().lerp(horizon, 0.4).getHexString()}`);
+  grad.addColorStop(1.0, `#${ground.getHexString()}`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
@@ -86,13 +138,14 @@ export function createWorld(canvas: HTMLCanvasElement): World {
   // sky — vertical bands from a soft overcast-blue zenith through the
   // FOG_TINT horizon down to a pale cream ground reflection. The HDRI below
   // is reserved exclusively for PBR reflections via scene.environment.
-  const skyTexture = makeSkyGradient();
+  let skyTexture = makeSkyGradient(LONDON_DAY);
   scene.background = skyTexture;
 
   // Fog so distant procedural geometry (buildings, road arms) melts into the
   // horizon band rather than popping at the far clip plane.
   const fogColor = new THREE.Color(FOG_TINT);
-  scene.fog = new THREE.Fog(fogColor, 45, 170);
+  const fog = new THREE.Fog(fogColor, 45, 170);
+  scene.fog = fog;
   renderer.setClearColor(fogColor, 1);
 
   // HDRI is loaded ONLY into scene.environment for plausible PBR reflections
@@ -180,6 +233,20 @@ export function createWorld(canvas: HTMLCanvasElement): World {
         const i = tickFns.indexOf(fn);
         if (i >= 0) tickFns.splice(i, 1);
       };
+    },
+    setAtmosphere(themeId) {
+      const a = ATMOSPHERES[themeId] ?? LONDON_DAY;
+      skyTexture.dispose();
+      skyTexture = makeSkyGradient(a);
+      scene.background = skyTexture;
+      fog.color.setHex(a.horizon);
+      renderer.setClearColor(fog.color, 1);
+      sun.color.setHex(a.sunColor);
+      sun.intensity = a.sunIntensity;
+      sun.position.set(...a.sunPosition);
+      hemi.color.setHex(a.hemiSky);
+      hemi.groundColor.setHex(a.hemiGround);
+      hemi.intensity = a.hemiIntensity;
     },
     setQuality(tier) {
       const settings = TIER_SETTINGS[tier];

@@ -6,7 +6,6 @@ import { TopPills } from './top-pills';
 import { TurnBanner } from './turn-banner';
 import { VictoryOverlay } from './victory-overlay';
 import { SpecialMoves } from './special-moves';
-import { ReplayControls } from './replay-controls';
 import { SystemBar } from './system-bar';
 import { DebugOverlay } from './debug-overlay';
 import { AiChoicePanel } from './ai-choice-panel';
@@ -15,6 +14,7 @@ import { ImpersonationBanner } from './impersonation-banner';
 import { PairControl } from './pair-control';
 import { GraphicsToggle } from './graphics-toggle';
 import { CallStrip } from './call-strip';
+import { Toasts } from './toasts';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 
 export function HudShell() {
@@ -30,7 +30,6 @@ export function HudShell() {
       <TurnBanner />
       <AiChoicePanel />
       <VictoryOverlay />
-      <ReplayControls />
       <SystemBar />
       <DebugOverlay />
       <InviteButton />
@@ -38,6 +37,7 @@ export function HudShell() {
       <PairControl />
       <GraphicsToggle />
       <CallStrip />
+      <Toasts />
     </>
   );
 }

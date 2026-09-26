@@ -35,6 +35,7 @@
 DATABASE_URL         PostgreSQL connection string (Neon)
 OPENROUTER_API_KEY   AI API key
 GEMINI_API_KEY       AI API key (alternate provider)
+IPINFO_TOKEN         ipinfo.io token for /api/geo lookups (optional; unauthenticated is rate-limited)
 TYPESAFE_API_KEY     Jev decision model key. Absent → Jev disabled, heuristic only.
 AI_DETECTIVE_POLICY  choose | jev | heuristic (default: choose). `choose` offers disagreements to humans.
 AI_CHOICE_TIMEOUT_MS How long a proposal waits for a human pick before the heuristic plays (default: 30000)
@@ -42,6 +43,7 @@ JEV_MODEL            Jev model id (default: jev-latest)
 JEV_TIMEOUT_MS       Per-attempt timeout for a Jev call (default: 4000)
 JEV_MIN_CONFIDENCE   Below this Jev confidence, fall back to the heuristic (default: 0)
 FRONTEND_URL         Allowed CORS origin
+ALLOWED_ORIGINS      Extra CORS origins, comma-separated (e.g. preview deployments)
 HOST                 Server host (default: 0.0.0.0)
 PORT                 Server port (default: 3000)
 ```

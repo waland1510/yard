@@ -1,5 +1,5 @@
 import type { RoleType } from '@yard/shared-utils';
-import type { ThemeName } from '../core/theme-registry';
+import { THEME_NAMES, type ThemeName } from '../core/theme-registry';
 
 const VALID_ROLES: ReadonlySet<RoleType> = new Set<RoleType>([
   'culprit',
@@ -10,7 +10,7 @@ const VALID_ROLES: ReadonlySet<RoleType> = new Set<RoleType>([
   'detective5',
 ]);
 
-const VALID_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(['classic', 'harry-potter']);
+const VALID_THEMES: ReadonlySet<ThemeName> = new Set<ThemeName>(THEME_NAMES);
 
 export interface UrlSession {
   /** Channel slug from the URL path `/game/:channel`. */

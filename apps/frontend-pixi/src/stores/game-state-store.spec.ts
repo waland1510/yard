@@ -84,3 +84,23 @@ describe('gameStateStore ai proposal', () => {
     expect(useGameStateStore.getState().aiProposal).toBeNull();
   });
 });
+
+describe('gameStateStore finished games', () => {
+  beforeEach(() => {
+    useGameStateStore.getState().reset();
+    useGameStateStore.getState().setChannel('abc');
+    useGameStateStore.getState().setFinished('culprit');
+  });
+
+  it('gameStore_staleActiveSnapshotForSameGame_staysFinished', () => {
+    useGameStateStore.getState().applyServerState({ channel: 'abc', status: 'active' });
+
+    expect(useGameStateStore.getState().status).toBe('finished');
+  });
+
+  it('gameStore_activeSnapshotForDifferentGame_becomesActive', () => {
+    useGameStateStore.getState().applyServerState({ channel: 'xyz', status: 'active' });
+
+    expect(useGameStateStore.getState().status).toBe('active');
+  });
+});

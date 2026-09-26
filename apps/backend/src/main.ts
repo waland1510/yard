@@ -26,6 +26,8 @@ const port = ENV.PORT;
 const server = fastify({
   logger: true,
   ignoreTrailingSlash: true,
+  // Behind a hosting proxy request.ip would otherwise be the proxy, not the player.
+  trustProxy: true,
 });
 const aiService = new AIPlayerService();
 const proposals = new AiProposalRegistry('heuristic');
@@ -35,6 +37,7 @@ const proposals = new AiProposalRegistry('heuristic');
 // both local frontends can talk to one backend without surgery.
 const allowedOrigins = [
   ENV.FRONTEND_URL,
+  ...ENV.ALLOWED_ORIGINS,
   'http://localhost:4200',
   'http://localhost:4201',
 ].filter(Boolean);
@@ -325,8 +328,14 @@ server.register(async function (fastify) {
       let currentChannel: string | null = null;
       let currentClientId: string | null = null;
 
-      connection.on('message', async (message) => {
-        const parsedMessage: Message = JSON.parse(message.toString());
+      const handleMessage = async (message: Buffer) => {
+        let parsedMessage: Message;
+        try {
+          parsedMessage = JSON.parse(message.toString());
+        } catch {
+          server.log.warn({ channel: currentChannel }, 'ws: ignoring malformed message');
+          return;
+        }
         switch (parsedMessage.type) {
           case 'startGame': {
             const ch = parsedMessage.data.ch;
@@ -629,6 +638,9 @@ server.register(async function (fastify) {
 
           case 'endGame':
             if (currentChannel) {
+              // Persist first: clients re-fetch state over REST and must not see it as active.
+              const ended = await hasActiveGame(currentChannel);
+              if (ended?.id) await updateGame(ended.id, { status: 'finished' });
               broadcast(currentChannel, {
                 type: 'endGame',
                 data: parsedMessage.data,
@@ -640,6 +652,13 @@ server.register(async function (fastify) {
           default:
             console.warn('Unknown message type:', parsedMessage.type);
         }
+      };
+
+      // An async listener's rejection is unhandled, and Node exits on unhandled rejections.
+      connection.on('message', (message: Buffer) => {
+        handleMessage(message).catch((error) => {
+          server.log.error({ err: error, channel: currentChannel }, 'ws: message handler failed');
+        });
       });
 
       connection.on('close', () => {
@@ -688,6 +707,19 @@ const broadcast = (channel: string, message: Message) => {
     }
   }
 };
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, async () => {
+    server.log.info({ signal }, 'shutting down');
+    try {
+      await server.close();
+      process.exit(0);
+    } catch (error) {
+      server.log.error(error);
+      process.exit(1);
+    }
+  });
+}
 
 server.listen({ port, host }, (err, address) => {
   if (err) {

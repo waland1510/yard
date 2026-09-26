@@ -2,11 +2,13 @@
 // Drives the rest-client + url-params-router. Hands off to the game route once started.
 
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { RoleType } from '@yard/shared-utils';
-import { THEMES, type ThemeName } from '../core/theme-registry';
+import { THEMES, THEME_NAMES, type ThemeName } from '../core/theme-registry';
 import { ROLE_PALETTE } from '../core/map-data';
 import { useRunnerStore } from '../stores/runner-store';
-import { createGame, getGeo, makeMockChannel, updatePlayer } from '../net/rest-client';
+import { createGame, getGame, getGeo, makeMockChannel, recordVisit, updatePlayer } from '../net/rest-client';
+import { RulesButton } from '../hud/rules-panel';
 
 type Step = 'welcome' | 'theme' | 'name' | 'role' | 'options' | 'launching';
 
@@ -41,6 +43,24 @@ export function SetupFlow({ onStart }: SetupFlowProps) {
     });
   }, []);
 
+  const navigate = useNavigate();
+  const lastGamePath = useRunnerStore((s) => s.lastGamePath);
+  const setLastGamePath = useRunnerStore((s) => s.setLastGamePath);
+  const [resumePath, setResumePath] = useState<string | null>(null);
+  useEffect(() => {
+    const channel = lastGamePath.match(/^\/game\/([^/?]+)/)?.[1];
+    if (!channel) return;
+    let cancelled = false;
+    getGame(decodeURIComponent(channel)).then((game) => {
+      if (cancelled) return;
+      if (game?.status === 'active') setResumePath(lastGamePath);
+      else setLastGamePath('');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [lastGamePath, setLastGamePath]);
+
   const themeDef = THEMES[theme];
 
   const goNext = () => {
@@ -55,6 +75,7 @@ export function SetupFlow({ onStart }: SetupFlowProps) {
   const handleStart = async () => {
     if (!role || !name.trim()) return;
     setStep('launching');
+    recordVisit(name.trim());
     // Try real backend first
     const created = await createGame({ theme, withAI });
     const channel = created?.channel ?? makeMockChannel();
@@ -82,12 +103,28 @@ export function SetupFlow({ onStart }: SetupFlowProps) {
           <span style={{ ...brandTitle, color: accent }}>SCOTLAND YARD</span>
           <span style={brandSub}>first-person</span>
         </div>
-        <ProgressDots step={step} accent={accent} />
+        <div style={headerRight}>
+          <RulesButton
+            themeId={theme}
+            renderTrigger={(open) => (
+              <button type="button" style={rulesLink} onClick={open}>
+                How to play
+              </button>
+            )}
+          />
+          <ProgressDots step={step} accent={accent} />
+        </div>
       </header>
 
       <main style={mainCard}>
         {step === 'welcome' && (
-          <Welcome name={lastUsername} greeting={greeting} accent={accent} onContinue={goNext} />
+          <Welcome
+            name={lastUsername}
+            greeting={greeting}
+            accent={accent}
+            onContinue={goNext}
+            onResume={resumePath ? () => navigate(resumePath) : undefined}
+          />
         )}
         {step === 'theme' && (
           <ThemePicker selected={theme} onSelect={setTheme} onNext={goNext} onBack={goBack} />
@@ -131,11 +168,13 @@ function Welcome({
   greeting,
   accent,
   onContinue,
+  onResume,
 }: {
   name: string;
   greeting: string | null;
   accent: string;
   onContinue: () => void;
+  onResume?: () => void;
 }) {
   const display = name ? `Hey ${name}` : 'Welcome, detective';
   return (
@@ -146,9 +185,16 @@ function Welcome({
         A turn-based detective game in first-person London. You'll deduce, pursue,
         or evade across 200 nodes of the underground.
       </p>
-      <button style={primaryBtn(accent)} onClick={onContinue}>
-        Begin
-      </button>
+      <div style={welcomeActions}>
+        {onResume && (
+          <button style={primaryBtn(accent)} onClick={onResume}>
+            Continue game
+          </button>
+        )}
+        <button style={onResume ? ghostBtn : primaryBtn(accent)} onClick={onContinue}>
+          {onResume ? 'New game' : 'Begin'}
+        </button>
+      </div>
     </>
   );
 }
@@ -169,7 +215,7 @@ function ThemePicker({
       <h2 style={stepTitle}>Choose your world</h2>
       <p style={stepBlurb}>The theme dresses the city, the characters, and the language of transport.</p>
       <div style={cardRow}>
-        {(['classic', 'harry-potter'] as ThemeName[]).map((name) => {
+        {THEME_NAMES.map((name) => {
           const t = THEMES[name];
           const isSel = selected === name;
           return (
@@ -409,6 +455,9 @@ function bgGradient(theme: ThemeName): string {
   if (theme === 'harry-potter') {
     return 'radial-gradient(ellipse at top, #2c1a4a 0%, #0b0820 50%, #050410 100%)';
   }
+  if (theme === 'barbie') {
+    return 'radial-gradient(ellipse at top, #5a1640 0%, #2a0a22 50%, #12040e 100%)';
+  }
   return 'radial-gradient(ellipse at top, #1a2230 0%, #0b1018 50%, #04060b 100%)';
 }
 
@@ -442,6 +491,19 @@ const topBar: React.CSSProperties = {
   zIndex: 1,
 };
 
+const headerRight: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 18 };
+const rulesLink: React.CSSProperties = {
+  background: 'transparent',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 999,
+  padding: '6px 12px',
+  color: 'rgba(255,255,255,0.8)',
+  fontFamily: 'inherit',
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: 0.4,
+  cursor: 'pointer',
+};
 const brand: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 12 };
 const brandTitle: React.CSSProperties = { fontSize: 18, fontWeight: 800, letterSpacing: 4 };
 const brandSub: React.CSSProperties = {
@@ -524,7 +586,7 @@ const cardRow: React.CSSProperties = {
 
 function themeCard(selected: boolean, accent: string): React.CSSProperties {
   return {
-    width: 280,
+    width: 250,
     padding: '22px 20px',
     background: selected ? `rgba(${hexToRgb(accent)}, 0.16)` : 'rgba(255,255,255,0.04)',
     border: `2px solid ${selected ? accent : 'rgba(255,255,255,0.1)'}`,
@@ -660,6 +722,8 @@ function primaryBtn(accent: string): React.CSSProperties {
     transition: 'transform 120ms ease',
   };
 }
+
+const welcomeActions: React.CSSProperties = { display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' };
 
 const ghostBtn: React.CSSProperties = {
   marginTop: 24,

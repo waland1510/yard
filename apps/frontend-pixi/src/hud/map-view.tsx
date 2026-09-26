@@ -40,8 +40,8 @@ export interface MapViewProps {
   /** Move count for the culprit so we can reveal Mr. X on rounds 3/8/13/18/24. */
   culpritMoveCount: number;
   ticketsByKind: Partial<Record<TransportKind, number>>;
-  /** Post-game replay (#11). The REPLAY banner lives in <ReplayControls/>; the map only
-   *  needs `interactive` to be false. Accepted for prop parity with <MapSurface/>. */
+  /** Post-game replay (#11); the map only needs `interactive` to be false. Accepted for
+   *  prop parity with <MapSurface/>. */
   isReplay?: boolean;
   onConnectionClick: (conn: Connection) => void;
 }

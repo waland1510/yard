@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useGameStateStore } from '../stores/game-state-store';
 import { notifications } from '../core/notification-service';
 import { COLOR, FONT, SCREEN_MARGIN, pillCompact } from './tokens';
+import { SYSTEM_BAR_WIDTH } from './system-bar';
 
 export function InviteButton() {
   const channel = useGameStateStore((s) => s.channel);
@@ -47,7 +48,7 @@ const container: React.CSSProperties = {
   ...pillCompact,
   position: 'fixed',
   bottom: SCREEN_MARGIN,
-  right: SCREEN_MARGIN + 36 * 2 + 6 + 8,
+  right: SCREEN_MARGIN + SYSTEM_BAR_WIDTH + 8,
   height: 36,
   zIndex: 30,
 };

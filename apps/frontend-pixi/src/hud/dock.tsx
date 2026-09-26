@@ -245,7 +245,11 @@ function Squad({
             <div style={location}>
               📍 {position}
               <span style={roleSub}>
-                {isCulprit ? 'Mr. X' : `Detective ${p.role.replace('detective', '')}`}
+                {p.username && !p.isAI
+                  ? p.username
+                  : isCulprit
+                  ? 'Mr. X'
+                  : `Detective ${p.role.replace('detective', '')}`}
               </span>
             </div>
             <div style={chips}>

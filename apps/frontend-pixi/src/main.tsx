@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { ErrorBoundary } from './app/error-boundary';
 import { Game } from './app/game';
 import { SetupFlow } from './setup/setup-flow';
 import './styles.css';
@@ -22,12 +23,14 @@ if (!rootEl) throw new Error('#root element missing');
 const root = createRoot(rootEl);
 root.render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<SetupRoute />} />
-        <Route path="/game/:channel" element={<Game />} />
-        <Route path="*" element={<SetupRoute />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<SetupRoute />} />
+          <Route path="/game/:channel" element={<Game />} />
+          <Route path="*" element={<SetupRoute />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );

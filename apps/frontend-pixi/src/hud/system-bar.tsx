@@ -1,17 +1,32 @@
-// Small bottom-right system controls: mute toggle, debug toggle (only renders when debug
-// is enabled in preferences).
+// Small bottom-right system controls: rules, mute toggle, debug toggle.
 
 import { useRunnerStore } from '../stores/runner-store';
+import { useGameStateStore } from '../stores/game-state-store';
+import { RulesButton } from './rules-panel';
 import { COLOR, SCREEN_MARGIN, iconSquare } from './tokens';
+
+const BUTTON_COUNT = 3;
+const GAP = 6;
+/** Horizontal space the bar occupies, so neighbouring bottom-right controls can clear it. */
+export const SYSTEM_BAR_WIDTH = 36 * BUTTON_COUNT + GAP * (BUTTON_COUNT - 1);
 
 export function SystemBar() {
   const muted = useRunnerStore((s) => s.muted);
   const setMuted = useRunnerStore((s) => s.setMuted);
   const debugEnabled = useRunnerStore((s) => s.debugEnabled);
   const setDebugEnabled = useRunnerStore((s) => s.setDebugEnabled);
+  const themeId = useGameStateStore((s) => s.theme);
 
   return (
     <div style={container}>
+      <RulesButton
+        themeId={themeId}
+        renderTrigger={(open) => (
+          <button style={iconButton} onClick={open} title="How to play" aria-label="Game rules">
+            📖
+          </button>
+        )}
+      />
       <button
         style={iconButton}
         onClick={() => setMuted(!muted)}
@@ -41,7 +56,7 @@ const container: React.CSSProperties = {
   bottom: SCREEN_MARGIN,
   right: SCREEN_MARGIN,
   display: 'flex',
-  gap: 6,
+  gap: GAP,
   zIndex: 30,
 };
 

@@ -12,7 +12,9 @@ export const ENV = {
   JEV_TIMEOUT_MS: parseInt(process.env.JEV_TIMEOUT_MS || '4000', 10),
   JEV_MIN_CONFIDENCE: parseFloat(process.env.JEV_MIN_CONFIDENCE || '0'),
   DATABASE_URL: process.env.DATABASE_URL || '',
+  IPINFO_TOKEN: process.env.IPINFO_TOKEN || '',
   FRONTEND_URL: process.env.FRONTEND_URL || '',
+  ALLOWED_ORIGINS: (process.env.ALLOWED_ORIGINS ?? '').split(',').map(o => o.trim()).filter(Boolean),
   HOST: process.env.HOST || '0.0.0.0',
   PORT: parseInt(process.env.PORT || '3000', 10),
 };

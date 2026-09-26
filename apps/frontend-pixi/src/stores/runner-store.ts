@@ -23,6 +23,8 @@ interface PersistedPrefs {
   muted: boolean;
   debugEnabled: boolean;
   lastUsername: string;
+  /** URL of the last joined online game, offered as "Continue game" in the lobby. */
+  lastGamePath: string;
   viewMode: ViewMode;
   graphicsQuality: GraphicsQuality;
 }
@@ -32,6 +34,7 @@ const DEFAULT_PREFS: PersistedPrefs = {
   muted: false,
   debugEnabled: false,
   lastUsername: '',
+  lastGamePath: '',
   viewMode: 'auto',
   graphicsQuality: 'auto',
 };
@@ -89,8 +92,10 @@ export interface RunnerStore {
   muted: boolean;
   debugEnabled: boolean;
   lastUsername: string;
+  lastGamePath: string;
 
   /** Actions */
+  setLastGamePath(path: string): void;
   setIdentity(role: RoleType | null, name: string): void;
   setDeviceType(t: DeviceType): void;
   setViewMode(m: ViewMode): void;
@@ -160,19 +165,18 @@ export const useRunnerStore = create<RunnerStore>((set, get) => ({
   muted: persisted.muted,
   debugEnabled: persisted.debugEnabled,
   lastUsername: persisted.lastUsername,
+  lastGamePath: persisted.lastGamePath,
+
+  setLastGamePath(path) {
+    if (get().lastGamePath === path) return;
+    set({ lastGamePath: path });
+    savePrefs({ ...currentPrefs(get), lastGamePath: path });
+  },
 
   setIdentity(role, name) {
     set({ myRole: role, myName: name, viewingAs: role });
-    const prefs: PersistedPrefs = {
-      language: get().language,
-      muted: get().muted,
-      debugEnabled: get().debugEnabled,
-      lastUsername: name,
-      viewMode: get().viewMode,
-      graphicsQuality: get().graphicsQuality,
-    };
     set({ lastUsername: name });
-    savePrefs(prefs);
+    savePrefs({ ...currentPrefs(get), lastUsername: name });
   },
 
   setDeviceType(t) {
@@ -299,6 +303,7 @@ function currentPrefs(get: () => RunnerStore): PersistedPrefs {
     muted: s.muted,
     debugEnabled: s.debugEnabled,
     lastUsername: s.lastUsername,
+    lastGamePath: s.lastGamePath,
     viewMode: s.viewMode,
     graphicsQuality: s.graphicsQuality,
   };

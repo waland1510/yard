@@ -148,7 +148,7 @@ export async function playRide(
   if (vehicle.kind === 'underground') {
     // Mount a concrete tunnel + stairs + train around the camera so the descent reads as
     // entering an underground station rather than flying below the city.
-    const rig = createTunnelRig(seatPos, rideForward);
+    const rig = createTunnelRig(seatPos, rideForward, vehicle.tunnelStyle);
     world.scene.add(rig.group);
     const originalFog = world.scene.fog;
     const originalBg = world.scene.background;

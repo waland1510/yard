@@ -64,4 +64,25 @@ export const themes: Record<string, Theme> = {
       river: 'Portkey',
     },
   },
+  barbie: {
+    name: 'Barbie World',
+    characters: {
+      culprit: { name: 'Barbie', image: '/images/barbie/barbie.svg' },
+      detectives: [
+        { name: 'Ken', image: '/images/barbie/ken.svg' },
+        { name: 'Skipper', image: '/images/barbie/skipper.svg' },
+        { name: 'Teresa', image: '/images/barbie/teresa.svg' },
+        { name: 'Midge', image: '/images/barbie/midge.svg' },
+        { name: 'Allan', image: '/images/barbie/allan.svg' },
+      ],
+    },
+    transportation: {
+      taxi: 'Pink Convertible',
+      bus: 'Dream Camper',
+      underground: 'Dream Slide',
+      secret: 'Disguise',
+      double: 'Glam Dash',
+      river: 'Pink Yacht',
+    },
+  },
 };

@@ -7,7 +7,7 @@ export interface CreateGameOptions {
 export function createGameState(themeName = 'classic'): GameState {
   const startingPositions = getStartingPositions();
   const channel = Math.random().toString(36).substring(7);
-  const theme = themes[themeName];
+  const theme = themes[themeName] ?? themes.classic;
 
   return {
     channel,

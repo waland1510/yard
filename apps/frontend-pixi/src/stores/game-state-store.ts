@@ -57,6 +57,8 @@ export interface GameStateStore extends GameSession {
   appendMove(move: Move): void;
   /** Update a player's position (used after a move). */
   setPosition(role: RoleType, position: number): void;
+  /** Merge fields into one player (e.g. after claiming a seat). */
+  patchPlayer(role: RoleType, patch: Partial<Player>): void;
   /** Decrement tickets after a move. */
   decrementTickets(role: RoleType, type: MoveType, secret?: boolean, double?: boolean): void;
   /** Set whose turn it is (server tells us this on each broadcast). */
@@ -99,7 +101,9 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
     set((s) => {
       const players = snapshot.players ?? s.players;
       const moves = snapshot.moves ?? s.moves;
-      const status = snapshot.status ?? s.status;
+      // A game never un-finishes; a stale REST response must not reopen it.
+      const reopening = s.status === 'finished' && snapshot.status === 'active' && snapshot.channel === s.channel;
+      const status = reopening ? s.status : snapshot.status ?? s.status;
       return {
         players,
         moves,
@@ -116,6 +120,12 @@ export const useGameStateStore = create<GameStateStore>((set) => ({
 
   appendMove(move) {
     set((s) => ({ moves: [...s.moves, move] }));
+  },
+
+  patchPlayer(role, patch) {
+    set((s) => ({
+      players: s.players.map((p) => (p.role === role ? { ...p, ...patch } : p)),
+    }));
   },
 
   setPosition(role, position) {

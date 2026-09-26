@@ -104,3 +104,7 @@ export async function updateGame(gameId: number, updates: Partial<GameState>) {
     throw new Error('Failed to update game');
   }
 }
+
+export async function pingDatabase(): Promise<void> {
+  await db.execute(sql`select 1`);
+}

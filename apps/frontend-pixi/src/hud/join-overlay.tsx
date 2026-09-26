@@ -12,7 +12,7 @@ import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme } from '../core/theme-registry';
 import { ROLE_PALETTE } from '../core/map-data';
-import { getPresence } from '../net/rest-client';
+import { getPresence, recordVisit } from '../net/rest-client';
 
 const ROLES: readonly RoleType[] = [
   'culprit',
@@ -55,6 +55,7 @@ export function JoinOverlay({ channel, onJoin }: JoinOverlayProps) {
 
   const handleJoin = () => {
     if (!canJoin || role == null) return;
+    recordVisit(name.trim());
     const params = new URLSearchParams({ role, name: name.trim(), theme: themeId });
     navigate(`/game/${encodeURIComponent(channel)}?${params.toString()}`, { replace: true });
     onJoin(role, name.trim());

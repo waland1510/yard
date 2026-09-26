@@ -6,6 +6,7 @@
 //   POST /api/games        — create a new game; returns { channel, ... }
 //   GET  /api/games/:id    — fetch full GameState by channel
 //   GET  /api/geo          — IP-based geolocation (best-effort)
+//   POST /api/geo          — record the player's visit location under their name
 
 import type { GameState } from '@yard/shared-utils';
 import type { ThemeName } from '../core/theme-registry';
@@ -113,6 +114,15 @@ export async function getGeo(): Promise<GeoInfo | null> {
   } catch {
     return null;
   }
+}
+
+/** Fire-and-forget: the backend resolves the caller's IP and stores it under this name. */
+export function recordVisit(username: string): void {
+  fetch(`${baseUrl()}/api/geo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: username.slice(0, 45) }),
+  }).catch(() => undefined);
 }
 
 /** Generate a local mock channel ID — used when REST fails so the lobby still leads

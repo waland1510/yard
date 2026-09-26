@@ -101,3 +101,8 @@ button:not(:disabled):active {
 .hud-card:not(:disabled):hover {
   background: rgba(255, 255, 255, 0.03);
 }
+
+@keyframes sy-toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

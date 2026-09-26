@@ -3,7 +3,7 @@
 
 import type { RoleType } from '@yard/shared-utils';
 
-export type ThemeName = 'classic' | 'harry-potter';
+export type ThemeName = 'classic' | 'harry-potter' | 'barbie';
 
 export interface ThemeCharacter {
   name: string;
@@ -118,7 +118,43 @@ export const THEMES: Record<ThemeName, Theme> = {
       lowTicketWarn: '/audio/low-warn-hp.wav',
     },
   },
+  barbie: {
+    id: 'barbie',
+    name: 'Barbie World',
+    characters: {
+      culprit: { name: 'Barbie', image: '/images/barbie/barbie.svg' },
+      detectives: [
+        { name: 'Ken', image: '/images/barbie/ken.svg' },
+        { name: 'Skipper', image: '/images/barbie/skipper.svg' },
+        { name: 'Teresa', image: '/images/barbie/teresa.svg' },
+        { name: 'Midge', image: '/images/barbie/midge.svg' },
+        { name: 'Allan', image: '/images/barbie/allan.svg' },
+      ],
+    },
+    transportation: {
+      taxi: 'Pink Convertible',
+      bus: 'Dream Camper',
+      underground: 'Dream Slide',
+      secret: 'Disguise',
+      double: 'Glam Dash',
+      river: 'Pink Yacht',
+    },
+    palette: {
+      accent: '#ff3fa4',
+      reveal: '#ff3fa4',
+      confetti: ['#ff3fa4', '#ffd1e8', '#5ec8f2', '#ffe066', '#b388ff'],
+      river: '#5ec8f2',
+    },
+    sfx: {
+      capture: '/audio/capture-barbie.wav',
+      reveal: '/audio/reveal-barbie.wav',
+      ticketSpent: '/audio/ticket-barbie.wav',
+      lowTicketWarn: '/audio/low-warn-barbie.wav',
+    },
+  },
 };
+
+export const THEME_NAMES = Object.keys(THEMES) as ThemeName[];
 
 export const DEFAULT_THEME: ThemeName = 'classic';
 
