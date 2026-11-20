@@ -54,3 +54,7 @@ vitest.config.*.timestamp*
 
 # AI eval output (reproducible from seeds)
 apps/backend/eval-results/
+
+.nx/polygraph
+.claude/worktrees
+.claude/settings.local.json
