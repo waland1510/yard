@@ -1,0 +1,40 @@
+.hud-destinations {
+  --moves-top: 16px;
+  --moves-left: 16px;
+  --moves-width: 256px;
+  --moves-bottom-clearance: 88px;
+  position: fixed;
+  z-index: 30;
+  top: var(--moves-top);
+  left: var(--moves-left);
+  max-width: calc(100vw - var(--moves-left) - 16px);
+  max-height: min(440px, calc(100dvh - var(--moves-top) - var(--moves-bottom-clearance)));
+}
+.hud-destinations[data-open='true'] {
+  width: var(--moves-width);
+}
+.hud-destinations[data-surface='map'] {
+  --moves-left: calc(var(--dock-w, 0px) + 32px);
+}
+.hud-move:not(:disabled):hover,
+.hud-move:focus-visible {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+@media (max-width: 600px) {
+  .hud-destinations {
+    --moves-top: 150px;
+    --moves-width: 232px;
+    z-index: 31;
+  }
+  .hud-destinations[data-surface='map'] {
+    --moves-top: 112px;
+    --moves-left: calc(min(var(--dock-w, 0px), 64px) + 32px);
+  }
+}
+@media (max-width: 600px) and (max-height: 420px) {
+  .hud-destinations,
+  .hud-destinations[data-surface='map'] {
+    --moves-top: 76px;
+    --moves-bottom-clearance: 64px;
+  }
+}

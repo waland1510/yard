@@ -1,9 +1,9 @@
 // The strategic map as a PRIMARY full-screen surface (the desktop default, #2). It owns the
-// whole viewport; switching back to street view is done via the <TopPills/> surface switch
-// or TAB, so there is no close button or backdrop here.
+// whole viewport. The surface button in TopPills switches back to street view.
 
 import type { Player, RoleType } from '@yard/shared-utils';
-import type { Connection, TransportKind } from '../game/connections';
+import type { Connection } from '../game/connections';
+import type { MoveTicketInventory } from '../core/move-validator';
 import { MapView } from './map-view';
 
 interface MapSurfaceProps {
@@ -14,7 +14,8 @@ interface MapSurfaceProps {
   viewerRole: RoleType | null;
   players: readonly Player[];
   culpritMoveCount: number;
-  ticketsByKind: Partial<Record<TransportKind, number>>;
+  tickets: MoveTicketInventory;
+  secretArmed: boolean;
   /** Hide the map (keeping it mounted) so the FPV ride cinematic shows through. */
   hidden?: boolean;
   /** Post-game replay (#11). */
@@ -30,7 +31,8 @@ export function MapSurface({
   viewerRole,
   players,
   culpritMoveCount,
-  ticketsByKind,
+  tickets,
+  secretArmed,
   hidden = false,
   isReplay = false,
   onConnectionClick,
@@ -46,7 +48,8 @@ export function MapSurface({
         viewerRole={viewerRole}
         players={players}
         culpritMoveCount={culpritMoveCount}
-        ticketsByKind={ticketsByKind}
+        tickets={tickets}
+        secretArmed={secretArmed}
         isReplay={isReplay}
         onConnectionClick={onConnectionClick}
       />

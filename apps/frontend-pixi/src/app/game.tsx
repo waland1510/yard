@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import * as THREE from 'three';
 import type { Move, MoveType } from '@yard/shared-utils';
@@ -19,6 +19,7 @@ import { createPovControls, PovControls } from '../three/controls';
 import { createTouchControls } from '../three/touch-controls';
 import { playRide, type ArrivalAnchor } from '../three/ride';
 import { Hud } from '../hud/hud';
+import { DestinationList } from '../hud/destination-list';
 import { useNarrowViewport } from '../hud/use-viewport';
 import { Crosshair } from '../hud/crosshair';
 import { Intro } from '../hud/intro';
@@ -49,6 +50,7 @@ import {
   culpritEscaped,
   culpritMoveCount,
   deriveWinner,
+  moveTicketKind,
 } from '../core/move-validator';
 import { notifications } from '../core/notification-service';
 import { replay, useReplay } from '../core/replay-singleton';
@@ -129,6 +131,7 @@ export function Game() {
   const channel = useGameStateStore((s) => s.channel);
   const myRole = useRunnerStore((s) => s.myRole);
   const viewingAs = useRunnerStore((s) => s.viewingAs);
+  const pendingSecret = useRunnerStore((s) => s.pendingSecret);
   // Which surface this device shows by default (#2): desktop → strategic map,
   // phone → immersive FPV; overridable via the surface switch in <TopPills/>.
   const activeSurface = useRunnerStore(selectActiveSurface);
@@ -141,6 +144,7 @@ export function Game() {
   // we render the FPV from this player's intersection but the click handler still acts
   // (or refuses to act) on behalf of myRole.
   const viewerRole = viewingAs ?? myRole;
+  const secretArmed = viewerRole === 'culprit' && pendingSecret;
 
   // Derived view from the IMPERSONATED player when impersonating, else from myRole
   const viewerPlayer = useMemo(
@@ -175,15 +179,6 @@ export function Game() {
     const includeRiver = viewerRole === 'culprit';
     return getConnections(myPosition, includeRiver);
   }, [myPosition, viewerRole]);
-  const ticketsByKind = useMemo(
-    () => ({
-      taxi: tickets.taxi,
-      bus: tickets.bus,
-      underground: tickets.underground,
-      river: tickets.secret,
-    }),
-    [tickets.taxi, tickets.bus, tickets.underground, tickets.secret]
-  );
 
   // Keep refs to avoid stale closures in the long-lived useEffect
   const myRoleRef = useRef(myRole);
@@ -785,8 +780,10 @@ export function Game() {
           setHoveredInfo(null);
           return;
         }
-        const remaining =
-          v.kind === 'river' ? ticketsRef.current.secret : ticketsRef.current[v.kind];
+        const runner = useRunnerStore.getState();
+        const role = runner.viewingAs ?? runner.myRole;
+        const ticket = moveTicketKind(v.kind, role === 'culprit' && runner.pendingSecret);
+        const remaining = ticketsRef.current[ticket];
         setHoveredInfo({
           kind: v.kind,
           destinationNodeId: v.targetNodeId,
@@ -875,6 +872,17 @@ export function Game() {
     vehicleClickRef.current?.(v);
   };
 
+  const highlightedRef = useRef<VehicleHandle | null>(null);
+  const getVehicles = useCallback(() => vehiclesRef.current, []);
+  const pickVehicle = useCallback((vehicle: VehicleHandle) => vehicleClickRef.current?.(vehicle), []);
+  const handleMoveHighlight = useCallback((conn: Connection | null) => {
+    highlightedRef.current?.setHover(false);
+    highlightedRef.current = conn
+      ? vehiclesRef.current.find((h) => h.kind === conn.kind && h.targetNodeId === conn.targetNodeId) ?? null
+      : null;
+    highlightedRef.current?.setHover(true);
+  }, []);
+
   // FPV is the active surface (street view). When false, the strategic map owns the
   // viewport. During a ride the cinematic always plays on the FPV canvas, so the map
   // surface hides itself rather than unmounting (keeps Google Maps warm).
@@ -925,9 +933,13 @@ export function Game() {
           <VehicleLabels
             world={worldRef.current}
             sceneVersion={sceneVersion}
-            getVehicles={() => vehiclesRef.current}
+            getVehicles={getVehicles}
             hidden={riding || !fpvEngaged}
-            onVehicleClick={(v) => vehicleClickRef.current?.(v)}
+            tickets={tickets}
+            secretArmed={secretArmed}
+            onVehicleClick={gameStatus === 'active' && isMyTurn && !replayView.isActive
+              ? pickVehicle
+              : undefined}
           />
           {showIntro && !fpvEngaged && !riding && (
             <Intro
@@ -947,12 +959,13 @@ export function Game() {
         <MapSurface
           currentNodeId={mapCurrentNodeId}
           connections={replaySnap ? [] : mapConnections}
-          isMyTurn={!replaySnap && !riding && isMyTurn}
+          isMyTurn={gameStatus === 'active' && !replayView.isActive && !riding && isMyTurn}
           currentTurnRole={currentTurn}
           viewerRole={replaySnap ? 'culprit' : viewerRole}
           players={mapPlayers}
           culpritMoveCount={mapCulpritMoveCount}
-          ticketsByKind={ticketsByKind}
+          tickets={tickets}
+          secretArmed={secretArmed}
           hidden={riding}
           isReplay={replayView.isActive}
           onConnectionClick={handleMapClick}
@@ -964,6 +977,19 @@ export function Game() {
           <span>MOCK MODE</span>
           {!narrow && <span style={mockSub}>· AI disabled · backend offline</span>}
         </div>
+      )}
+      {gameStatus === 'active' && !replayView.isActive && !riding && !needsJoin && !(isFpv && showIntro && !fpvEngaged) && (
+        <DestinationList
+          key={activeSurface}
+          connections={mapConnections}
+          tickets={tickets}
+          secretArmed={secretArmed}
+          canMove={isMyTurn}
+          surface={isFpv ? 'fpv' : 'map'}
+          touch={touchMode}
+          onPick={handleMapClick}
+          onHighlight={handleMoveHighlight}
+        />
       )}
       <HudShell />
       <div

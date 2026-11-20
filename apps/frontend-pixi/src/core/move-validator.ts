@@ -40,10 +40,16 @@ export interface ProposedMove {
   double?: boolean;
 }
 
-/** The river has no ticket of its own: every ferry ride is paid with a secret ticket,
- *  exactly as the legacy board client did. */
+export type MoveTicketKind = Exclude<MoveType, 'river'> | 'secret';
+export type MoveTicketInventory = Record<MoveTicketKind, number>;
+
+/** Every ferry ride costs a secret ticket. An armed secret ticket pays for any other transport. */
+export function moveTicketKind(transport: MoveType, secret: boolean | undefined): MoveTicketKind {
+  return transport === 'river' || secret ? 'secret' : transport;
+}
+
 export function spendsSecretTicket(transport: MoveType, secret: boolean | undefined): boolean {
-  return transport === 'river' || !!secret;
+  return moveTicketKind(transport, secret) === 'secret';
 }
 
 export function validateMove(move: ProposedMove, ctx: ValidationContext): ValidationVerdict {

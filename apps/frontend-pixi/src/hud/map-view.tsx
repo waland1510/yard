@@ -27,6 +27,7 @@ import { spawnSpotlight, spawnTrailDot, spawnPulse, type EffectHandle } from './
 import { KIND_COLOR, drawEdge, boardDash, mountBoardEdges, stopServices } from './map-edges';
 import { SCREEN_MARGIN } from './tokens';
 import { useNarrowViewport, useTouchPrimary } from './use-viewport';
+import { moveTicketKind, type MoveTicketInventory } from '../core/move-validator';
 
 export interface MapViewProps {
   currentNodeId: number;
@@ -40,7 +41,8 @@ export interface MapViewProps {
   players: readonly Player[];
   /** Move count for the culprit so we can reveal Mr. X on rounds 3/8/13/18/24. */
   culpritMoveCount: number;
-  ticketsByKind: Partial<Record<TransportKind, number>>;
+  tickets: MoveTicketInventory;
+  secretArmed: boolean;
   /** Post-game replay (#11); the map only needs `interactive` to be false. Accepted for
    *  prop parity with <MapSurface/>. */
   isReplay?: boolean;
@@ -267,7 +269,8 @@ export function MapView({
   viewerRole,
   players,
   culpritMoveCount,
-  ticketsByKind,
+  tickets,
+  secretArmed,
   onConnectionClick,
 }: MapViewProps) {
   const narrow = useNarrowViewport();
@@ -458,8 +461,9 @@ export function MapView({
     // Bold edges from current to each reachable destination + large destination markers
     for (const conn of connections) {
       const target = coordsForNode(conn.targetNodeId);
-      const tickets = ticketsByKind[conn.kind] ?? 0;
-      const empty = tickets <= 0;
+      const ticketKind = moveTicketKind(conn.kind, secretArmed);
+      const remaining = tickets[ticketKind];
+      const empty = remaining <= 0;
       const ringColor = empty ? '#999' : KIND_COLOR[conn.kind];
 
       highlightEdgesRef.current.push(
@@ -480,10 +484,8 @@ export function MapView({
         zIndex: 100,
         title: `${nodeDisplayName(conn.targetNodeId)} — ${
           empty
-            ? 'no ticket'
-            : conn.kind === 'river'
-            ? `${transportLabels[conn.kind]} · uses a secret ticket · ${tickets - 1} left after`
-            : `${transportLabels[conn.kind]} · ${tickets - 1} left after`
+            ? `no ${transportLabels[ticketKind]} ticket`
+            : `${transportLabels[conn.kind]} · ${transportLabels[ticketKind]} ticket · ${remaining - 1} left after`
         }`,
         cursor: empty || !interactive ? 'not-allowed' : 'pointer',
       });
@@ -504,7 +506,7 @@ export function MapView({
       // Valid-move pulse (#4): looping aura under each affordable destination. A low
       // ticket count (1–2) warms the colour as a soft scarcity warning.
       if (!empty && interactive) {
-        const lowTicket = tickets > 0 && tickets <= 2;
+        const lowTicket = remaining <= 2;
         pulseHandlesRef.current.push(
           spawnPulse(map, target, lowTicket ? '#ff9f43' : KIND_COLOR[conn.kind])
         );
@@ -515,7 +517,8 @@ export function MapView({
     currentNodeId,
     connections,
     interactive,
-    ticketsByKind,
+    tickets,
+    secretArmed,
     onConnectionClick,
     transportLabels,
   ]);
