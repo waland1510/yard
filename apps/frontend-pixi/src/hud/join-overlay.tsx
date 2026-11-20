@@ -11,8 +11,8 @@ import type { RoleType } from '@yard/shared-utils';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme } from '../core/theme-registry';
-import { ROLE_PALETTE } from '../core/map-data';
 import { getPresence, recordVisit } from '../net/rest-client';
+import { COLOR, PLAYER_COLOR } from './tokens';
 
 const ROLES: readonly RoleType[] = [
   'culprit',
@@ -77,8 +77,9 @@ export function JoinOverlay({ channel, onJoin }: JoinOverlayProps) {
             const character = isCulprit
               ? theme.characters.culprit
               : theme.characters.detectives[idx];
-            const color = ROLE_PALETTE[r as keyof typeof ROLE_PALETTE];
+            const color = PLAYER_COLOR[r] ?? COLOR.fg2;
             const isSel = role === r;
+            const roleLabel = isCulprit ? 'Mr. X' : `Detective ${idx + 1}`;
             const takenBy = occupied.get(r);
             const isTaken = !!takenBy;
             return (
@@ -102,7 +103,7 @@ export function JoinOverlay({ channel, onJoin }: JoinOverlayProps) {
                   }}
                 />
                 <div style={roleName}>{character.name}</div>
-                <div style={roleSub}>{isCulprit ? 'Mr. X' : `Detective ${idx + 1}`}</div>
+                {roleLabel !== character.name && <div style={roleSub}>{roleLabel}</div>}
                 {isTaken && (
                   <div style={takenBadge}>{takenBy ? `taken · ${takenBy}` : 'taken'}</div>
                 )}

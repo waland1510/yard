@@ -59,25 +59,6 @@ export function compassFromDelta(dx: number, dy: number): Direction {
   return dy >= 0 ? 'south' : 'north';
 }
 
-// Role color palette — single source for character tokens, UI accents, paper-map dots.
-export interface RolePalette {
-  detective1: string;
-  detective2: string;
-  detective3: string;
-  detective4: string;
-  detective5: string;
-  culprit: string;
-}
-
-export const ROLE_PALETTE: RolePalette = {
-  detective1: '#3b82f6',
-  detective2: '#f59e0b',
-  detective3: '#10b981',
-  detective4: '#ec4899',
-  detective5: '#8b5cf6',
-  culprit: '#111827',
-};
-
 // Named landmarks for ~15 recognizable London nodes. Everything else falls back to "Junction #N".
 export const LANDMARK_NAMES: Record<number, string> = {
   1: "Regent's Park",

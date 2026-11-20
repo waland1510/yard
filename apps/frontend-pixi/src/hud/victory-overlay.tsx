@@ -7,8 +7,8 @@ import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme, characterFor } from '../core/theme-registry';
 import type { RoleType } from '@yard/shared-utils';
-import { ROLE_PALETTE } from '../core/map-data';
 import { deriveWinner } from '../core/move-validator';
+import { PLAYER_COLOR } from './tokens';
 
 export function VictoryOverlay() {
   const status = useGameStateStore((s) => s.status);
@@ -73,7 +73,7 @@ export function VictoryOverlay() {
           alt={character.name}
           style={{
             ...avatar,
-            borderColor: ROLE_PALETTE[winner as keyof typeof ROLE_PALETTE] ?? theme.palette.accent,
+            borderColor: PLAYER_COLOR[winner] ?? theme.palette.accent,
           }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
