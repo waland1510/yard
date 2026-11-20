@@ -810,15 +810,16 @@ export function Game() {
     document.addEventListener('pointerlockchange', pointerLockHandler);
 
     const keyHandler = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      e.preventDefault();
+      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+      if (document.pointerLockElement !== canvas || document.querySelector('[aria-modal="true"]')) return;
       const runner = useRunnerStore.getState();
-      const toMap = selectActiveSurface(runner) === 'fpv';
+      if (selectActiveSurface(runner) !== 'fpv') return;
+      const target = e.target;
+      if (target instanceof HTMLElement && target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return;
+      e.preventDefault();
       runner.toggleSurface();
-      playSfx(toMap ? 'map-open' : 'map-close');
-      if (toMap && document.pointerLockElement === canvas) document.exitPointerLock();
+      playSfx('map-open');
+      document.exitPointerLock();
     };
     window.addEventListener('keydown', keyHandler);
 
@@ -930,6 +931,7 @@ export function Game() {
           />
           {showIntro && !fpvEngaged && !riding && (
             <Intro
+              touch={touchMode}
               onDismiss={() => {
                 setShowIntro(false);
                 // Pointer lock only applies to mouse controls; touch engages immediately.

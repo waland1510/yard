@@ -77,7 +77,7 @@ function RulesModal({ themeId, onClose }: { themeId: RulesButtonProps['themeId']
       items: [
         'Street view: look around and click a vehicle or station to ride it.',
         'Strategic map: click a highlighted junction to move; right-click any junction for Street View.',
-        'Tab switches between street view and the strategic map.',
+        'Use the surface button to switch views. Press Tab while the street-view pointer is locked to open the map.',
       ],
     },
   ];

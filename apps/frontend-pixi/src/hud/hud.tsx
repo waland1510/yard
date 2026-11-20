@@ -80,7 +80,7 @@ export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo, touch }: Hu
 
       {!touch && !narrow && (
         <div style={mapHintStyle}>
-          <kbd style={kbdStyle}>TAB</kbd> strategic map
+          <kbd style={kbdStyle}>TAB</kbd> strategic map while pointer is locked
         </div>
       )}
     </>

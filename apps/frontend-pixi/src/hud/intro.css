@@ -1,0 +1,16 @@
+.street-intro-backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.street-intro-card {
+  position: relative;
+}
+
+@media (max-height: 540px) {
+  .street-intro {
+    --street-intro-padding: 12px;
+    --street-intro-card-margin: 0;
+  }
+}
