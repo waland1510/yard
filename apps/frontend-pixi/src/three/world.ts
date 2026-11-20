@@ -76,15 +76,15 @@ const ATMOSPHERES: Record<string, Atmosphere> = {
 };
 
 /**
- * Procedural equirectangular sky gradient. Painted into a tall, narrow canvas
- * as vertical bands (zenith -> mid -> horizon -> ground) and wrapped as an
+ * Procedural equirectangular sky gradient with soft cloud banks. Painted as
+ * vertical bands (zenith -> mid -> horizon -> ground) and wrapped as an
  * equirectangular texture so THREE can sample it via scene.background.
  */
 function makeSkyGradient(atmosphere: Atmosphere): THREE.CanvasTexture {
   const zenith = new THREE.Color(atmosphere.zenith);
   const horizon = new THREE.Color(atmosphere.horizon);
   const ground = new THREE.Color(atmosphere.ground);
-  const w = 16;
+  const w = 512;
   const h = 256;
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -103,6 +103,33 @@ function makeSkyGradient(atmosphere: Atmosphere): THREE.CanvasTexture {
   grad.addColorStop(1.0, `#${ground.getHexString()}`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
+
+  // A few soft, deterministic cloud banks give the open sky depth without adding
+  // geometry, animation, or draw calls. Keep the horizon clear to blend with fog.
+  // Repeat each bank across the texture seam so turning the camera stays seamless.
+  const clouds = [
+    [0.06, 0.22, 0.14, 0.045],
+    [0.29, 0.31, 0.17, 0.035],
+    [0.53, 0.19, 0.12, 0.04],
+    [0.76, 0.33, 0.18, 0.035],
+    [0.96, 0.26, 0.13, 0.045],
+  ] as const;
+  ctx.save();
+  ctx.globalAlpha = 0.13;
+  for (const [x, y, rx, ry] of clouds) {
+    for (const offset of [-1, 0, 1]) {
+      ctx.save();
+      ctx.translate((x + offset) * w, y * h);
+      ctx.scale(rx * w, ry * h);
+      const cloud = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      cloud.addColorStop(0, '#ffffff');
+      cloud.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = cloud;
+      ctx.fillRect(-1, -1, 2, 2);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.mapping = THREE.EquirectangularReflectionMapping;
