@@ -19,6 +19,11 @@ export function isRevealRound(culpritMoveNumber: number): boolean {
   return REVEAL_SET.has(culpritMoveNumber);
 }
 
+export function movesUntilReveal(culpritMoveCount: number): number | null {
+  const next = SHOW_CULPRIT_AT_MOVES.find((move) => move > culpritMoveCount);
+  return next == null ? null : next - culpritMoveCount;
+}
+
 const NODE_BY_ID = new Map<number, Node>(
   mapData.nodes.filter((n) => n.id > 0).map((n) => [n.id, n])
 );

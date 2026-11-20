@@ -7,6 +7,7 @@ import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme } from '../core/theme-registry';
 import { play as playSfx } from '../core/audio-bus';
+import { useNarrowViewport } from './use-viewport';
 import { COLOR, FONT, MOTION, RADIUS, SHADOW, centeredX } from './tokens';
 
 const HOLD_MS = 1600;
@@ -18,6 +19,7 @@ export function TurnBanner() {
   const myRole = useRunnerStore((s) => s.myRole);
   const viewingAs = useRunnerStore((s) => s.viewingAs);
   const theme = getTheme(themeId);
+  const narrow = useNarrowViewport();
 
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('Your turn');
@@ -53,6 +55,7 @@ export function TurnBanner() {
     <div
       style={{
         ...container,
+        top: narrow ? 196 : container.top,
         opacity: visible ? 1 : 0,
         transform: visible ? 'translate(-50%, 0)' : 'translate(-50%, -40px)',
         transition: `opacity 240ms ease, transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4), left ${MOTION}`,
@@ -68,7 +71,7 @@ export function TurnBanner() {
 
 const container: React.CSSProperties = {
   position: 'fixed',
-  top: 118,
+  top: 152,
   ...centeredX(),
   zIndex: 12,
   pointerEvents: 'none',

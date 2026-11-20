@@ -8,7 +8,7 @@ import type { Move, Player, RoleType } from '@yard/shared-utils';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore } from '../stores/runner-store';
 import { getTheme, characterFor } from '../core/theme-registry';
-import { SHOW_CULPRIT_AT_MOVES, isRevealRound, nodeDisplayName } from '../core/map-data';
+import { SHOW_CULPRIT_AT_MOVES, isRevealRound, movesUntilReveal, nodeDisplayName } from '../core/map-data';
 import { TOTAL_ROUNDS, culpritMoveCount } from '../core/move-validator';
 import {
   COLOR,
@@ -83,13 +83,16 @@ export function Dock() {
   const currentTurn = useGameStateStore((s) => s.currentTurn);
   const themeId = useGameStateStore((s) => s.theme);
   const myRole = useRunnerStore((s) => s.myRole);
+  const viewingAs = useRunnerStore((s) => s.viewingAs);
   const theme = getTheme(themeId);
+  const viewerRole = viewingAs ?? myRole;
+  const viewer = players.find((p) => p.role === viewerRole);
 
   const culpritMoves = useMemo(() => moves.filter((m) => m.role === 'culprit'), [moves]);
   const playedRounds = culpritMoves.length;
   const round = Math.min(TOTAL_ROUNDS, Math.max(1, playedRounds + (status === 'finished' ? 0 : 1)));
-  const nextReveal = SHOW_CULPRIT_AT_MOVES.find((r) => r >= round);
-  const revealImminent = nextReveal != null && nextReveal - round <= 1;
+  const roundsToReveal = movesUntilReveal(playedRounds);
+  const revealImminent = roundsToReveal === 1;
 
   useEffect(() => {
     publishShift(open);
@@ -112,7 +115,7 @@ export function Dock() {
       : theme.name;
 
   return (
-    <aside style={{ ...dock, width: open ? DOCK_WIDTH : DOCK_RAIL_WIDTH }} aria-label="Game dock">
+    <aside style={{ ...dock, width: open ? `min(${DOCK_WIDTH}px, calc(100vw - ${SCREEN_MARGIN * 2}px))` : DOCK_RAIL_WIDTH }} aria-label="Game dock">
       <div style={head}>
         <button
           type="button"
@@ -133,10 +136,14 @@ export function Dock() {
 
       {open ? (
         <>
+          {status === 'active' && (
+            <Briefing culpritMoves={culpritMoves} roundsToReveal={roundsToReveal} viewer={viewer} />
+          )}
           <div style={tabs}>
             <button
               type="button"
               style={tabBtn(tab === 'squad')}
+              aria-pressed={tab === 'squad'}
               onClick={() => update({ tab: 'squad' })}
             >
               Squad
@@ -144,6 +151,7 @@ export function Dock() {
             <button
               type="button"
               style={tabBtn(tab === 'trail')}
+              aria-pressed={tab === 'trail'}
               onClick={() => update({ tab: 'trail' })}
             >
               Trail
@@ -171,6 +179,93 @@ export function Dock() {
         />
       )}
     </aside>
+  );
+}
+
+// ─── Briefing ────────────────────────────────────────────────────────────────
+
+/** The three facts a turn is decided on: when Mr. X surfaces next, what he has done since
+ *  he was last seen, and what the viewer can still spend. */
+function Briefing({
+  culpritMoves,
+  roundsToReveal,
+  viewer,
+}: {
+  culpritMoves: Move[];
+  roundsToReveal: number | null;
+  viewer: Player | undefined;
+}) {
+  const themeId = useGameStateStore((s) => s.theme);
+  const theme = getTheme(themeId);
+
+  let lastSeenIndex = -1;
+  for (let i = culpritMoves.length - 1; i >= 0; i--) {
+    if (isRevealRound(i + 1) && culpritMoves[i].position != null) {
+      lastSeenIndex = i;
+      break;
+    }
+  }
+  const lastSeen = lastSeenIndex >= 0 ? culpritMoves[lastSeenIndex] : null;
+  const since = culpritMoves.slice(lastSeenIndex + 1);
+
+  return (
+    <dl style={briefing} aria-label="Turn briefing">
+      <dt style={briefLabel}>Next reveal</dt>
+      <dd style={{ ...briefValue, color: roundsToReveal != null && roundsToReveal <= 1 ? COLOR.redTint : COLOR.fg }}>
+        {roundsToReveal == null
+          ? 'none left'
+          : `in ${roundsToReveal} ${roundsToReveal === 1 ? 'round' : 'rounds'}`}
+      </dd>
+
+      <dt style={briefLabel}>Last seen</dt>
+      <dd style={briefValue}>
+        {lastSeen ? (
+          <>
+            {nodeDisplayName(lastSeen.position)}
+            <span style={briefDim}> · round {lastSeenIndex + 1}</span>
+          </>
+        ) : (
+          <span style={briefDim}>not yet</span>
+        )}
+      </dd>
+
+      <dt style={briefLabel}>{lastSeen ? 'Since then' : 'Moves so far'}</dt>
+      <dd style={briefChips}>
+        {since.length === 0 ? (
+          <span style={briefDim}>none</span>
+        ) : (
+          since.map((move, i) => {
+            const moveNumber = lastSeenIndex + 2 + i;
+            const tone = move.secret ? TRANSPORT_CHIP.secret : TRANSPORT_CHIP[move.type];
+            return (
+              <span
+                key={moveNumber}
+                style={{ ...chip, color: tone.color, borderColor: tone.border }}
+                title={`Round ${moveNumber}`}
+              >
+                {transportAbbrev(move, theme)}
+              </span>
+            );
+          })
+        )}
+      </dd>
+
+      {viewer && (
+        <>
+          <dt style={briefLabel}>Your tickets</dt>
+          <dd style={briefChips}>
+            <Chip label={theme.transportation.taxi} short={theme.transportationShort.taxi} count={viewer.taxiTickets} tone={TRANSPORT_CHIP.taxi} />
+            <Chip label={theme.transportation.bus} short={theme.transportationShort.bus} count={viewer.busTickets} tone={TRANSPORT_CHIP.bus} />
+            <Chip
+              label={theme.transportation.underground}
+              short={theme.transportationShort.underground}
+              count={viewer.undergroundTickets}
+              tone={TRANSPORT_CHIP.underground}
+            />
+          </dd>
+        </>
+      )}
+    </dl>
   );
 }
 
@@ -210,6 +305,12 @@ function Squad({
         const character = characterFor(theme, p.role);
         const isCulprit = p.role === 'culprit';
         const accent = PLAYER_COLOR[p.role] ?? COLOR.fg2;
+        const roleLabel =
+          p.username && !p.isAI
+            ? p.username
+            : isCulprit
+            ? 'Mr. X'
+            : `Detective ${p.role.replace('detective', '')}`;
 
         let position: string;
         if (!isCulprit || isMe) position = nodeDisplayName(p.position);
@@ -244,19 +345,14 @@ function Squad({
             </div>
             <div style={location}>
               📍 {position}
-              <span style={roleSub}>
-                {p.username && !p.isAI
-                  ? p.username
-                  : isCulprit
-                  ? 'Mr. X'
-                  : `Detective ${p.role.replace('detective', '')}`}
-              </span>
+              {roleLabel !== character.name && <span style={roleSub}>{roleLabel}</span>}
             </div>
             <div style={chips}>
-              <Chip label={theme.transportation.taxi} count={p.taxiTickets} tone={TRANSPORT_CHIP.taxi} />
-              <Chip label={theme.transportation.bus} count={p.busTickets} tone={TRANSPORT_CHIP.bus} />
+              <Chip label={theme.transportation.taxi} short={theme.transportationShort.taxi} count={p.taxiTickets} tone={TRANSPORT_CHIP.taxi} />
+              <Chip label={theme.transportation.bus} short={theme.transportationShort.bus} count={p.busTickets} tone={TRANSPORT_CHIP.bus} />
               <Chip
                 label={theme.transportation.underground}
+                short={theme.transportationShort.underground}
                 count={p.undergroundTickets}
                 tone={TRANSPORT_CHIP.underground}
               />
@@ -264,11 +360,13 @@ function Squad({
                 <>
                   <Chip
                     label={theme.transportation.secret}
+                    short={theme.transportationShort.secret}
                     count={p.secretTickets ?? 0}
                     tone={TRANSPORT_CHIP.secret}
                   />
                   <Chip
                     label={theme.transportation.double}
+                    short={theme.transportationShort.double}
                     count={p.doubleTickets ?? 0}
                     tone={TRANSPORT_CHIP.double}
                   />
@@ -283,18 +381,18 @@ function Squad({
   );
 }
 
-function Chip({ label, count, tone }: { label: string; count: number; tone: ChipTone }) {
+function Chip({ label, short, count, tone }: { label: string; short: string; count: number; tone: ChipTone }) {
   const empty = count <= 0;
   return (
     <span
       style={{
         ...chip,
-        color: empty ? 'rgba(255,255,255,.3)' : tone.color,
+        color: empty ? 'rgba(255,255,255,.5)' : tone.color,
         borderColor: empty ? 'rgba(255,255,255,.1)' : tone.border,
       }}
       title={`${label}: ${count}`}
     >
-      {label.slice(0, 4).toUpperCase()} {count}
+      {short.toUpperCase()} {count}
     </span>
   );
 }
@@ -424,18 +522,9 @@ function Trail({
 }
 
 function transportAbbrev(move: Move, theme: ReturnType<typeof getTheme>): string {
-  const label = move.secret
-    ? theme.transportation.secret
-    : move.type === 'taxi'
-    ? theme.transportation.taxi
-    : move.type === 'bus'
-    ? theme.transportation.bus
-    : move.type === 'underground'
-    ? theme.transportation.underground
-    : move.type === 'river'
-    ? theme.transportation.river
-    : move.type;
-  return `${label.slice(0, 4).toUpperCase()}${move.double ? ' ×2' : ''}`;
+  const short = theme.transportationShort;
+  const label = move.secret ? short.secret : short[move.type];
+  return `${label.toUpperCase()}${move.double ? '×2' : ''}`;
 }
 
 // ─── Rail ────────────────────────────────────────────────────────────────────
@@ -550,6 +639,47 @@ const title: React.CSSProperties = {
   textOverflow: 'ellipsis',
 };
 
+const briefing: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'auto 1fr',
+  gap: '7px 12px',
+  alignItems: 'baseline',
+  margin: '0 14px 12px',
+  padding: '11px 12px',
+  background: COLOR.raised,
+  border: `1px solid ${COLOR.hairline}`,
+  borderRadius: RADIUS.card,
+};
+
+const briefLabel: React.CSSProperties = {
+  font: `600 10px ${FONT.mono}`,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  color: COLOR.fg2,
+  whiteSpace: 'nowrap',
+};
+
+const briefValue: React.CSSProperties = {
+  font: `600 13px ${FONT.ui}`,
+  color: COLOR.fg,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const briefDim: React.CSSProperties = {
+  font: `500 12px ${FONT.ui}`,
+  color: COLOR.fg2,
+};
+
+const briefChips: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 4,
+  minWidth: 0,
+};
+
 const tabs: React.CSSProperties = {
   display: 'flex',
   gap: 4,
@@ -630,7 +760,7 @@ const name: React.CSSProperties = {
 
 function tag(color: string, background: string): React.CSSProperties {
   return {
-    font: `600 9.5px ${FONT.mono}`,
+    font: `600 10px ${FONT.mono}`,
     letterSpacing: '.08em',
     padding: '1.5px 6px',
     borderRadius: RADIUS.tag,
@@ -651,8 +781,8 @@ const location: React.CSSProperties = {
 };
 
 const roleSub: React.CSSProperties = {
-  color: 'rgba(255,255,255,.35)',
-  fontSize: 10,
+  color: COLOR.fg2,
+  fontSize: 10.5,
   letterSpacing: '.06em',
   textTransform: 'uppercase',
 };
@@ -736,15 +866,18 @@ function cellNumber(reveal: boolean, current: boolean): React.CSSProperties {
 
 function cellLabel(move: Move | undefined): React.CSSProperties {
   return {
-    font: `600 8.5px ${FONT.mono}`,
-    letterSpacing: '.05em',
+    font: `600 10px ${FONT.mono}`,
+    letterSpacing: '.02em',
     color: move ? COLOR.fg : COLOR.fg2,
     whiteSpace: 'nowrap',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   };
 }
 
 const cellPosition: React.CSSProperties = {
-  font: `500 8.5px ${FONT.mono}`,
+  font: `500 10px ${FONT.mono}`,
   color: COLOR.redTint,
 };
 

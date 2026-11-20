@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import { useRunnerStore } from '../stores/runner-store';
 import { getCompanionSession } from '../net/companion-session';
 import { notifications } from '../core/notification-service';
-import { COLOR, FONT, RADIUS, SCREEN_MARGIN, SHADOW, pillLight } from './tokens';
+import { COLOR, FONT, RADIUS, SCREEN_MARGIN, SHADOW, pillCompact } from './tokens';
 
 function pairingLink(code: string): string {
   const url = new URL(window.location.href);
@@ -169,9 +169,9 @@ const panelBase: React.CSSProperties = {
 };
 
 const pairBtn: React.CSSProperties = {
-  ...pillLight,
+  ...pillCompact,
   ...panelBase,
-  color: '#333',
+  border: `1px solid ${COLOR.hairline}`,
 };
 
 const panel: React.CSSProperties = {

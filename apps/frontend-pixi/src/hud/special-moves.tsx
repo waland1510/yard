@@ -8,6 +8,7 @@ import { getTheme } from '../core/theme-registry';
 import { play as playSfx } from '../core/audio-bus';
 import { selectActiveSurface } from '../stores/runner-store';
 import { COLOR, FONT, SCREEN_MARGIN, centeredX, pillDark } from './tokens';
+import { useNarrowViewport } from './use-viewport';
 
 const SECRET_COLOR = '#c9a0e8';
 const DOUBLE_COLOR = '#8db8e8';
@@ -24,6 +25,7 @@ export function SpecialMoves() {
   const setPendingSecret = useRunnerStore((s) => s.setPendingSecret);
   const setPendingDouble = useRunnerStore((s) => s.setPendingDouble);
   const onMap = useRunnerStore(selectActiveSurface) === 'map';
+  const narrow = useNarrowViewport();
 
   if (myRole !== 'culprit') return null;
   if (status === 'finished') return null;
@@ -41,7 +43,7 @@ export function SpecialMoves() {
   const doubleDisabled = !isMyTurn || isDoubleMove || (doubleTickets <= 0 && !pendingDouble);
 
   return (
-    <div style={{ ...container, bottom: onMap ? SCREEN_MARGIN : 92 }}>
+    <div style={{ ...container, bottom: narrow ? (onMap ? 64 : 128) : onMap ? SCREEN_MARGIN : 92 }}>
       <button
         type="button"
         className={pendingSecret ? 'hud-pill-gold' : 'hud-pill-dark'}
@@ -56,7 +58,7 @@ export function SpecialMoves() {
       >
         <span style={iconStyle}>🎭</span>
         <span style={labelStyle}>{theme.transportation.secret}</span>
-        <span style={countStyle(secretDisabled)}>×{secretTickets}</span>
+        <span style={countStyle}>×{secretTickets}</span>
         {pendingSecret && <span style={armedDot(SECRET_COLOR)}>●</span>}
       </button>
       <button
@@ -73,7 +75,7 @@ export function SpecialMoves() {
       >
         <span style={iconStyle}>⏱️</span>
         <span style={labelStyle}>{theme.transportation.double}</span>
-        <span style={countStyle(doubleDisabled)}>×{doubleTickets}</span>
+        <span style={countStyle}>×{doubleTickets}</span>
         {(pendingDouble || isDoubleMove) && <span style={armedDot(DOUBLE_COLOR)}>●</span>}
       </button>
       {isDoubleMove && (
@@ -102,7 +104,7 @@ function toggleButton(active: boolean, color: string, disabled: boolean): React.
     background: active ? COLOR.gold : COLOR.pill,
     color: active ? COLOR.onGold : '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.55 : 1,
+    opacity: disabled ? 0.7 : 1,
     boxShadow: active ? `0 3px 18px ${color}55` : pillDark.boxShadow,
   };
 }
@@ -114,13 +116,10 @@ const iconStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {};
 
-function countStyle(dim: boolean): React.CSSProperties {
-  return {
-    font: `600 12px ${FONT.mono}`,
-    color: dim ? 'rgba(255,255,255,0.45)' : 'inherit',
-    opacity: dim ? 1 : 0.85,
-  };
-}
+const countStyle: React.CSSProperties = {
+  font: `600 12px ${FONT.mono}`,
+  opacity: 0.85,
+};
 
 function armedDot(color: string): React.CSSProperties {
   return {

@@ -45,6 +45,8 @@ export interface Theme {
     detectives: [ThemeCharacter, ThemeCharacter, ThemeCharacter, ThemeCharacter, ThemeCharacter];
   };
   transportation: ThemeTransportLabels;
+  /** Chip-sized labels (≤ 8 chars) for dense HUD surfaces; must stay distinct per transport. */
+  transportationShort: ThemeTransportLabels;
   palette: ThemePalette;
   sfx: ThemeSfx;
 }
@@ -70,6 +72,14 @@ export const THEMES: Record<ThemeName, Theme> = {
       secret: 'Secret',
       double: 'Double',
       river: 'River',
+    },
+    transportationShort: {
+      taxi: 'Taxi',
+      bus: 'Bus',
+      underground: 'Tube',
+      secret: 'Secret',
+      double: 'Double',
+      river: 'Ferry',
     },
     palette: {
       accent: '#ff6b35',
@@ -105,6 +115,14 @@ export const THEMES: Record<ThemeName, Theme> = {
       double: 'Time-Turner',
       river: 'Portkey',
     },
+    transportationShort: {
+      taxi: 'Apparate',
+      bus: 'Knight',
+      underground: 'Floo',
+      secret: 'Cloak',
+      double: 'Turner',
+      river: 'Portkey',
+    },
     palette: {
       accent: '#ffd700',
       reveal: '#ffd700',
@@ -138,6 +156,14 @@ export const THEMES: Record<ThemeName, Theme> = {
       secret: 'Disguise',
       double: 'Glam Dash',
       river: 'Pink Yacht',
+    },
+    transportationShort: {
+      taxi: 'Car',
+      bus: 'Camper',
+      underground: 'Slide',
+      secret: 'Disguise',
+      double: 'Dash',
+      river: 'Yacht',
     },
     palette: {
       accent: '#ff3fa4',

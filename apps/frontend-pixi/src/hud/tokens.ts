@@ -47,13 +47,14 @@ export const RADIUS = {
 
 export const SHADOW = {
   dock: '0 8px 40px rgba(0,0,0,.35)',
-  pillLight: '0 2px 14px rgba(0,0,0,.18)',
   pillDark: '0 3px 14px rgba(0,0,0,.25)',
 } as const;
 
 export const MOTION = '.28s cubic-bezier(.5,0,.2,1)';
 
 export const SCREEN_MARGIN = 16;
+/** CSS length of the smallest tappable control (see `--tap` in styles.css). */
+export const TAP = 'var(--tap, 36px)';
 export const DOCK_WIDTH = 340;
 export const DOCK_RAIL_WIDTH = 64;
 
@@ -100,23 +101,9 @@ export const pillDark: CSSProperties = {
   border: 0,
   borderRadius: RADIUS.pill,
   padding: '11px 20px',
+  minHeight: TAP,
   font: `600 14px ${FONT.ui}`,
   boxShadow: SHADOW.pillDark,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
-
-export const pillLight: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  background: '#fff',
-  color: '#333',
-  border: 0,
-  borderRadius: RADIUS.pill,
-  padding: '9px 16px',
-  font: `600 13px ${FONT.ui}`,
-  boxShadow: '0 2px 12px rgba(0,0,0,.16)',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
 };
@@ -134,8 +121,8 @@ export const monoCount: CSSProperties = {
 };
 
 export const iconSquare: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: TAP,
+  height: TAP,
   borderRadius: RADIUS.control,
   border: `1px solid ${COLOR.hairline}`,
   background: COLOR.raised,

@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import { notifications, type NotificationKind } from '../core/notification-service';
 import { COLOR, FONT, RADIUS, SHADOW, centeredX } from './tokens';
+import { useNarrowViewport } from './use-viewport';
 
 const ACCENT: Record<NotificationKind, string> = {
   info: COLOR.blueTint,
@@ -25,9 +26,10 @@ const ICON: Record<NotificationKind, string> = {
 
 export function Toasts() {
   const queue = useSyncExternalStore(notifications.subscribe, notifications.list);
+  const narrow = useNarrowViewport();
   if (queue.length === 0) return null;
   return (
-    <div style={stack} role="status" aria-live="polite">
+    <div style={narrow ? stackNarrow : stack} role="status" aria-live="polite">
       {queue.slice(-4).map((n) => (
         <button
           key={n.id}
@@ -44,10 +46,13 @@ export function Toasts() {
   );
 }
 
+// Phone: the turn banner drops below the map's button column, so toasts follow it down.
+const STACK_TOP_NARROW = 250;
+
 const stack: React.CSSProperties = {
   position: 'fixed',
-  // Below the turn banner (top 118, ~46px tall) so a toast never hides under it.
-  top: 176,
+  // Below the turn banner (top 152, ~46px tall) so a toast never hides under it.
+  top: 210,
   ...centeredX(),
   zIndex: 45,
   display: 'flex',
@@ -57,6 +62,8 @@ const stack: React.CSSProperties = {
   pointerEvents: 'none',
   maxWidth: 'calc(100vw - 32px)',
 };
+
+const stackNarrow: React.CSSProperties = { ...stack, top: STACK_TOP_NARROW };
 
 const toast: React.CSSProperties = {
   pointerEvents: 'auto',

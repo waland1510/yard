@@ -18,6 +18,14 @@
      over the free map area instead of the window. 0 when no dock is mounted. */
   --hud-shift: 0px;
   --dock-w: 0px;
+  /* Minimum control size; grows to a finger-sized target on touch-primary devices. */
+  --tap: 36px;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --tap: 44px;
+  }
 }
 
 html,
@@ -105,4 +113,41 @@ button:not(:disabled):active {
 @keyframes sy-toast-in {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.hud-segment:not(:disabled):hover {
+  background: #353945 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.hud-turn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 600px) {
+  .hud-top-pills {
+    --hud-shift: 0px;
+    --dock-w: 0px;
+  }
+  .hud-turn,
+  .hud-segment {
+    --hud-segment-padding: 10px;
+    --hud-segment-font-size: 12px;
+  }
 }

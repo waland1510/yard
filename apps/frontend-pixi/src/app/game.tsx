@@ -19,6 +19,7 @@ import { createPovControls, PovControls } from '../three/controls';
 import { createTouchControls } from '../three/touch-controls';
 import { playRide, type ArrivalAnchor } from '../three/ride';
 import { Hud } from '../hud/hud';
+import { useNarrowViewport } from '../hud/use-viewport';
 import { Crosshair } from '../hud/crosshair';
 import { Intro } from '../hud/intro';
 import { VehicleLabels } from '../hud/vehicle-labels';
@@ -72,6 +73,7 @@ export function Game() {
   // True when the FPV is driven by touch (phone) rather than pointer-lock mouse-look.
   // Decided once at scene init from the device profile.
   const [touchMode, setTouchMode] = useState(false);
+  const narrow = useNarrowViewport();
   const [showIntro, setShowIntro] = useState(true);
   const location = useLocation();
   const urlSession = useMemo(
@@ -912,6 +914,7 @@ export function Game() {
             round={round}
             tickets={tickets}
             hoveredInfo={hoveredInfo}
+            touch={touchMode}
           />
           <Crosshair
             pointerLocked={pointerLocked}
@@ -954,10 +957,10 @@ export function Game() {
         />
       )}
       {isMockChannel && (
-        <div style={mockBadge}>
+        <div style={narrow ? mockBadgeNarrow : mockBadge}>
           <span style={mockDot} />
           <span>MOCK MODE</span>
-          <span style={mockSub}>· AI disabled · backend offline</span>
+          {!narrow && <span style={mockSub}>· AI disabled · backend offline</span>}
         </div>
       )}
       <HudShell />
@@ -998,13 +1001,25 @@ const mockBadge: React.CSSProperties = {
   pointerEvents: 'none',
 };
 
+// Phone: the top row belongs to the turn/surface pills, so the badge drops to the bottom
+// edge, between the graphics toggle (left) and the system bar (right).
+const mockBadgeNarrow: React.CSSProperties = {
+  ...mockBadge,
+  top: 'auto',
+  right: 'auto',
+  bottom: 24,
+  left: 112,
+  padding: '4px 10px',
+  fontSize: 10,
+  whiteSpace: 'nowrap',
+};
+
 const mockDot: React.CSSProperties = {
   width: 7,
   height: 7,
   borderRadius: '50%',
   background: '#fff',
   boxShadow: '0 0 6px #fff',
-  animation: 'pulse 1.6s ease-in-out infinite',
 };
 
 const mockSub: React.CSSProperties = {

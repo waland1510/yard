@@ -6,10 +6,10 @@ import { useMemo } from 'react';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import { getTheme, characterFor } from '../core/theme-registry';
-import { SHOW_CULPRIT_AT_MOVES, isRevealRound } from '../core/map-data';
+import { isRevealRound, movesUntilReveal } from '../core/map-data';
 import { culpritMoveCount } from '../core/move-validator';
 import { useReplay } from '../core/replay-singleton';
-import { COLOR, FONT, RADIUS, SHADOW, SCREEN_MARGIN, centeredX } from './tokens';
+import { COLOR, FONT, PLAYER_COLOR, RADIUS, SHADOW, SCREEN_MARGIN, TAP, centeredX } from './tokens';
 
 export function TopPills() {
   const currentTurn = useGameStateStore((s) => s.currentTurn);
@@ -30,9 +30,8 @@ export function TopPills() {
   const played = culpritMoveCount(moves);
   const reveal = useMemo(() => {
     if (isRevealRound(played)) return { text: `Mr. X revealed · round ${played}`, hot: true };
-    const next = SHOW_CULPRIT_AT_MOVES.find((r) => r > played);
-    if (next == null) return null;
-    const inN = next - played;
+    const inN = movesUntilReveal(played);
+    if (inN == null) return null;
     return { text: `Mr. X reveals in ${inN} ${inN === 1 ? 'round' : 'rounds'}`, hot: inN <= 1 };
   }, [played]);
 
@@ -41,12 +40,18 @@ export function TopPills() {
   const goingToFpv = activeSurface === 'map';
 
   return (
-    <div style={cluster}>
+    <div className="hud-top-pills" style={cluster}>
       <div style={segmented}>
-        <span style={segment(isMyTurn)}>{status === 'finished' ? 'Game over' : turnLabel}</span>
+        <span className="hud-turn" style={turnSegment(isMyTurn)} role="status">
+          {!isMyTurn && status !== 'finished' && (
+            <span style={{ ...turnDot, background: PLAYER_COLOR[currentTurn] ?? COLOR.fg2 }} aria-hidden />
+          )}
+          <span className="hud-turn-label">{status === 'finished' ? 'Game over' : turnLabel}</span>
+        </span>
         <button
           type="button"
-          style={{ ...segment(false), cursor: 'pointer' }}
+          className="hud-segment"
+          style={switchSegment}
           onClick={toggleSurface}
           aria-label={goingToFpv ? 'Switch to street view' : 'Switch to strategic map'}
         >
@@ -73,35 +78,61 @@ const cluster: React.CSSProperties = {
   gap: 8,
   zIndex: 30,
   fontFamily: FONT.ui,
+  maxWidth: 'calc(100vw - var(--dock-w, 0px) - 32px)',
 };
 
 const segmented: React.CSSProperties = {
   display: 'flex',
-  background: '#fff',
+  maxWidth: '100%',
+  background: COLOR.panel,
+  border: `1px solid ${COLOR.hairline}`,
   borderRadius: RADIUS.pill,
   padding: 4,
-  gap: 2,
-  boxShadow: SHADOW.pillLight,
+  gap: 4,
+  boxShadow: SHADOW.dock,
 };
 
-function segment(active: boolean): React.CSSProperties {
+const segmentBase: React.CSSProperties = {
+  border: 0,
+  minHeight: `calc(${TAP} - 4px)`,
+  padding: '0 var(--hud-segment-padding, 16px)',
+  borderRadius: RADIUS.pill,
+  font: `600 var(--hud-segment-font-size, 14px) ${FONT.ui}`,
+  whiteSpace: 'nowrap',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 7,
+};
+
+function turnSegment(mine: boolean): React.CSSProperties {
   return {
-    border: 0,
-    background: active ? COLOR.pill : 'transparent',
-    color: active ? '#fff' : '#555',
-    padding: '8px 18px',
-    borderRadius: RADIUS.pill,
-    font: `600 14px ${FONT.ui}`,
-    whiteSpace: 'nowrap',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
+    ...segmentBase,
+    minWidth: 0,
+    background: mine ? COLOR.gold : 'transparent',
+    color: mine ? COLOR.onGold : COLOR.fg,
+    fontWeight: mine ? 700 : 600,
   };
 }
 
-const revealPill: React.CSSProperties = {
+const turnDot: React.CSSProperties = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+  flexShrink: 0,
+};
+
+const switchSegment: React.CSSProperties = {
+  ...segmentBase,
+  flexShrink: 0,
   background: COLOR.pill,
-  color: '#fff',
+  color: COLOR.fg,
+  cursor: 'pointer',
+};
+
+const revealPill: React.CSSProperties = {
+  background: COLOR.panel,
+  border: `1px solid ${COLOR.hairline}`,
+  color: COLOR.fg,
   borderRadius: RADIUS.pill,
   padding: '7px 16px',
   font: `600 12.5px ${FONT.ui}`,

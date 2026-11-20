@@ -19,6 +19,7 @@ import {
   useCallStore,
 } from '../stores/call-store';
 import { useRunnerStore } from '../stores/runner-store';
+import { useNarrowViewport } from './use-viewport';
 import {
   COLOR,
   FONT,
@@ -92,12 +93,13 @@ function useTiles(): Tile[] {
 }
 
 function JoinButton() {
+  const top = useStripTop();
   const joining = useCallStore(selectCallJoining);
   const othersInCall = useCallStore(selectOthersInCall);
   const error = useCallStore(selectCallError);
   const { join } = useCallStore.getState();
   return (
-    <div style={joinWrap}>
+    <div style={{ ...joinWrap, top }}>
       <button type="button" style={joinPill} onClick={join} disabled={joining}>
         <span aria-hidden>📹</span>
         {joining ? 'Joining…' : 'Join call'}
@@ -109,11 +111,12 @@ function JoinButton() {
 }
 
 function ExpandedStrip() {
+  const top = useStripTop();
   const tiles = useTiles();
   const speaking = useCallStore(selectSpeaking);
   const error = useCallStore(selectCallError);
   return (
-    <div style={strip} aria-label="Call participants">
+    <div style={{ ...strip, top }} aria-label="Call participants">
       <div style={tileList}>
         {tiles.map((t) => (
           <VideoTile key={t.id} tile={t} speaking={!!speaking[t.id]} />
@@ -126,12 +129,13 @@ function ExpandedStrip() {
 }
 
 function CollapsedStrip() {
+  const top = useStripTop();
   const tiles = useTiles();
   const speaking = useCallStore(selectSpeaking);
   const mic = useCallStore(selectCallMic);
   const { toggleMic, setCollapsed } = useCallStore.getState();
   return (
-    <div style={{ ...strip, width: 'auto', alignItems: 'center' }} aria-label="Call participants">
+    <div style={{ ...strip, top, width: 'auto', alignItems: 'center' }} aria-label="Call participants">
       {tiles.map((t) => (
         <Avatar key={t.id} tile={t} speaking={!!speaking[t.id]} size={40} />
       ))}
@@ -293,6 +297,12 @@ const STRIP_WIDTH = 188;
 // Clears the map's top-right button column above and its transport legend below.
 const STRIP_TOP = 156;
 const STRIP_BOTTOM_CLEARANCE = 228;
+// Phone: the button column sits below the centred top pills, so the strip follows it down.
+const STRIP_TOP_NARROW = 250;
+
+function useStripTop(): number {
+  return useNarrowViewport() ? STRIP_TOP_NARROW : STRIP_TOP;
+}
 
 const anchor: React.CSSProperties = {
   position: 'fixed',

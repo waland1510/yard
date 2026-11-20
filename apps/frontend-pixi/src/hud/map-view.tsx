@@ -26,6 +26,7 @@ import { getTheme, characterFor } from '../core/theme-registry';
 import { spawnSpotlight, spawnTrailDot, spawnPulse, type EffectHandle } from './map-effects';
 import { KIND_COLOR, drawEdge, boardDash, mountBoardEdges, stopServices } from './map-edges';
 import { SCREEN_MARGIN } from './tokens';
+import { useNarrowViewport, useTouchPrimary } from './use-viewport';
 
 export interface MapViewProps {
   currentNodeId: number;
@@ -60,12 +61,7 @@ const KIND_ICON: Record<TransportKind, string> = {
   river: '⛴️',
 };
 
-const KIND_LABEL: Record<TransportKind, string> = {
-  taxi: 'Taxi',
-  bus: 'Bus',
-  underground: 'Tube',
-  river: 'Ferry',
-};
+const LEGEND_KINDS: readonly TransportKind[] = ['taxi', 'bus', 'underground', 'river'];
 
 const ROLE_LABEL: Record<string, string> = {
   culprit: 'Mr. X',
@@ -274,6 +270,8 @@ export function MapView({
   ticketsByKind,
   onConnectionClick,
 }: MapViewProps) {
+  const narrow = useNarrowViewport();
+  const touch = useTouchPrimary();
   const containerRef = useRef<HTMLDivElement>(null);
   const streetViewContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -312,6 +310,7 @@ export function MapView({
   const proposalCameraRef = useRef<{ zoom: number; center: google.maps.LatLng | undefined } | null>(null);
   const aiProposal = useGameStateStore((s) => s.aiProposal);
   const themeId = useGameStateStore((s) => s.theme);
+  const transportLabels = getTheme(themeId).transportation;
   const status = useGameStateStore((s) => s.status);
 
   const [mapReady, setMapReady] = useState(false);
@@ -483,8 +482,8 @@ export function MapView({
           empty
             ? 'no ticket'
             : conn.kind === 'river'
-            ? `${KIND_LABEL[conn.kind]} · uses a secret ticket · ${tickets - 1} left after`
-            : `${KIND_LABEL[conn.kind]} · ${tickets - 1} left after`
+            ? `${transportLabels[conn.kind]} · uses a secret ticket · ${tickets - 1} left after`
+            : `${transportLabels[conn.kind]} · ${tickets - 1} left after`
         }`,
         cursor: empty || !interactive ? 'not-allowed' : 'pointer',
       });
@@ -518,6 +517,7 @@ export function MapView({
     interactive,
     ticketsByKind,
     onConnectionClick,
+    transportLabels,
   ]);
 
   // Player avatars (detectives always; Mr. X only on reveal rounds OR to himself).
@@ -871,7 +871,7 @@ export function MapView({
           background: '#1a1a1a',
         }}
       />
-      <div style={topRightButtons}>
+      <div style={narrow ? topRightButtonsNarrow : topRightButtons}>
         <button
           type="button"
           onClick={() =>
@@ -905,9 +905,9 @@ export function MapView({
           </button>
         </div>
       </div>
-      <div style={legendBox}>
+      <div style={narrow ? legendBoxNarrow : legendBox}>
         <div style={legendTitle}>Transport</div>
-        {(Object.keys(KIND_LABEL) as TransportKind[]).map((k) => (
+        {LEGEND_KINDS.map((k) => (
           <div key={k} style={legendRow}>
             <span
               style={{
@@ -918,11 +918,11 @@ export function MapView({
             />
             <span style={{ fontSize: 12 }}>{KIND_ICON[k]}</span>
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
-              {KIND_LABEL[k]}
+              {transportLabels[k]}
             </span>
           </div>
         ))}
-        <div style={legendHint}>Right-click any node for Street View</div>
+        {!touch && <div style={legendHint}>Right-click any node for Street View</div>}
       </div>
       {streetViewLocation &&
         createPortal(
@@ -985,6 +985,12 @@ const topRightButtons: React.CSSProperties = {
   gap: 8,
 };
 
+// Phone: the centred turn/reveal pills span the top row, so this column starts beneath them.
+const topRightButtonsNarrow: React.CSSProperties = {
+  ...topRightButtons,
+  top: 112,
+};
+
 const lookHereBtn: React.CSSProperties = {
   padding: '8px 14px',
   background: '#2b2e36',
@@ -1036,6 +1042,12 @@ const legendBox: React.CSSProperties = {
   gap: 6,
   boxShadow: '0 6px 22px rgba(0,0,0,0.45)',
   pointerEvents: 'none',
+};
+
+// Phone: clears the Secret / Double pills, which share the bottom row at this width.
+const legendBoxNarrow: React.CSSProperties = {
+  ...legendBox,
+  bottom: 116,
 };
 
 const legendTitle: React.CSSProperties = {

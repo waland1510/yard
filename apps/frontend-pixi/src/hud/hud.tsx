@@ -2,6 +2,8 @@ import { VehicleKind } from '../three/vehicles';
 import type { HoveredInfo } from '../app/game';
 import { useGameStateStore } from '../stores/game-state-store';
 import { getTheme } from '../core/theme-registry';
+import { COLOR, FONT, RADIUS, SHADOW, SCREEN_MARGIN, TRANSPORT_CHIP, type ChipTone } from './tokens';
+import { useNarrowViewport } from './use-viewport';
 
 interface HudProps {
   nodeId: number;
@@ -9,14 +11,8 @@ interface HudProps {
   round: number;
   tickets: { taxi: number; bus: number; underground: number };
   hoveredInfo: HoveredInfo | null;
+  touch: boolean;
 }
-
-const KIND_COLOR: Record<VehicleKind, string> = {
-  taxi: '#f6c945',
-  bus: '#e25555',
-  underground: '#5a8dde',
-  river: '#6cb8d6',
-};
 
 const KIND_ICON: Record<VehicleKind, string> = {
   taxi: '🚖',
@@ -32,8 +28,11 @@ const KIND_VERB: Record<VehicleKind, string> = {
   river: 'Board',
 };
 
-export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo }: HudProps) {
+const TICKET_KINDS = ['taxi', 'bus', 'underground'] as const;
+
+export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo, touch }: HudProps) {
   const themeId = useGameStateStore((s) => s.theme);
+  const narrow = useNarrowViewport();
   const theme = getTheme(themeId);
   const labelFor = (kind: VehicleKind): string => theme.transportation[kind];
 
@@ -44,22 +43,29 @@ export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo }: HudProps)
           <span style={pillLabel}>ROUND</span>
           <span style={pillValue}>{round}</span>
         </div>
-        <div style={{ ...pill, marginLeft: 12 }}>
-          <span style={pillLabel}>YOU ARE AT</span>
-          <span style={pillValue}>{nodeName}</span>
+        <div style={{ ...pill, minWidth: 0 }}>
+          {!narrow && <span style={pillLabel}>YOU ARE AT</span>}
+          <span style={{ ...pillValue, ...ellipsis }}>{nodeName}</span>
           <span style={pillSub}>#{nodeId}</span>
         </div>
       </div>
 
-      <div style={bottomBar}>
-        <Ticket label={labelFor('taxi')} count={tickets.taxi} color="#f6c945" icon="🚖" />
-        <Ticket label={labelFor('bus')} count={tickets.bus} color="#e25555" icon="🚌" />
-        <Ticket label={labelFor('underground')} count={tickets.underground} color="#5a8dde" icon="Ⓤ" />
+      <div style={narrow ? bottomBarNarrow : bottomBar}>
+        {TICKET_KINDS.map((kind) => (
+          <Ticket
+            key={kind}
+            label={narrow ? theme.transportationShort[kind] : labelFor(kind)}
+            count={tickets[kind]}
+            tone={TRANSPORT_CHIP[kind]}
+            icon={KIND_ICON[kind]}
+            compact={narrow}
+          />
+        ))}
       </div>
 
       {hoveredInfo && (
         <div style={actionHint}>
-          <div style={{ ...actionTitle, color: KIND_COLOR[hoveredInfo.kind] }}>
+          <div style={{ ...actionTitle, color: TRANSPORT_CHIP[hoveredInfo.kind].color }}>
             {KIND_ICON[hoveredInfo.kind]} {KIND_VERB[hoveredInfo.kind]} {labelFor(hoveredInfo.kind)}
           </div>
           <div style={actionDest}>
@@ -72,31 +78,49 @@ export function Hud({ nodeId, nodeName, round, tickets, hoveredInfo }: HudProps)
         </div>
       )}
 
-      <div style={mapHintStyle}>
-        <kbd style={kbdStyle}>TAB</kbd> strategic map
-      </div>
+      {!touch && !narrow && (
+        <div style={mapHintStyle}>
+          <kbd style={kbdStyle}>TAB</kbd> strategic map
+        </div>
+      )}
     </>
   );
 }
 
-function Ticket({ label, count, color, icon }: { label: string; count: number; color: string; icon: string }) {
+interface TicketProps {
+  label: string;
+  count: number;
+  tone: ChipTone;
+  icon: string;
+  compact: boolean;
+}
+
+function Ticket({ label, count, tone, icon, compact }: TicketProps) {
   const empty = count <= 0;
   return (
     <div
       style={{
-        ...ticketCard,
-        borderColor: empty ? 'rgba(255,255,255,0.12)' : color,
-        opacity: empty ? 0.45 : 1,
+        ...(compact ? ticketCardCompact : ticketCard),
+        borderColor: empty ? COLOR.hairline : tone.border,
+        opacity: empty ? 0.7 : 1,
       }}
     >
-      <div style={{ ...ticketIcon, color }}>{icon}</div>
+      <div style={{ ...(compact ? ticketIconCompact : ticketIcon), color: tone.color }}>{icon}</div>
       <div style={ticketBody}>
-        <div style={ticketLabel}>{label}</div>
-        <div style={{ ...ticketCount, color: empty ? '#888' : '#fff' }}>×{count}</div>
+        <div style={{ ...ticketLabel, ...ellipsis }}>{label}</div>
+        <div style={{ ...ticketCount, color: empty ? COLOR.fg2 : COLOR.fg }}>×{count}</div>
       </div>
     </div>
   );
 }
+
+const ellipsis: React.CSSProperties = {
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const PANEL_GLASS = 'rgba(23, 25, 30, 0.82)';
 
 const topBar: React.CSSProperties = {
   position: 'fixed',
@@ -104,38 +128,41 @@ const topBar: React.CSSProperties = {
   left: '50%',
   transform: 'translateX(-50%)',
   display: 'flex',
+  gap: 8,
+  maxWidth: `calc(100vw - ${SCREEN_MARGIN * 2}px)`,
   zIndex: 5,
   pointerEvents: 'none',
 };
 
 const pill: React.CSSProperties = {
-  background: 'rgba(12, 14, 18, 0.72)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 10,
+  background: PANEL_GLASS,
+  border: `1px solid ${COLOR.hairline}`,
+  borderRadius: RADIUS.control,
   padding: '6px 14px',
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  fontSize: 12,
-  letterSpacing: 1.4,
-  color: '#fff',
+  font: `600 11px ${FONT.ui}`,
+  letterSpacing: '.12em',
+  color: COLOR.fg,
+  whiteSpace: 'nowrap',
   backdropFilter: 'blur(6px)',
 };
 
 const pillLabel: React.CSSProperties = {
-  color: 'rgba(255,255,255,0.55)',
-  fontWeight: 600,
+  color: COLOR.fg2,
 };
 
 const pillValue: React.CSSProperties = {
   fontWeight: 700,
   fontSize: 14,
+  letterSpacing: 0,
 };
 
 const pillSub: React.CSSProperties = {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.45)',
-  fontWeight: 500,
+  font: `500 11px ${FONT.mono}`,
+  letterSpacing: 0,
+  color: COLOR.fg2,
 };
 
 const bottomBar: React.CSSProperties = {
@@ -144,46 +171,71 @@ const bottomBar: React.CSSProperties = {
   left: '50%',
   transform: 'translateX(-50%)',
   display: 'flex',
-  gap: 14,
+  gap: 12,
   zIndex: 5,
   pointerEvents: 'none',
 };
 
+// Phone: full-width row lifted above the bottom-corner controls (graphics toggle, system bar).
+const bottomBarNarrow: React.CSSProperties = {
+  ...bottomBar,
+  bottom: 64,
+  left: SCREEN_MARGIN,
+  right: SCREEN_MARGIN,
+  transform: 'none',
+  gap: 8,
+};
+
 const ticketCard: React.CSSProperties = {
-  background: 'rgba(10, 12, 16, 0.78)',
+  background: PANEL_GLASS,
   border: '1px solid',
-  borderRadius: 12,
+  borderRadius: RADIUS.card,
   padding: '10px 14px',
   display: 'flex',
   alignItems: 'center',
   gap: 10,
   minWidth: 130,
+  boxShadow: SHADOW.pillDark,
   backdropFilter: 'blur(8px)',
+};
+
+const ticketCardCompact: React.CSSProperties = {
+  ...ticketCard,
+  flex: '1 1 0',
+  minWidth: 0,
+  padding: '8px 10px',
+  gap: 8,
 };
 
 const ticketIcon: React.CSSProperties = {
   fontSize: 26,
   width: 32,
   textAlign: 'center',
+  flexShrink: 0,
+};
+
+const ticketIconCompact: React.CSSProperties = {
+  ...ticketIcon,
+  fontSize: 20,
+  width: 24,
 };
 
 const ticketBody: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  lineHeight: 1.1,
+  lineHeight: 1.15,
+  minWidth: 0,
 };
 
 const ticketLabel: React.CSSProperties = {
-  color: 'rgba(255,255,255,0.6)',
-  fontSize: 11,
-  letterSpacing: 1.2,
+  color: COLOR.fg2,
+  font: `600 11px ${FONT.ui}`,
+  letterSpacing: '.1em',
   textTransform: 'uppercase',
-  fontWeight: 600,
 };
 
 const ticketCount: React.CSSProperties = {
-  fontSize: 20,
-  fontWeight: 700,
+  font: `600 19px ${FONT.mono}`,
 };
 
 const actionHint: React.CSSProperties = {
@@ -244,9 +296,9 @@ const kbdStyle: React.CSSProperties = {
   padding: '2px 8px',
   background: 'rgba(255,255,255,0.12)',
   border: '1px solid rgba(255,255,255,0.25)',
-  borderRadius: 4,
+  borderRadius: RADIUS.tag,
   fontSize: 11,
-  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+  fontFamily: FONT.mono,
   fontWeight: 600,
   letterSpacing: 1,
 };
