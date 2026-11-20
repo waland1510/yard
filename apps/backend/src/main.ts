@@ -9,6 +9,7 @@ import {
   RoleType,
   PairingRegistry,
   type CompanionDevice,
+  type CompanionResumeCredential,
   type CompanionSurface,
 } from '@yard/shared-utils';
 import { fastify } from 'fastify';
@@ -16,6 +17,7 @@ import { setTimeout } from 'timers/promises';
 import { app } from './app/app';
 import { AIPlayerService } from './app/helpers/ai-player';
 import { AiProposalRegistry } from './app/helpers/ai-proposal-registry';
+import { CompanionResumeRegistry } from './app/helpers/companion-resume-registry';
 import { ENV } from './app/helpers/env';
 import { addMove, hasActiveGame, updateGame } from './app/helpers/db-operations';
 import { hasLegalMove } from './app/helpers/move-candidates';
@@ -74,6 +76,7 @@ const channelMembers: Record<
       clientId?: string;
       deviceType?: CompanionDevice;
       surface?: CompanionSurface;
+      peerClientId?: string;
       inCall?: boolean;
       mic?: boolean;
       cam?: boolean;
@@ -83,6 +86,8 @@ const channelMembers: Record<
 
 // Authoritative companion-pairing code registry (#1). Single-use, time-bounded codes.
 const pairing = new PairingRegistry();
+const companionResumes = new CompanionResumeRegistry();
+const gameRevisions = new Map<string, number>();
 
 function findByClientId(channel: string, clientId: string): WebSocket | null {
   const members = channelMembers[channel];
@@ -93,23 +98,41 @@ function findByClientId(channel: string, clientId: string): WebSocket | null {
   return null;
 }
 
-// The paired peer of `clientId`: the OTHER connection on the same role that holds a
-// companion surface. Used to forward relay / heartbeat (#6/#12) to the right socket.
-function findPeerOf(channel: string, clientId: string): WebSocket | null {
+function findPeerOf(channel: string, socket: WebSocket): WebSocket | null {
   const members = channelMembers[channel];
-  if (!members) return null;
-  let mine: { role: string } | null = null;
-  for (const m of members.values()) {
-    if (m.clientId === clientId) {
-      mine = m;
-      break;
-    }
+  const member = members?.get(socket);
+  const peerId = member?.peerClientId;
+  const peer = peerId ? findByClientId(channel, peerId) : null;
+  return member?.clientId && peer && members?.get(peer)?.peerClientId === member.clientId ? peer : null;
+}
+
+function notifyPairLoss(channel: string, socket: WebSocket, reason?: 'unpaired'): void {
+  const members = channelMembers[channel];
+  const member = members?.get(socket);
+  if (!member?.clientId) return;
+  const peer = findPeerOf(channel, socket);
+  member.surface = undefined;
+  member.peerClientId = undefined;
+  const peerMember = peer && members.get(peer);
+  if (!peer || !peerMember) return;
+  peerMember.surface = undefined;
+  peerMember.peerClientId = undefined;
+  if (peer.readyState === peer.OPEN) {
+    peer.send(JSON.stringify({ type: 'paired', data: { reason } }));
   }
-  if (!mine) return null;
-  for (const [ws, m] of members) {
-    if (m.clientId !== clientId && m.role === mine.role && m.surface) return ws;
-  }
-  return null;
+}
+
+function removeSocket(channel: string, socket: WebSocket): void {
+  channels[channel]?.delete(socket);
+  channelMembers[channel]?.delete(socket);
+  socket.close();
+}
+
+function unlinkPhone(channel: string, socket: WebSocket): void {
+  const member = channelMembers[channel]?.get(socket);
+  const phone = member?.surface === 'fpv-companion' ? socket : findPeerOf(channel, socket);
+  notifyPairLoss(channel, socket, 'unpaired');
+  if (phone) removeSocket(channel, phone);
 }
 
 function broadcastPresence(channel: string) {
@@ -327,6 +350,59 @@ server.register(async function (fastify) {
     (connection /* WebSocket */) => {
       let currentChannel: string | null = null;
       let currentClientId: string | null = null;
+      let resumeInProgress = false;
+      let pendingResume: { token: string; phoneClientId: string } | undefined;
+      const socket = connection as unknown as WebSocket;
+
+      function hostFor(channel: string, role: string, clientId: string): WebSocket | null {
+        const hostSocket = findByClientId(channel, clientId);
+        if (!hostSocket || hostSocket === socket || hostSocket.readyState !== hostSocket.OPEN) return null;
+        const member = channelMembers[channel]?.get(hostSocket);
+        return member?.role === role && member.surface !== 'fpv-companion' ? hostSocket : null;
+      }
+
+      function joinPhone(channel: string, role: RoleType, clientId: string, deviceType?: CompanionDevice): void {
+        currentChannel = channel;
+        currentClientId = clientId;
+        (channels[channel] ??= new Set()).add(socket);
+        (channelMembers[channel] ??= new Map()).set(socket, { clientId, role, username: '', deviceType });
+      }
+
+      function pairPhone(channel: string, hostSocket: WebSocket, resume?: CompanionResumeCredential): void {
+        const hostMember = channelMembers[channel]?.get(hostSocket);
+        const phoneMember = channelMembers[channel]?.get(socket);
+        if (!hostMember?.clientId || !phoneMember?.clientId) return;
+
+        hostMember.surface = 'map-primary';
+        hostMember.peerClientId = phoneMember.clientId;
+        phoneMember.surface = 'fpv-companion';
+        phoneMember.peerClientId = hostMember.clientId;
+        connection.send(JSON.stringify({
+          type: 'paired',
+          data: {
+            surface: phoneMember.surface,
+            peerClientId: hostMember.clientId,
+            peerSurface: hostMember.surface,
+            role: phoneMember.role,
+            resume,
+          },
+        }));
+        hostSocket.send(JSON.stringify({
+          type: 'paired',
+          data: {
+            surface: hostMember.surface,
+            peerClientId: phoneMember.clientId,
+            peerSurface: phoneMember.surface,
+          },
+        }));
+        const proposal = proposals.current(channel);
+        if (proposal) connection.send(JSON.stringify({ type: 'aiProposal', data: { proposal } }));
+        broadcastPresence(channel);
+      }
+
+      function pairError(reason: string): void {
+        connection.send(JSON.stringify({ type: 'pairError', data: { reason } }));
+      }
 
       const handleMessage = async (message: Buffer) => {
         let parsedMessage: Message;
@@ -336,6 +412,7 @@ server.register(async function (fastify) {
           server.log.warn({ channel: currentChannel }, 'ws: ignoring malformed message');
           return;
         }
+        if (resumeInProgress || (pendingResume && parsedMessage.type !== 'pairReady')) return;
         switch (parsedMessage.type) {
           case 'startGame': {
             const ch = parsedMessage.data.ch;
@@ -447,7 +524,7 @@ server.register(async function (fastify) {
               connection as unknown as WebSocket
             );
             const hostClientId = parsedMessage.data.clientId;
-            if (!me?.role || !hostClientId) break;
+            if (!me?.role || me.surface === 'fpv-companion' || !hostClientId) break;
             me.clientId = hostClientId;
             currentClientId = hostClientId;
             const { code, expiresAt } = pairing.issue({
@@ -464,59 +541,98 @@ server.register(async function (fastify) {
 
           // The companion (phone) redeems the code and joins the host's role as fpv-companion.
           case 'pairRedeem': {
-            const code = parsedMessage.data.code;
-            const companionClientId = parsedMessage.data.clientId;
-            if (!code || !companionClientId) break;
-            const res = pairing.redeem({ code, now: Date.now() });
-            if (!res.ok) {
-              const reason = 'reason' in res ? res.reason : 'unknown-code';
-              connection.send(
-                JSON.stringify({ type: 'pairError', data: { reason } })
-              );
+            const { code, clientId: phoneClientId, deviceType } = parsedMessage.data;
+            if (currentChannel || typeof code !== 'string' || typeof phoneClientId !== 'string' || !phoneClientId) break;
+            const result = pairing.redeem({ code, now: Date.now() });
+            if (!result.ok) {
+              pairError(result.reason);
               break;
             }
-            const ch = res.channel;
-            currentChannel = ch;
-            currentClientId = companionClientId;
-            if (!channels[ch]) channels[ch] = new Set();
-            channels[ch].add(connection as unknown as WebSocket);
-            if (!channelMembers[ch]) channelMembers[ch] = new Map();
-            channelMembers[ch].set(connection as unknown as WebSocket, {
-              role: res.role,
-              username: '',
-              clientId: companionClientId,
-              deviceType: parsedMessage.data.deviceType,
-              surface: 'fpv-companion',
-            });
-            // Mark the host as map-primary and notify both sides.
-            const hostWs = findByClientId(ch, res.hostClientId);
-            if (hostWs) {
-              const hostMember = channelMembers[ch].get(hostWs);
-              if (hostMember) hostMember.surface = 'map-primary';
-              hostWs.send(
-                JSON.stringify({
-                  type: 'paired',
-                  data: {
-                    surface: 'map-primary',
-                    peerClientId: companionClientId,
-                    peerSurface: 'fpv-companion',
-                  },
-                })
-              );
+            const { channel, hostClientId } = result;
+            const role = result.role as RoleType;
+            const hostSocket = hostFor(channel, role, hostClientId);
+            if (!hostSocket || phoneClientId === hostClientId || findByClientId(channel, phoneClientId)) {
+              pairError('host-unavailable');
+              break;
             }
-            connection.send(
-              JSON.stringify({
-                type: 'paired',
-                data: {
-                  surface: 'fpv-companion',
-                  peerClientId: res.hostClientId,
-                  peerSurface: 'map-primary',
-                  // The companion inherits the host's role.
-                  role: res.role as RoleType,
+            unlinkPhone(channel, hostSocket);
+            const resume = companionResumes.issue({ channel, role, hostClientId, phoneClientId }, Date.now());
+            joinPhone(channel, role, phoneClientId, deviceType);
+            pairPhone(channel, hostSocket, resume);
+            break;
+          }
+
+          case 'pairResume': {
+            const { channel } = parsedMessage;
+            const { resumeToken: token, clientId: phoneClientId, deviceType } = parsedMessage.data;
+            if (currentChannel || !channel || typeof token !== 'string' || typeof phoneClientId !== 'string') break;
+            const link = companionResumes.find(token, channel, phoneClientId, Date.now());
+            if (!link) {
+              pairError('resume-rejected');
+              break;
+            }
+
+            if (!hostFor(channel, link.role, link.hostClientId)) {
+              pairError('host-unavailable');
+              break;
+            }
+
+            const revision = gameRevisions.get(channel);
+            resumeInProgress = true;
+            const game = await hasActiveGame(channel, true);
+            resumeInProgress = false;
+            if (connection.readyState !== connection.OPEN) break;
+            if (companionResumes.find(token, channel, phoneClientId, Date.now()) !== link) {
+              pairError('resume-rejected');
+              break;
+            }
+            if (!game || !hostFor(channel, link.role, link.hostClientId)) {
+              pairError('host-unavailable');
+              break;
+            }
+            if (revision !== gameRevisions.get(channel)) {
+              pairError('resume-retry');
+              break;
+            }
+
+            // A phone can wake before the previous socket's close reaches the server.
+            const previous = findByClientId(channel, phoneClientId);
+            if (previous) {
+              notifyPairLoss(channel, previous);
+              if (previous.readyState === previous.OPEN) {
+                previous.send(JSON.stringify({ type: 'pairError', data: { reason: 'superseded' } }));
+              }
+              removeSocket(channel, previous);
+            }
+
+            joinPhone(channel, link.role, phoneClientId, deviceType);
+            pendingResume = { token, phoneClientId };
+            // The desktop remains the sole mover until the phone applies this snapshot.
+            connection.send(JSON.stringify({
+              type: 'paired',
+              data: {
+                role: link.role,
+                gameState: {
+                  ...game,
+                  currentTurn: turnFromMoves(game) ?? game.currentTurn,
+                  isDoubleMove: !!game.moves[game.moves.length - 1]?.double,
                 },
-              })
-            );
-            broadcastPresence(ch);
+              },
+            }));
+            break;
+          }
+
+          case 'pairReady': {
+            if (!currentChannel || !pendingResume) break;
+            const { token, phoneClientId } = pendingResume;
+            const link = companionResumes.find(token, currentChannel, phoneClientId, Date.now());
+            const hostSocket = link && hostFor(currentChannel, link.role, link.hostClientId);
+            if (!hostSocket) {
+              pairError(link ? 'host-unavailable' : 'resume-rejected');
+              break;
+            }
+            pendingResume = undefined;
+            pairPhone(currentChannel, hostSocket);
             break;
           }
 
@@ -526,7 +642,7 @@ server.register(async function (fastify) {
           case 'companionPing':
           case 'companionPong': {
             if (!currentChannel || !currentClientId) break;
-            const peer = findPeerOf(currentChannel, currentClientId);
+            const peer = findPeerOf(currentChannel, socket);
             if (peer && peer.readyState === peer.OPEN) {
               peer.send(
                 JSON.stringify({ type: parsedMessage.type, data: parsedMessage.data })
@@ -538,17 +654,8 @@ server.register(async function (fastify) {
           // Explicit unpair (#12): clear both surfaces and tell the peer it's solo again.
           case 'pairUnlink': {
             if (!currentChannel || !currentClientId) break;
-            const members = channelMembers[currentChannel];
-            const me = members?.get(connection as unknown as WebSocket);
-            if (me) me.surface = undefined;
-            const peer = findPeerOf(currentChannel, currentClientId);
-            if (peer) {
-              const pm = members?.get(peer);
-              if (pm) pm.surface = undefined;
-              if (peer.readyState === peer.OPEN) {
-                peer.send(JSON.stringify({ type: 'paired', data: {} }));
-              }
-            }
+            companionResumes.revoke(currentChannel, currentClientId);
+            unlinkPhone(currentChannel, socket);
             broadcastPresence(currentChannel);
             break;
           }
@@ -579,13 +686,13 @@ server.register(async function (fastify) {
           }
 
           case 'makeMove':
-            if (currentChannel) {
+            if (currentChannel && channels[currentChannel]?.has(socket)) {
               const { role, double, position } = parsedMessage.data;
               const moveType = parsedMessage.data.type;
               if (!role || !moveType || position === undefined) break;
 
               const game = await hasActiveGame(currentChannel);
-              if (!game?.id) break;
+              if (!game?.id || !channels[currentChannel]?.has(socket)) break;
               await addMove(game.id, role, moveType, position, parsedMessage.data.secret, double);
 
               const updatedGame = await hasActiveGame(currentChannel);
@@ -663,31 +770,13 @@ server.register(async function (fastify) {
 
       connection.on('close', () => {
         if (currentChannel && channels[currentChannel]) {
-          const closing = channelMembers[currentChannel]?.get(
-            connection as unknown as WebSocket
-          );
-          channels[currentChannel].delete(connection as unknown as WebSocket);
-          channelMembers[currentChannel]?.delete(connection as unknown as WebSocket);
-          // If a paired device dropped, tell its surviving peer (same role) so it can
-          // fall back to solo control (full re-pair UX is #12).
-          if (closing?.surface && closing.role) {
-            const members = channelMembers[currentChannel];
-            if (members) {
-              for (const [ws, m] of members) {
-                if (
-                  m.role === closing.role &&
-                  m.surface &&
-                  m.clientId !== closing.clientId
-                ) {
-                  m.surface = undefined;
-                  ws.send(JSON.stringify({ type: 'paired', data: {} }));
-                }
-              }
-            }
-          }
+          notifyPairLoss(currentChannel, socket);
+          channels[currentChannel].delete(socket);
+          channelMembers[currentChannel]?.delete(socket);
           if (channels[currentChannel].size === 0) {
             delete channels[currentChannel];
             delete channelMembers[currentChannel];
+            gameRevisions.delete(currentChannel);
           } else {
             broadcastPresence(currentChannel);
           }
@@ -700,6 +789,9 @@ server.register(async function (fastify) {
 const broadcast = (channel: string, message: Message) => {
   const clients = channels[channel];
   if (clients) {
+    if (message.type === 'makeMove' || message.type === 'updateGameState' || message.type === 'endGame') {
+      gameRevisions.set(channel, (gameRevisions.get(channel) ?? 0) + 1);
+    }
     for (const client of clients) {
       if (client.readyState === client.OPEN) {
         client.send(JSON.stringify(message));

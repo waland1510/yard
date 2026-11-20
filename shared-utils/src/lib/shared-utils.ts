@@ -176,6 +176,8 @@ export type MessageType =
   | 'pairRequest'
   | 'pairCode'
   | 'pairRedeem'
+  | 'pairResume'
+  | 'pairReady'
   | 'paired'
   | 'pairError'
   // Companion live coordination (#6/#12): transient view/intent relay, heartbeat, unpair.
@@ -249,6 +251,8 @@ export interface Message {
     peerClientId?: string;
     peerSurface?: import('./companion').CompanionSurface;
     expiresAt?: number;
+    resume?: import('./companion').CompanionResumeCredential;
+    resumeToken?: string;
     inCall?: boolean;
     mic?: boolean;
     cam?: boolean;

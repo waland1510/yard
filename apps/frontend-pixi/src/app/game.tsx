@@ -34,7 +34,8 @@ import { getTheme } from '../core/theme-registry';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
 import { detectDeviceProfile, deviceTypeFromProfile, isTouchPrimary, resolveQualityTier } from '../core/device-surface';
-import { getWebSocketClient } from '../net/websocket-client';
+import { getWebSocketClient } from '../net/websocket-singleton';
+import { readCompanionResume } from '../net/companion-resume-storage';
 import { CompanionSession, setCompanionSession, getCompanionSession } from '../net/companion-session';
 import { CompanionRelay, setCompanionRelay } from '../net/companion-relay';
 import { LivenessMonitor } from '../net/liveness-monitor';
@@ -77,6 +78,8 @@ export function Game() {
   const [touchMode, setTouchMode] = useState(false);
   const narrow = useNarrowViewport();
   const [showIntro, setShowIntro] = useState(true);
+  const [failedPairCode, setFailedPairCode] = useState<string | null>(null);
+  const peerConnected = useRunnerStore((s) => s.peerConnected);
   const location = useLocation();
   const urlSession = useMemo(
     () => parseUrlSession(location.pathname, location.search),
@@ -100,7 +103,7 @@ export function Game() {
   const claimedSeatRef = useRef('');
   useEffect(() => {
     const role = seatRole;
-    if (!role || !myName || seatChannel.startsWith('mock')) return;
+    if (urlSession?.pairCode || !role || !myName || seatChannel.startsWith('mock')) return;
     const me = seatPlayers.find((p) => p.role === role);
     if (!me?.id || (me.username === myName && !me.isAI)) return;
     const key = `${seatChannel}:${me.id}:${myName}`;
@@ -108,7 +111,7 @@ export function Game() {
     claimedSeatRef.current = key;
     useGameStateStore.getState().patchPlayer(role, { username: myName, isAI: false });
     updatePlayer(me.id, { username: myName, isAI: false });
-  }, [seatPlayers, seatChannel, seatRole, myName]);
+  }, [seatPlayers, seatChannel, seatRole, myName, urlSession?.pairCode]);
   useEffect(() => {
     if (!urlSession || urlSession.isMock || !urlSession.roleExplicit || urlSession.pairCode) return;
     useRunnerStore
@@ -236,16 +239,23 @@ export function Game() {
       // game (e.g. a finished status and its victory screen) shows before the server state lands.
       useGameStateStore.getState().reset();
       replay.reset();
-      useRunnerStore.getState().setIdentity(urlSession.role, sessionName);
+      const pairCode = urlSession.pairCode;
+      const runner = useRunnerStore.getState();
+      runner.setIdentity(pairCode ? null : urlSession.role, sessionName);
+      runner.setPairingRole(null);
+      runner.setPeerConnected(false);
+      runner.setPeerPendingMove(null);
       useGameStateStore.getState().setChannel(urlSession.channel);
       useGameStateStore.getState().setTheme(urlSession.theme);
 
       const client = getWebSocketClient();
       // Companion pairing (#1): wraps the WS transport; tracks this device's surface/peer.
       const companionDevice = deviceTypeFromProfile(detectDeviceProfile());
+      const savedResume = pairCode ? readCompanionResume(urlSession.channel, pairCode) : undefined;
       const companion = new CompanionSession({
-        transport: { send: (t, d) => { client.send(t, d); } },
+        transport: { send: (t, d) => client.send(t, d) },
         deviceType: companionDevice,
+        clientId: savedResume?.clientId,
       });
       setCompanionSession(companion);
 
@@ -311,21 +321,35 @@ export function Game() {
             notifications.push('warning', 'Companion device disconnected');
           }
         }
+        if (!alive && pairCode) wakePhone();
       }, 2000);
+      let syncVersion = 0;
+      let resumedFromSnapshot = false;
+      const syncGame = async () => {
+        const version = ++syncVersion;
+        const game = await getGame(urlSession.channel);
+        if (version !== syncVersion || !game) return;
+        const moves = game.moves ?? [];
+        useGameStateStore.getState().applyServerState({
+          ...game,
+          currentTurn: deriveCurrentTurn(moves),
+          isDoubleMove: !!moves[moves.length - 1]?.double,
+        });
+      };
       client.setHandlers({
-        onConnectionStatus: (s) => {
-          useGameStateStore.getState().setConnection(s);
-          if (s === 'connected') {
-            // Backend doesn't push game state on joinGame — fetch it via REST.
-            // It also doesn't persist currentTurn between moves, so we derive it from
-            // the moves array (same getNextRole rule the backend applies on broadcast).
-            getGame(urlSession.channel).then((g) => {
-              if (g) {
-                const derived = deriveCurrentTurn(g.moves ?? []);
-                useGameStateStore.getState().applyServerState({ ...g, currentTurn: derived });
-              }
-            });
+        onConnectionStatus: (status) => {
+          useGameStateStore.getState().setConnection(status);
+          if (status === 'connected') {
+            if (!pairCode) void syncGame();
+            return;
           }
+          syncVersion += 1;
+          resumedFromSnapshot = false;
+          liveness.reset();
+          companion.handleMessage('paired', {});
+          const runner = useRunnerStore.getState();
+          runner.setPeerConnected(false);
+          runner.setPeerPendingMove(null);
         },
         onUpdateGameState: (state) => {
           useGameStateStore.getState().applyServerState(state);
@@ -392,6 +416,17 @@ export function Game() {
           callMesh.handleSignal(from, signal);
         },
         onPairing: (type, data) => {
+          if (pairCode && type === 'pairError') {
+            setFailedPairCode(pairCode);
+            return;
+          }
+          if (type === 'paired' && data.gameState) {
+            // The socket sends pairReady after this handler returns.
+            useGameStateStore.getState().applyServerState(data.gameState);
+            resumedFromSnapshot = true;
+            return;
+          }
+
           companion.handleMessage(type, data);
           // Mirror this device's assigned surface into the runner store so the active
           // surface resolves to FPV (controller) or map (viewer).
@@ -414,8 +449,15 @@ export function Game() {
           if (type === 'paired') {
             const paired = companion.isPaired();
             useRunnerStore.getState().setPeerConnected(paired);
-            if (paired) liveness.markSeen(Date.now());
-            else useRunnerStore.getState().setPeerPendingMove(null);
+            if (paired) {
+              liveness.markSeen(Date.now());
+              if (pairCode) {
+                setFailedPairCode(null);
+                if (!resumedFromSnapshot) void syncGame();
+              }
+            } else {
+              useRunnerStore.getState().setPeerPendingMove(null);
+            }
           }
         },
         onCompanionRelay: (data) => {
@@ -439,15 +481,50 @@ export function Game() {
           notifications.push('error', 'Connection error');
         },
       });
-      (window as unknown as { __wsClient?: ReturnType<typeof getWebSocketClient> }).__wsClient = client;
       client.connect({
         ...urlSession,
         name: sessionName,
         clientId: companion.clientId,
         deviceType: companionDevice,
+        resume: savedResume,
       });
+      const wakePhone = () => {
+        if (document.hidden || !navigator.onLine) return;
+        // Some phones suspend without emitting a hidden event, leaving a stale open socket.
+        if (client.status() === 'connected' && companion.isPaired()) {
+          if (liveness.isAlive(Date.now())) {
+            client.send('companionPing', {});
+            return;
+          }
+          client.suspend();
+        }
+        client.resume();
+      };
+      const onVisibilityChange = () => {
+        if (document.hidden) client.suspend();
+        else wakePhone();
+      };
+      const onOffline = () => client.suspend();
+      if (pairCode) {
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('pageshow', wakePhone);
+        window.addEventListener('focus', wakePhone);
+        window.addEventListener('online', wakePhone);
+        window.addEventListener('offline', onOffline);
+        if (document.hidden) client.suspend();
+      }
+
       return () => {
+        syncVersion += 1;
+        client.setHandlers({});
         client.disconnect();
+        if (pairCode) {
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+          window.removeEventListener('pageshow', wakePhone);
+          window.removeEventListener('focus', wakePhone);
+          window.removeEventListener('online', wakePhone);
+          window.removeEventListener('offline', onOffline);
+        }
         setCompanionSession(null);
         setCompanionRelay(null);
         window.clearInterval(pingTimer);
@@ -465,7 +542,7 @@ export function Game() {
     return () => {
       useGameStateStore.getState().reset();
     };
-  }, [needsJoin, urlSession?.channel, urlSession?.role, urlSession?.name, urlSession?.theme]);
+  }, [needsJoin, urlSession]);
 
   // Three.js setup — runs once
   useEffect(() => {
@@ -609,22 +686,23 @@ export function Game() {
         return;
       }
 
-      // Companion move authority (#7): while paired with a connected peer, only the FPV
-      // controller commits — the map-primary desktop defers so the two devices don't race.
+      // Give the desktop control while the phone is away and recheck at the end of
+      // the ride in case the phone reattached during the animation.
       const companionSession = getCompanionSession();
-      if (companionSession) {
-        const canCommit = new MoveAuthority().canCommit({
-          myClientId: companionSession.clientId,
-          mySurface: companionSession.surface(),
-          peerPresent: useRunnerStore.getState().peerConnected,
-          myRole: role,
-          currentTurn: useGameStateStore.getState().currentTurn,
-        });
-        if (!canCommit) {
-          flashInvalid();
-          notifications.push('warning', 'Make the move from your phone');
-          return;
-        }
+      const wsClient = companionSession ? getWebSocketClient() : null;
+      const canCommitFromDevice = () => !companionSession || new MoveAuthority().canCommit({
+        myClientId: companionSession.clientId,
+        mySurface: companionSession.surface(),
+        peerPresent: useRunnerStore.getState().peerConnected,
+        myRole: role,
+        currentTurn: useGameStateStore.getState().currentTurn,
+      });
+
+      if (wsClient && !wsClient.isCompanionReady()) return;
+      if (!canCommitFromDevice()) {
+        flashInvalid();
+        notifications.push('warning', 'Make the move from your phone');
+        return;
       }
 
       const useSecret = role === 'culprit' && (runner.pendingSecret || v.kind === 'river');
@@ -664,6 +742,7 @@ export function Game() {
       const kind = v.kind as MoveType;
 
       const fromNode = lastBuiltForNode;
+      const { channel: startingChannel, moves: startingMoves } = useGameStateStore.getState();
       try {
         await playRide(world, v, overlay, () => {
           rebuildScene(target);
@@ -677,17 +756,13 @@ export function Game() {
           secret: useSecret || undefined,
           double: tagDouble || undefined,
         };
-        const wsClient = (window as unknown as { __wsClient?: { send: (t: string, d: Record<string, unknown>) => boolean } }).__wsClient;
-        if (wsClient) {
-          wsClient.send('makeMove', {
-            role,
-            type: kind,
-            position: target,
-            secret: useSecret,
-            double: tagDouble,
-          });
-        }
         const store = useGameStateStore.getState();
+        if (wsClient && (store.channel !== startingChannel || store.moves.length !== startingMoves.length || !canCommitFromDevice() ||
+          !wsClient.send('makeMove', { role, type: kind, position: target, secret: useSecret, double: tagDouble }))) {
+          const currentPosition = store.players.find((player) => player.role === role)?.position;
+          if (currentPosition != null) rebuildScene(currentPosition);
+          return;
+        }
         store.appendMove(move);
         store.setPosition(role, target);
         store.decrementTickets(role, kind, useSecret, tagDouble);
@@ -897,6 +972,7 @@ export function Game() {
   const replayView = useReplay();
   const replaySnap = replayView.isActive ? replay.current() : null;
   const mapPlayers = replaySnap ? replaySnap.players : players;
+  const awaitingPhonePair = !!urlSession?.pairCode && !peerConnected;
   const mapCurrentNodeId = replaySnap
     ? replaySnap.culpritActualPosition ?? myPosition ?? 1
     : myPosition;
@@ -937,7 +1013,7 @@ export function Game() {
             hidden={riding || !fpvEngaged}
             tickets={tickets}
             secretArmed={secretArmed}
-            onVehicleClick={gameStatus === 'active' && isMyTurn && !replayView.isActive
+            onVehicleClick={gameStatus === 'active' && isMyTurn && !awaitingPhonePair && !replayView.isActive
               ? pickVehicle
               : undefined}
           />
@@ -959,7 +1035,7 @@ export function Game() {
         <MapSurface
           currentNodeId={mapCurrentNodeId}
           connections={replaySnap ? [] : mapConnections}
-          isMyTurn={gameStatus === 'active' && !replayView.isActive && !riding && isMyTurn}
+          isMyTurn={gameStatus === 'active' && !replayView.isActive && !riding && isMyTurn && !awaitingPhonePair}
           currentTurnRole={currentTurn}
           viewerRole={replaySnap ? 'culprit' : viewerRole}
           players={mapPlayers}
@@ -984,12 +1060,19 @@ export function Game() {
           connections={mapConnections}
           tickets={tickets}
           secretArmed={secretArmed}
-          canMove={isMyTurn}
+          canMove={isMyTurn && !awaitingPhonePair}
           surface={isFpv ? 'fpv' : 'map'}
           touch={touchMode}
           onPick={handleMapClick}
           onHighlight={handleMoveHighlight}
         />
+      )}
+      {awaitingPhonePair && (
+        <div style={phonePairStatus} role="status">
+          {failedPairCode === urlSession?.pairCode
+            ? 'On the desktop, choose Unpair if shown, then Pair phone for a new code.'
+            : 'Connecting to the desktop…'}
+        </div>
       )}
       <HudShell />
       <div
@@ -1006,6 +1089,22 @@ export function Game() {
     </>
   );
 }
+
+const phonePairStatus: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 64,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  width: 'max-content',
+  maxWidth: 'calc(100% - 32px)',
+  padding: '8px 12px',
+  borderRadius: 12,
+  background: '#17191e',
+  color: '#fff',
+  fontSize: 13,
+  textAlign: 'center',
+  zIndex: 32,
+};
 
 const mockBadge: React.CSSProperties = {
   position: 'fixed',

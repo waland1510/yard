@@ -122,6 +122,16 @@ Concretely:
 - **Backend is in scope.** The prior "backend untouched / client-side-only" posture has been removed from the docs. Companion coordination, device-scoped presence, the relay, and move-authority arbitration live on the server; this is the optimal place for them.
 - **Authoritative game state path is unchanged.** `GameState` / `Player` / `Move` shapes and the existing broadcast flow stay as-is. Companion features are *additive*.
 
+### Resuming the phone connection
+
+The phone redeems the desktop QR code once. After pairing, it stores a separate 24-hour resume credential in the same game tab. When a browser supports background detection, Yard closes the phone socket as the tab goes into the background. Returning to the tab prompts Yard to reconnect with the saved credential. A reload of the same tab can also resume the pairing.
+
+On `pairResume`, the server checks that the credential belongs to the phone and game, then sends the latest game snapshot. The desktop can keep playing while the phone is away or syncing. The phone sends `pairReady` after applying the snapshot, and the server restores the two surfaces and hands control back to the phone.
+
+If the credential expires, the desktop unpairs the phone, or the backend restarts, scan a fresh QR from **Pair phone** on the desktop. Use **Unpair** first if the desktop still shows **Phone disconnected**.
+
+`breaking_change: true` tracks the WebSocket contract update. The resume events and credential fields extend the existing pairing messages. Phone resume requires the updated frontend and backend.
+
 ### New / modified deep modules
 
 **Coordination (net + game-logic) — the modules under test:**
@@ -161,17 +171,18 @@ Concretely:
 
 ## Testing Decisions
 
-**Scope (per decision):** unit tests are written **only for the Sync & Authority modules**. Render/graphics modules (post-processing, fidelity assets, map effects, touch controls, heatmap/preview visuals) and the live WebSocket/relay transport are validated by integration/manual play, not unit tests, because their value is in visual/timing behavior and real network conditions that unit tests model poorly.
+**Scope (per decision):** unit tests cover the sync and authority modules, including the phone resume handshake with a simulated socket. Render and graphics behavior and the live transport are validated through integration or manual play.
 
 **What makes a good test here:** assert *external behavior and contract*, not implementation details. For these modules that means feeding inputs (pairing codes, device profiles, turn/role/pairing state) and asserting the decision/output, with no coupling to internal data structures or render side effects.
 
 **Modules under test and the behaviors to cover:**
 
-- **`CompanionSession`** — a freshly issued code redeems exactly once and links the companion to the correct role/surface; a second redeem of the same code is rejected; an expired code is rejected; `peerAttached` / `peerLost` fire on attach/detach; pairing survives a reconnect (re-redeem restores the same surface role).
+- **`CompanionSession`** — a fresh code links the phone to the correct role and surface on first redemption. Duplicate and expired codes are rejected. `peerAttached` and `peerLost` fire when the peer attaches or drops.
+- **Phone resume** — the credential is valid for its original game and phone until expiry or revocation. Returning to the same game tab restores the original surface after the phone applies the game snapshot and acknowledges it.
 - **`MoveAuthority`** — given a role with two paired clients, exactly one returns `canCommit === true` for the current turn; the FPV controller is the default committer; on peer loss, authority transfers to the surviving device; a companion cannot commit while the primary holds authority; `delegateTo` flips the committer deterministically.
 - **`DeviceSurfaceResolver` (`resolveSurface`)** — touch/coarse-pointer profile resolves to FPV, fine-pointer/desktop resolves to map, a manual override beats the auto decision, and an unpaired solo device still resolves to a usable surface.
 
-**Prior art in the codebase:** the pure, deterministic test style already used for `shared-utils/src/lib/deduction-engine.ts` and the client-side `move-validator` is the model — same shape of "given inputs → assert decision," same `@nx/jest` setup. (Note: the base `PRD.md` deferred all tests; this feature reverses that for these three modules only.)
+**Prior art in the codebase:** the pure, deterministic test style already used for `shared-utils/src/lib/deduction-engine.ts` and the client-side `move-validator` is the model — same shape of "given inputs → assert decision," same `@nx/jest` setup.
 
 ## Out of Scope
 

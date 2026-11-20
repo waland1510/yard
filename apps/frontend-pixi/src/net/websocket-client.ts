@@ -12,10 +12,13 @@ import type {
   RoleType,
   GameState,
   CompanionDevice,
+  CompanionResumeCredential,
   PresenceMember,
 } from '@yard/shared-utils';
+import { clearCompanionResume, saveCompanionResume } from './companion-resume-storage';
 
 const RECONNECT_MS = 4000;
+const CONNECT_TIMEOUT_MS = 15_000;
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'disconnected';
 
@@ -58,33 +61,31 @@ export interface JoinParams {
   deviceType?: CompanionDevice;
   /** When set, join as a companion by redeeming this code instead of claiming a role. */
   pairCode?: string;
+  resume?: CompanionResumeCredential;
 }
 
 export interface WebSocketClient {
   connect(params: JoinParams): void;
   disconnect(): void;
+  suspend(): void;
+  resume(): void;
+  isCompanionReady(): boolean;
   send(type: MessageType, data: Record<string, unknown>): boolean;
   status(): ConnectionStatus;
   setHandlers(handlers: WSHandlers): void;
 }
 
-/** Singleton client — same instance across React StrictMode double-mounts so we don't
- *  open and immediately tear down sockets. */
-let singletonClient: WebSocketClient | null = null;
-export function getWebSocketClient(): WebSocketClient {
-  if (!singletonClient) singletonClient = createWebSocketClient();
-  return singletonClient;
-}
-
-export function createWebSocketClient(url?: string): WebSocketClient {
-  const wsUrl = url ?? readWsUrl();
-
+export function createWebSocketClient(wsUrl: string): WebSocketClient {
   let socket: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let join: JoinParams | null = null;
   let status: ConnectionStatus = 'idle';
   let handlers: WSHandlers = {};
   let manuallyClosed = false;
+  let suspended = false;
+  let pairConfirmed = false;
+  let pairRejected = false;
+  let connectionTimer: ReturnType<typeof setTimeout> | null = null;
 
   function setStatus(s: ConnectionStatus) {
     if (status === s) return;
@@ -131,9 +132,30 @@ export function createWebSocketClient(url?: string): WebSocketClient {
         handlers.onPresence?.({ members: data.members ?? [] });
         break;
       case 'pairCode':
-      case 'paired':
-      case 'pairError':
         handlers.onPairing?.(type, data);
+        break;
+      case 'paired':
+        if (join?.pairCode) {
+          if (data.resume && join.clientId) {
+            join.resume = data.resume;
+            saveCompanionResume(join.channel, { ...data.resume, pairCode: join.pairCode, clientId: join.clientId });
+          }
+          if (data.gameState) {
+            handlers.onPairing?.(type, data);
+            sendInternal('pairReady', {});
+            break;
+          }
+          pairConfirmed = data.surface === 'fpv-companion' && !!data.peerClientId;
+          if (pairConfirmed) clearConnectionTimer();
+          else if (data.reason === 'unpaired') rejectPairing(data.reason);
+          else retry();
+        }
+        handlers.onPairing?.(type, data);
+        break;
+      case 'pairError':
+        if (join?.resume && (data.reason === 'host-unavailable' || data.reason === 'resume-retry')) retry();
+        else if (join?.pairCode) rejectPairing(data.reason);
+        else handlers.onPairing?.(type, data);
         break;
       case 'companionRelay':
         handlers.onCompanionRelay?.(data as unknown as { kind: string; payload: unknown });
@@ -152,42 +174,91 @@ export function createWebSocketClient(url?: string): WebSocketClient {
     }
   }
 
+  function clearConnectionTimer() {
+    if (connectionTimer) clearTimeout(connectionTimer);
+    connectionTimer = null;
+  }
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  function closeSocket() {
+    clearConnectionTimer();
+    const closing = socket;
+    socket = null;
+    pairConfirmed = false;
+    closing?.close();
+  }
+
+  function retry() {
+    closeSocket();
+    setStatus('disconnected');
+    scheduleReconnect();
+  }
+
+  function rejectPairing(reason?: string) {
+    if (join?.pairCode) {
+      clearCompanionResume(join.channel, join.pairCode);
+      join.resume = undefined;
+    }
+    pairRejected = true;
+    closeSocket();
+    setStatus('disconnected');
+    handlers.onPairing?.('pairError', { reason });
+  }
+
+  function armConnectionTimeout() {
+    clearConnectionTimer();
+    connectionTimer = setTimeout(retry, CONNECT_TIMEOUT_MS);
+  }
+
   function open() {
-    if (manuallyClosed) return;
-    setStatus('connecting');
-    try {
-      socket = new WebSocket(wsUrl);
-    } catch (e) {
-      handlers.onError?.(e);
-      scheduleReconnect();
+    if (!join || socket || manuallyClosed || suspended || pairRejected) return;
+    if (join.resume && join.resume.expiresAt <= Date.now()) {
+      rejectPairing('resume-rejected');
       return;
     }
 
-    socket.onopen = () => {
+    setStatus('connecting');
+    let active: WebSocket;
+    try {
+      active = new WebSocket(wsUrl);
+    } catch (error) {
+      handlers.onError?.(error);
+      retry();
+      return;
+    }
+
+    socket = active;
+    armConnectionTimeout();
+    active.onopen = () => {
+      if (socket !== active || !join) return;
+      clearConnectionTimer();
       setStatus('connected');
-      if (join) sendJoinOrPair(join);
+      sendJoinOrPair(join);
+      if (join.pairCode) armConnectionTimeout();
     };
-    socket.onmessage = (ev) => {
+    active.onmessage = (ev) => {
+      if (socket !== active) return;
       try {
-        const msg = JSON.parse(ev.data) as Message;
-        dispatch(msg);
-      } catch (e) {
-        handlers.onError?.(e);
+        dispatch(JSON.parse(ev.data) as Message);
+      } catch (error) {
+        handlers.onError?.(error);
       }
     };
-    socket.onclose = () => {
-      setStatus('disconnected');
-      socket = null;
-      scheduleReconnect();
+    active.onclose = () => {
+      if (socket !== active) return;
+      retry();
     };
-    socket.onerror = (e) => {
-      handlers.onError?.(e);
+    active.onerror = (error) => {
+      if (socket === active) handlers.onError?.(error);
     };
   }
 
   function scheduleReconnect() {
-    if (manuallyClosed) return;
-    if (reconnectTimer) return;
+    if (manuallyClosed || suspended || pairRejected || reconnectTimer) return;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       open();
@@ -204,6 +275,13 @@ export function createWebSocketClient(url?: string): WebSocketClient {
   // Companion devices redeem a pairing code instead of claiming a role; everyone else
   // joins their seat. Both carry clientId/deviceType so presence can tell devices apart.
   function sendJoinOrPair(j: JoinParams): boolean {
+    if (j.resume) {
+      return sendInternal('pairResume', {
+        resumeToken: j.resume.token,
+        clientId: j.clientId,
+        deviceType: j.deviceType,
+      });
+    }
     if (j.pairCode) {
       return sendInternal('pairRedeem', {
         code: j.pairCode,
@@ -233,17 +311,29 @@ export function createWebSocketClient(url?: string): WebSocketClient {
         deferredDisconnect = null;
       }
       manuallyClosed = false;
-      const sameChannel = join?.channel === params.channel;
-      join = params;
-      if (socket && socket.readyState === WebSocket.OPEN && sameChannel) {
-        // Already connected to the same channel — just re-send join/pair
-        sendJoinOrPair(params);
-      } else if (socket && socket.readyState === WebSocket.CONNECTING && sameChannel) {
-        // Connection is still being established — joinGame will fire from onopen
-      } else if (!socket) {
-        open();
+      suspended = false;
+      const sameSession = join?.channel === params.channel && join.clientId === params.clientId &&
+        join.pairCode === params.pairCode && join.name === params.name && join.role === params.role;
+      if (!sameSession) {
+        closeSocket();
+        clearReconnectTimer();
+        pairRejected = false;
+        join = params;
       }
+      open();
     },
+    suspend() {
+      suspended = true;
+      clearReconnectTimer();
+      closeSocket();
+      setStatus('disconnected');
+    },
+    resume() {
+      suspended = false;
+      clearReconnectTimer();
+      open();
+    },
+    isCompanionReady: () => !join?.pairCode || pairConfirmed,
     disconnect() {
       // Defer the real disconnect by 200ms — under React StrictMode the cleanup fires
       // immediately on mount, and a new mount follows. We want to keep the connection
@@ -252,19 +342,14 @@ export function createWebSocketClient(url?: string): WebSocketClient {
       deferredDisconnect = setTimeout(() => {
         deferredDisconnect = null;
         manuallyClosed = true;
-        if (reconnectTimer) {
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        }
-        if (socket) {
-          socket.onclose = null;
-          socket.close();
-          socket = null;
-        }
+        clearReconnectTimer();
+        closeSocket();
+        join = null;
         setStatus('idle');
       }, 200);
     },
     send(type, data) {
+      if (join?.pairCode && !pairConfirmed && type === 'makeMove') return false;
       return sendInternal(type, data);
     },
     status: () => status,
@@ -272,9 +357,4 @@ export function createWebSocketClient(url?: string): WebSocketClient {
       handlers = h;
     },
   };
-}
-
-function readWsUrl(): string {
-  const env = (import.meta as { env?: { VITE_WS_URL?: string } }).env;
-  return env?.VITE_WS_URL ?? 'ws://localhost:3000/ws';
 }

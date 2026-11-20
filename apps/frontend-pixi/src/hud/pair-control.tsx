@@ -77,8 +77,14 @@ export function PairControl() {
           type="button"
           style={unpairBtn}
           onClick={() => {
-            getCompanionSession()?.unpair();
-            useRunnerStore.getState().setPairingRole(null);
+            if (!getCompanionSession()?.unpair()) {
+              notifications.push('warning', 'Reconnect the desktop before unpairing.');
+              return;
+            }
+            const runner = useRunnerStore.getState();
+            runner.setPairingRole(null);
+            runner.setPeerConnected(false);
+            runner.setPeerPendingMove(null);
             setEverPaired(false);
             setCode(null);
           }}

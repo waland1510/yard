@@ -31,6 +31,12 @@ export interface IssueResult {
   expiresAt: number;
 }
 
+/** Private credential returned to the phone after it redeems the one-time code. */
+export interface CompanionResumeCredential {
+  token: string;
+  expiresAt: number;
+}
+
 export type RedeemFailure = 'unknown-code' | 'expired' | 'already-redeemed';
 
 export type RedeemResult =

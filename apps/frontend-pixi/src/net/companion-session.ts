@@ -10,7 +10,7 @@ import type { CompanionDevice, CompanionSurface } from '@yard/shared-utils';
 
 export interface CompanionTransport {
   /** Send a pairing message over the channel. */
-  send(type: 'pairRequest' | 'pairRedeem' | 'pairUnlink', data: Record<string, unknown>): void;
+  send(type: 'pairRequest' | 'pairRedeem' | 'pairUnlink', data: Record<string, unknown>): boolean | void;
 }
 
 export interface PairedPeer {
@@ -108,9 +108,10 @@ export class CompanionSession {
 
   /** Explicitly end the companion session (#12): tell the server to unlink, then clear
    *  local state. The peer is notified via the server's `paired`-without-peer broadcast. */
-  unpair(): void {
-    this.transport.send('pairUnlink', { clientId: this.clientId });
+  unpair(): boolean {
+    if (this.transport.send('pairUnlink', { clientId: this.clientId }) === false) return false;
     this.reset();
+    return true;
   }
 
   /**

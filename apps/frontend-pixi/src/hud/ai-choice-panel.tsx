@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AiDecisionSource, AiProposalOption, RoleType } from '@yard/shared-utils';
 import { useGameStateStore } from '../stores/game-state-store';
 import { useRunnerStore, selectActiveSurface } from '../stores/runner-store';
-import { getWebSocketClient } from '../net/websocket-client';
+import { getWebSocketClient } from '../net/websocket-singleton';
 import { nodeDisplayName } from '../core/map-data';
 import { COLOR, FONT, MOTION, RADIUS, SHADOW, centeredX } from './tokens';
 

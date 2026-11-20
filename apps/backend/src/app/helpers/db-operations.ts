@@ -12,9 +12,9 @@ const db = drizzle(databaseUrl, {
   casing: 'snake_case',
 });
 
-export async function hasActiveGame(channel: string): Promise<GameState | null> {
-  try {
-    const [game] = await db
+export async function hasActiveGame(channel: string, consistentSnapshot = false): Promise<GameState | null> {
+  const read = async (reader: Pick<typeof db, 'select'>): Promise<GameState | null> => {
+    const [game] = await reader
       .select()
       .from(gamesTable)
       .where(eq(gamesTable.channel, channel))
@@ -26,7 +26,7 @@ export async function hasActiveGame(channel: string): Promise<GameState | null> 
 
     const gameId = game.id;
 
-    const players = await db
+    const players = await reader
       .select()
       .from(playersTable)
       .where(eq(playersTable.gameId, gameId))
@@ -35,7 +35,7 @@ export async function hasActiveGame(channel: string): Promise<GameState | null> 
 
     // The deduction engine replays this log positionally, so chronological order is a
     // correctness requirement, not a nicety. Postgres gives no order without ORDER BY.
-    const moves = await db
+    const moves = await reader
       .select()
       .from(movesTable)
       .where(eq(movesTable.gameId, gameId))
@@ -43,6 +43,13 @@ export async function hasActiveGame(channel: string): Promise<GameState | null> 
       .execute() as GameState['moves'];
 
     return { ...game, players, moves };
+  };
+
+  try {
+    if (consistentSnapshot) {
+      return await db.transaction(read, { isolationLevel: 'repeatable read', accessMode: 'read only' });
+    }
+    return await read(db);
   } catch (error) {
     console.error('Error fetching active game:', error);
     return null;

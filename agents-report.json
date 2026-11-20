@@ -471,5 +471,57 @@
     },
     "score": 10,
     "verdict": "approved"
+  },
+  {
+    "agent": "code-review",
+    "status": "success",
+    "confidence": 0.95,
+    "needs_human": false,
+    "breaking_change": true,
+    "artifacts": [
+      {
+        "file": "shared-utils/src/lib/shared-utils.ts",
+        "action": "modified",
+        "summary": "Added phone resume and readiness messages."
+      },
+      {
+        "file": "apps/backend/src/main.ts",
+        "action": "modified",
+        "summary": "Authenticates resume, sends a consistent snapshot, and restores the pair after acknowledgment."
+      },
+      {
+        "file": "apps/frontend-pixi/src/app/game.tsx",
+        "action": "modified",
+        "summary": "Resumes on foreground activity and updates move controls after syncing."
+      }
+    ],
+    "issues": [
+      "Phone hardware behavior was not exercised. The frontend and backend protocol changes require a coordinated rollout."
+    ],
+    "acceptance_checks": [
+      {
+        "check": "Phone reconnect and control handoff",
+        "method": "Fastify WebSocket integration with a mocked database",
+        "passed": true,
+        "evidence": "Verified a stale snapshot retries if the desktop moves, the desktop keeps control until pairReady, and explicit unpair revokes the saved credential."
+      },
+      {
+        "check": "Regression suite",
+        "method": "Nx Jest",
+        "passed": true,
+        "evidence": "117 frontend tests and 6 focused backend pairing tests passed."
+      },
+      {
+        "check": "Build and code checks",
+        "method": "Nx and React Doctor",
+        "passed": true,
+        "evidence": "Lint, frontend and backend type checks, production builds, and the React Doctor changed-file scan passed."
+      }
+    ],
+    "audit": {
+      "intent_ref": "companion-phone-resume",
+      "timestamp": "2026-11-20T22:25:38.520879+00:00",
+      "agent_version": "1.0"
+    }
   }
 ]

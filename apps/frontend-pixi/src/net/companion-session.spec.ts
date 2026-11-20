@@ -136,10 +136,21 @@ describe('CompanionSession', () => {
     });
     expect(session.isPaired()).toBe(true);
 
-    session.unpair();
+    expect(session.unpair()).toBe(true);
     expect(transport.sent).toContainEqual({ type: 'pairUnlink', data: { clientId: 'host1' } });
     expect(session.isPaired()).toBe(false);
     expect(session.surface()).toBeNull();
+  });
+
+  it('companionSession_unpairWhileOffline_keepsThePairUntilItCanNotifyTheServer', () => {
+    const session = new CompanionSession({ transport: { send: () => false }, deviceType: 'desktop' });
+    session.handleMessage('paired', {
+      surface: 'map-primary',
+      peerClientId: 'phone1',
+      peerSurface: 'fpv-companion',
+    });
+    expect(session.unpair()).toBe(false);
+    expect(session.isPaired()).toBe(true);
   });
 
   it('companionSession_reAttachAfterLoss_restoresPeer', () => {
